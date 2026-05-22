@@ -1,0 +1,73 @@
+spring:
+  application:
+    name: ai-studyhub-backend
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/ai_studyhub?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+    open-in-view: false
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+# ── JWT ──────────────────────────────────────────────────────
+jwt:
+  secret: ${JWT_SECRET:ai-studyhub-super-secret-key-change-in-production-2025}
+  expiration-ms: 86400000      # 24 hours
+  reset-token-expiry-ms: 900000 # 15 minutes
+
+# ── Firebase ─────────────────────────────────────────────────
+firebase:
+  service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:src/main/resources/firebase-service-account.json}
+  storage-bucket: ${FIREBASE_STORAGE_BUCKET:your-project-id.appspot.com}
+  project-id: ${FIREBASE_PROJECT_ID:your-project-id}
+
+# ── Gemini AI ────────────────────────────────────────────────
+gemini:
+  api-key: ${GEMINI_API_KEY}
+  model: gemini-1.5-flash
+  project-id: ${GOOGLE_CLOUD_PROJECT_ID}
+  location: us-central1
+  max-tokens: 2048
+  temperature: 0.7
+
+# ── Swagger / OpenAPI ────────────────────────────────────────
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+# ── App config ───────────────────────────────────────────────
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  upload:
+    allowed-types: PDF,DOCX,PPTX
+    max-size-bytes: 52428800  # 50 MB
