@@ -1,0 +1,15 @@
+spring:
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+
+logging:
+  level:
+    root: WARN
+    com.studyhub: INFO
+
+server:
+  port: 8080
+  ssl:
+    enabled: false  # handle SSL at reverse proxy (nginx)
