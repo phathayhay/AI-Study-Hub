@@ -1,8 +1,7 @@
 package com.studyhub.common.enums;
 
-public enum ReportStatus {
+public enum ModerationStatus {
     PENDING,
-    REVIEWING,
-    RESOLVED,
+    APPROVED,
     REJECTED
 }

@@ -1,2 +1,7 @@
 package com.studyhub.common.enums;
-public enum UserStatus { ACTIVE, BANNED }
+
+public enum UserStatus {
+    ACTIVE,
+    INACTIVE,
+    BANNED
+}
