@@ -1,2 +1,9 @@
 package com.studyhub.common.enums;
-public enum FileType { PDF, DOCX, PPTX }
+
+public enum FileType {
+    PDF,
+    DOCX,
+    PPTX,
+    TXT,
+    ZIP
+}
