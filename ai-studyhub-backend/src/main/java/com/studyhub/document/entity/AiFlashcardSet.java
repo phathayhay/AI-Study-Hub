@@ -6,41 +6,37 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "folders", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"user_id", "parent_folder_id", "folder_name"})
-})
+@Table(name = "ai_flashcard_sets")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-public class Folder {
+public class AiFlashcardSet {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "document_id", nullable = false)
+    private Document document;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "folder_name", nullable = false, length = 255)
-    private String folderName;
+    @Column(name = "set_name", nullable = false, length = 255)
+    private String setName;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_folder_id")
-    private Folder parentFolder;
+    @Column(name = "description", length = 255)
+    private String description;
+
+    @Column(name = "total_cards", nullable = false)
+    @Builder.Default
+    private Integer totalCards = 0;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
     }
 }
