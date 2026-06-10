@@ -60,7 +60,7 @@ function AdminSidebar({ active, onNavigate }) {
         <span>A</span>
         <div><strong>Admin FPTU</strong><small>admin@fpt.edu.vn</small></div>
       </div>
-      <button className="admin-logout" onClick={() => onNavigate('login')} type="button">
+      <button className="admin-logout" onClick={() => onNavigate('guest-home')} type="button">
         <StudyHubIcon name="logout" size={18} /> Đăng xuất
       </button>
     </aside>

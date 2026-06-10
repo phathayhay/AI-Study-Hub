@@ -15,20 +15,44 @@ import {
 } from './study-hub/public-pages'
 import { StudyDocumentPage } from './study-hub/study-document'
 
+const defaultStudyFile = {
+  name: '漢字--JPD316 Lesson 5-NEW.pptx',
+  attachmentName: 'BTVN-BAI_PART3.docx',
+  subject: 'Japanese',
+  content: '',
+}
+
 export default function StudyHubApp() {
-  const [route, setRoute] = useState('admin-overview')
+  const [route, setRoute] = useState('guest-home')
+  const [previousRoute, setPreviousRoute] = useState('guest-home')
+  const [role, setRole] = useState(null)
   const [libraryTab, setLibraryTab] = useState('sessions')
   const [studyTab, setStudyTab] = useState('original')
   const [studyMode, setStudyMode] = useState('default')
+  const [uploadMode, setUploadMode] = useState('document')
+  const [studyFile, setStudyFile] = useState(defaultStudyFile)
   const [selectedFile, setSelectedFile] = useState(null)
   const [showReport, setShowReport] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
 
   const navigate = (nextRoute) => {
+    if (nextRoute === 'new-study-session') {
+      setPreviousRoute(route)
+      setUploadMode('study')
+      setRoute('upload')
+      setShowNotifications(false)
+      setShowReport(false)
+      setSelectedFile(null)
+      return
+    }
+
+    setPreviousRoute(route)
     setRoute(nextRoute)
     setShowNotifications(false)
     setShowReport(false)
     setSelectedFile(null)
+    if (nextRoute === 'guest-home') setRole(null)
+    if (nextRoute === 'upload') setUploadMode('document')
     if (nextRoute === 'library') setLibraryTab('sessions')
     if (nextRoute === 'study') {
       setStudyTab('original')
@@ -36,12 +60,36 @@ export default function StudyHubApp() {
     }
   }
 
-  if (route === 'login') return <LoginPage onNavigate={navigate} />
+  const handleLogin = (nextRole) => {
+    setRole(nextRole)
+    navigate(nextRole === 'admin' ? 'admin-overview' : 'home')
+  }
+
+  const openStudyFile = (file) => {
+    setStudyFile({
+      name: file.name,
+      attachmentName: file.name,
+      subject: file.subject,
+      content: '',
+      sizeLabel: file.sizeLabel,
+    })
+    navigate('study')
+  }
+
+  const handleStudyUpload = (file) => {
+    setStudyFile(file)
+    setUploadMode('document')
+    navigate('study')
+  }
+
+  if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
   if (route === 'register') return <RegisterPage onNavigate={navigate} />
   if (route.startsWith('admin-')) return <AdminApp route={route} onNavigate={navigate} />
 
-  const guest = route === 'guest-home'
-  const activeRoute = guest ? 'guest-home' : route === 'folder-detail' ? 'explore' : route
+  const guest = !role
+  const activeRoute = guest
+    ? ['explore', 'folder-detail', 'doc-detail'].includes(route) ? 'explore' : 'guest-home'
+    : route === 'folder-detail' ? 'explore' : route
 
   return (
     <AppLayout
@@ -53,7 +101,7 @@ export default function StudyHubApp() {
     >
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
 
-      {route === 'guest-home' && <HomeScreen guest onNavigate={navigate} />}
+      {route === 'guest-home' && <HomeScreen guest={guest} onNavigate={navigate} />}
       {route === 'home' && <HomeScreen onNavigate={navigate} />}
       {route === 'explore' && <ExplorePage onNavigate={navigate} />}
       {route === 'folder-detail' && <FolderDetailPage onNavigate={navigate} />}
@@ -65,14 +113,26 @@ export default function StudyHubApp() {
           onTabChange={setLibraryTab}
         />
       )}
-      {route === 'upload' && <UploadPage />}
+      {route === 'upload' && (
+        <UploadPage
+          mode={uploadMode}
+          onStudyFileUploaded={handleStudyUpload}
+        />
+      )}
       {route === 'profile' && <ProfilePage />}
       {route === 'pricing' && <PricingPage onNavigate={navigate} />}
-      {route === 'doc-detail' && <DocumentDetailPage onReport={() => setShowReport(true)} />}
+      {route === 'doc-detail' && (
+        <DocumentDetailPage
+          onBack={() => navigate(previousRoute || (role ? 'home' : 'guest-home'))}
+          onReport={() => setShowReport(true)}
+        />
+      )}
       {route === 'study' && (
         <StudyDocumentPage
           activeTab={studyTab}
+          file={studyFile}
           mode={studyMode}
+          onNavigate={navigate}
           onModeChange={setStudyMode}
           onTabChange={(tab) => {
             setStudyTab(tab)
@@ -81,7 +141,7 @@ export default function StudyHubApp() {
         />
       )}
 
-      {selectedFile && <FilePreviewModal file={selectedFile} onClose={() => setSelectedFile(null)} onView={() => navigate('study')} />}
+      {selectedFile && <FilePreviewModal file={selectedFile} onClose={() => setSelectedFile(null)} onView={() => openStudyFile(selectedFile)} />}
       {showReport && <ReportModal onClose={() => setShowReport(false)} />}
     </AppLayout>
   )

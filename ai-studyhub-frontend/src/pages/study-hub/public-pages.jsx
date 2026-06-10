@@ -66,23 +66,61 @@ export function ExplorePage({ onNavigate }) {
   )
 }
 
-export function UploadPage() {
+export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
+  const [uploadedText, setUploadedText] = useState('')
+  const [readStatus, setReadStatus] = useState('')
   const fileInputRef = useRef(null)
+  const isStudyUpload = mode === 'study'
 
-  const handleFileSelect = (files) => {
+  const handleFileSelect = async (files) => {
     const [file] = Array.from(files ?? [])
-    if (file) setSelectedUploadFile(file)
+    if (!file) return
+
+    setSelectedUploadFile(file)
+    setUploadedText('')
+    setReadStatus('')
+
+    if (!canReadAsText(file)) {
+      setReadStatus('File đã được chọn. Định dạng này cần parser/backend để đọc nội dung trực tiếp.')
+      return
+    }
+
+    try {
+      const text = await file.text()
+      setUploadedText(text.trim())
+      setReadStatus(text.trim() ? 'Đã đọc nội dung file.' : 'File không có nội dung text để hiển thị.')
+    } catch {
+      setReadStatus('Chưa đọc được nội dung file. Vui lòng thử file khác.')
+    }
   }
 
   const clearSelectedFile = () => {
     setSelectedUploadFile(null)
+    setUploadedText('')
+    setReadStatus('')
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const startStudySession = () => {
+    if (!selectedUploadFile || !onStudyFileUploaded) return
+
+    onStudyFileUploaded({
+      name: selectedUploadFile.name,
+      attachmentName: selectedUploadFile.name,
+      subject: selectedUploadFile.type || 'Imported file',
+      sizeLabel: formatFileSize(selectedUploadFile.size),
+      content: uploadedText,
+      readStatus,
+    })
   }
 
   return (
     <main className="page-surface upload-page">
-      <PageTitle title="Tải lên tài liệu" subtitle="Chia sẻ tài liệu học tập với cộng đồng FPTU hoặc lưu trữ cá nhân" />
+      <PageTitle
+        title={isStudyUpload ? 'Tạo Study Session mới' : 'Tải lên tài liệu'}
+        subtitle={isStudyUpload ? 'Tải file lên để AI tạo workspace học tập từ nội dung của bạn' : 'Chia sẻ tài liệu học tập với cộng đồng FPTU hoặc lưu trữ cá nhân'}
+      />
       <section className="upload-card">
         {!selectedUploadFile ? (
           <>
@@ -90,7 +128,7 @@ export function UploadPage() {
               ref={fileInputRef}
               className="visually-hidden"
               type="file"
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.zip"
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.zip,.txt,.md,.csv,.json"
               onChange={(event) => handleFileSelect(event.target.files)}
             />
             <div
@@ -119,7 +157,8 @@ export function UploadPage() {
               <span><strong>{selectedUploadFile.name}</strong><small>{formatFileSize(selectedUploadFile.size)}</small></span>
               <button onClick={clearSelectedFile} type="button">×</button>
             </div>
-            <label>Tiêu đề tài liệu *<input placeholder="Nhập tiêu đề tài liệu" /></label>
+            {readStatus && <p className="upload-read-status">{readStatus}</p>}
+            <label>Tiêu đề tài liệu *<input defaultValue={selectedUploadFile.name} placeholder="Nhập tiêu đề tài liệu" /></label>
             <label>Mô tả<textarea placeholder="Mô tả ngắn gọn nội dung tài liệu..." /></label>
             <div className="upload-form__grid">
               <label>Ngành học *<input placeholder="Chọn hoặc nhập ngành học" /></label>
@@ -128,7 +167,9 @@ export function UploadPage() {
               <label>Loại tài liệu *<input placeholder="Chọn loại tài liệu" /></label>
             </div>
             <div className="upload-form__actions">
-              <button className="upload-submit" type="button">Tải lên</button>
+              <button className="upload-submit" onClick={isStudyUpload ? startStudySession : undefined} type="button">
+                {isStudyUpload ? 'Bắt đầu học với AI' : 'Tải lên'}
+              </button>
               <button className="cancel-button" onClick={clearSelectedFile} type="button">Hủy</button>
             </div>
           </div>
@@ -176,6 +217,12 @@ export function ProfilePage() {
   )
 }
 
+function canReadAsText(file) {
+  const readableExtensions = ['.txt', '.md', '.csv', '.json', '.html', '.css', '.js', '.jsx', '.ts', '.tsx']
+  const lowerName = file.name.toLowerCase()
+  return file.type.startsWith('text/') || readableExtensions.some((extension) => lowerName.endsWith(extension))
+}
+
 export function FolderDetailPage({ onNavigate }) {
   return (
     <main className="page-surface folder-detail-page">
@@ -198,13 +245,13 @@ export function FolderDetailPage({ onNavigate }) {
   )
 }
 
-export function DocumentDetailPage({ onReport }) {
+export function DocumentDetailPage({ onBack, onReport }) {
   const doc = featuredDocuments[1]
   return (
     <main className="page-surface document-detail-page">
       <div className="doc-layout">
         <section className="doc-main-card">
-          <button className="text-link" type="button">← Quay lại</button>
+          <button className="text-link" onClick={onBack} type="button">← Quay lại</button>
           <div className="doc-tags"><Badge tone="blue">{doc.code}</Badge><Badge>{doc.type}</Badge></div>
           <h1>{doc.title}</h1>
           <p>{doc.description}</p>

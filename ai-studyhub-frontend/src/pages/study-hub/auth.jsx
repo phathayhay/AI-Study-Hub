@@ -1,18 +1,33 @@
+import { useState } from 'react'
 import Brand from '../../components/layout/Brand'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 
-export function LoginPage({ onNavigate }) {
+export function LoginPage({ onLogin, onNavigate }) {
+  const [role, setRole] = useState('student')
+
   return (
     <AuthShell title="Đăng nhập" subtitle="Chào mừng trở lại!" onNavigate={onNavigate}>
       <div className="auth-shortcuts">
-        <button onClick={() => onNavigate('admin-overview')} type="button">Auto Fill Admin</button>
-        <button onClick={() => onNavigate('home')} type="button">Auto Fill User</button>
+        <button
+          className={role === 'admin' ? 'is-active' : ''}
+          onClick={() => setRole('admin')}
+          type="button"
+        >
+          Admin
+        </button>
+        <button
+          className={role === 'student' ? 'is-active' : ''}
+          onClick={() => setRole('student')}
+          type="button"
+        >
+          Sinh viên
+        </button>
       </div>
       <AuthCard>
-        <Field icon="mail" label="Email FPT" value="student@fpt.edu.vn" />
-        <Field icon="lock" label="Mật khẩu" value="••••••••" />
+        <Field icon="mail" label="Email FPT" value={role === 'admin' ? 'admin@fpt.edu.vn' : 'student@fpt.edu.vn'} />
+        <Field icon="lock" label="Mật khẩu" value={role === 'admin' ? 'admin123' : 'student123'} type="password" />
         <div className="auth-row"><label><input type="checkbox" /> Ghi nhớ đăng nhập</label><a>Quên mật khẩu?</a></div>
-        <button className="auth-submit" type="button" onClick={() => onNavigate('home')}>Đăng nhập</button>
+        <button className="auth-submit" type="button" onClick={() => onLogin(role)}>Đăng nhập</button>
         <p>Chưa có tài khoản?<button onClick={() => onNavigate('register')} type="button">Đăng ký ngay</button></p>
         <hr />
         <small><strong>Demo Accounts:</strong><br />Admin: admin@fpt.edu.vn / admin123<br />User: student@fpt.edu.vn / student123</small>
@@ -55,11 +70,11 @@ function AuthCard({ children }) {
   return <section className="auth-card">{children}</section>
 }
 
-function Field({ icon, label, value }) {
+function Field({ icon, label, type = 'text', value }) {
   return (
     <label className="field">
       {label}
-      <span><StudyHubIcon name={icon} size={18} /><input defaultValue={value} /></span>
+      <span><StudyHubIcon name={icon} size={18} /><input key={value} defaultValue={value} type={type} /></span>
     </label>
   )
 }
