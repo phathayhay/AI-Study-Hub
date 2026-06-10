@@ -45,7 +45,20 @@ CREATE TABLE majors (
 );
 
 -- =====================================================
--- 3. USERS
+-- 3. ROLES
+-- ADMIN
+-- USER
+-- hệ thống phân quyền
+-- =====================================================
+
+CREATE TABLE roles (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+    role_name VARCHAR(50)
+        UNIQUE NOT NULL
+);
+
+-- =====================================================
+-- 4. USERS
 -- Thông tin tài khoản sinh viên
 -- Chứa:
 -- Student Code
@@ -54,6 +67,7 @@ CREATE TABLE majors (
 -- Campus
 -- Major
 -- Subscription Plan
+-- Role (mỗi user 1 role duy nhất)
 -- =====================================================
 
 CREATE TABLE users (
@@ -72,6 +86,7 @@ CREATE TABLE users (
     ) DEFAULT 'HCM',
     major_id BIGINT,
     plan_id BIGINT DEFAULT 1,
+    role_id BIGINT,
     current_semester VARCHAR(20),
     status ENUM(
         'ACTIVE',
@@ -95,42 +110,16 @@ CREATE TABLE users (
         REFERENCES majors(id),
     CONSTRAINT fk_users_plan
         FOREIGN KEY (plan_id)
-        REFERENCES subscription_plans(id)
-);
-
--- =====================================================
--- 4. ROLES
--- ADMIN
--- USER
--- hệ thống phân quyền
--- =====================================================
-
-CREATE TABLE roles (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    role_name VARCHAR(50)
-        UNIQUE NOT NULL
-);
-
--- =====================================================
--- 5. USER ROLES
--- Many-to-Many
--- User <-> Role
--- một user có thể có nhiều role
--- =====================================================
-
-CREATE TABLE user_roles (
-    user_id BIGINT NOT NULL,
-    role_id BIGINT NOT NULL,
-    PRIMARY KEY(user_id, role_id),
-    CONSTRAINT fk_user_roles_user
-        FOREIGN KEY(user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_user_roles_role
-        FOREIGN KEY(role_id)
+        REFERENCES subscription_plans(id),
+    CONSTRAINT fk_users_role
+        FOREIGN KEY (role_id)
         REFERENCES roles(id)
-        ON DELETE CASCADE
 );
+
+-- =====================================================
+-- 5. USER ROLES (REMOVED)
+-- Trực tiếp lưu role_id trong bảng users (mỗi user 1 role duy nhất)
+-- =====================================================
 
 -- =====================================================
 -- 6. REFRESH TOKENS
@@ -261,6 +250,9 @@ ON users(major_id);
 
 CREATE INDEX idx_users_plan
 ON users(plan_id);
+
+CREATE INDEX idx_users_role
+ON users(role_id);
 
 -- REFRESH TOKENS
 CREATE INDEX idx_refresh_token
