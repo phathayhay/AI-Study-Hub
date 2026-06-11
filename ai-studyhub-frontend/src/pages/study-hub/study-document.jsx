@@ -1,19 +1,34 @@
+import { useEffect, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { studyTabs } from '../../data/studyHubData'
 
-export function StudyDocumentPage({ activeTab, file, mode, onModeChange, onNavigate, onTabChange }) {
+export function StudyDocumentPage({ activeTab, file, mode, onBack, onModeChange, onTabChange }) {
   const currentFile = file ?? {
     name: '漢字--JPD316 Lesson 5-NEW.pptx',
     attachmentName: 'BTVN-BAI_PART3.docx',
     content: '',
+  }
+  const [generatedTabs, setGeneratedTabs] = useState({ notes: false, summary: false })
+  const [quizStage, setQuizStage] = useState('empty')
+
+  useEffect(() => {
+    setGeneratedTabs({ notes: false, summary: false })
+    setQuizStage('empty')
+  }, [currentFile.name, currentFile.attachmentName])
+
+  const generateTab = (tab) => {
+    setGeneratedTabs((currentTabs) => ({ ...currentTabs, [tab]: true }))
   }
 
   return (
     <div className="study-shell">
       <main className="study-main">
         <div className="study-header">
-          <button className="back-pill" onClick={() => onNavigate('library')} type="button">←</button>
+          <button className="back-pill study-back-button" onClick={onBack} type="button">
+            <span className="back-pill__icon"><StudyHubIcon name="arrow-left" size={16} /></span>
+            <span>Trở lại</span>
+          </button>
           <span>›</span>
           <strong>{currentFile.name}</strong>
           <StudyHubIcon name="file" size={14} />
@@ -25,15 +40,73 @@ export function StudyDocumentPage({ activeTab, file, mode, onModeChange, onNavig
             </button>
           ))}
         </nav>
-        <div className="study-doc-pill"><StudyHubIcon name="file" size={16} /> {currentFile.attachmentName || currentFile.name}</div>
+        {activeTab === 'original' && <div className="study-doc-pill"><StudyHubIcon name="file" size={16} /> {currentFile.attachmentName || currentFile.name}</div>}
         {activeTab === 'original' && <OriginalContent file={currentFile} />}
-        {activeTab === 'notes' && <AiNotes file={currentFile} />}
-        {activeTab === 'summary' && <AiSummary file={currentFile} />}
+        {activeTab === 'notes' && (generatedTabs.notes ? (
+          <AiNotes file={currentFile} />
+        ) : (
+          <AiGeneratePrompt
+            description="Generate detailed notes covering the important information in your original content"
+            label="Notes"
+            onGenerate={() => generateTab('notes')}
+          />
+        ))}
+        {activeTab === 'summary' && (generatedTabs.summary ? (
+          <AiSummary file={currentFile} />
+        ) : (
+          <AiGeneratePrompt
+            description="Create a clear and easy-to-understand summary of your content"
+            label="Summary"
+            onGenerate={() => generateTab('summary')}
+          />
+        ))}
         {activeTab === 'flashcards' && (mode === 'manage' ?<ManageCards file={currentFile} /> : <Flashcards file={currentFile} onManage={() => onModeChange('manage')} />)}
-        {activeTab === 'quizzes' && (mode === 'taking' ?<QuizTaking file={currentFile} onQuit={() => onModeChange('default')} /> : <CreateQuiz file={currentFile} onGenerate={() => onModeChange('taking')} />)}
+        {activeTab === 'quizzes' && (mode === 'taking' ? (
+          <QuizTaking
+            file={currentFile}
+            onQuit={() => {
+              setQuizStage('empty')
+              onModeChange('default')
+            }}
+          />
+        ) : quizStage === 'create' ? (
+          <CreateQuiz
+            file={currentFile}
+            onGenerate={() => {
+              setQuizStage('taking')
+              onModeChange('taking')
+            }}
+          />
+        ) : (
+          <QuizEmptyState onCreate={() => setQuizStage('create')} />
+        ))}
       </main>
       <AiTutor />
     </div>
+  )
+}
+
+function AiGeneratePrompt({ description, label, onGenerate }) {
+  return (
+    <section className="ai-generate-panel">
+      <h2><span>AI</span> {label}</h2>
+      <p>{description}</p>
+      <button className="ai-generate-button" onClick={onGenerate} type="button">
+        <StudyHubIcon name="sparkle" size={16} /> Generate
+      </button>
+    </section>
+  )
+}
+
+function QuizEmptyState({ onCreate }) {
+  return (
+    <section className="quiz-empty-view">
+      <header>
+        <h2>Your Quizzes</h2>
+        <button className="ai-generate-button" onClick={onCreate} type="button">Create Quiz</button>
+      </header>
+      <div className="quiz-empty-card">No quizzes found</div>
+    </section>
   )
 }
 

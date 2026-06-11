@@ -9,6 +9,30 @@ import { appUser, featuredDocuments, featuredFolders, recentActivities } from '.
 import { pricingPlans } from './config'
 import { DocumentCardMini, ExploreFolderCard, InfoLine, PageTitle, SectionTitle } from './shared'
 
+const uploadSelectFields = [
+  {
+    label: 'Ngành học *',
+    placeholder: 'Chọn ngành học',
+    options: ['Công nghệ thông tin', 'Kỹ thuật phần mềm', 'Trí tuệ nhân tạo', 'An toàn thông tin', 'Thiết kế đồ họa', 'Ngôn ngữ Nhật'],
+  },
+  {
+    label: 'Học kỳ *',
+    placeholder: 'Chọn học kỳ',
+    options: ['Kỳ 1', 'Kỳ 2', 'Kỳ 3', 'Kỳ 4', 'Kỳ 5', 'Kỳ 6', 'Kỳ 7', 'Kỳ 8', 'Kỳ 9'],
+  },
+  {
+    label: 'Mã môn học *',
+    hint: '[1 môn]',
+    placeholder: 'Chọn mã môn học',
+    options: ['PRF192', 'PRO192', 'CSD201', 'DBI202', 'SWP391', 'CEA201', 'JPD316', 'MAS291'],
+  },
+  {
+    label: 'Loại tài liệu *',
+    placeholder: 'Chọn loại tài liệu',
+    options: ['Slide', 'Notes', 'Assignment', 'Lab', 'Exam', 'Source Code', 'Project'],
+  },
+]
+
 export function HomeScreen({ guest = false, onNavigate }) {
   return (
     <main className="home-main">
@@ -161,13 +185,18 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
             <label>Tiêu đề tài liệu *<input defaultValue={selectedUploadFile.name} placeholder="Nhập tiêu đề tài liệu" /></label>
             <label>Mô tả<textarea placeholder="Mô tả ngắn gọn nội dung tài liệu..." /></label>
             <div className="upload-form__grid">
-              <label>Ngành học *<input placeholder="Chọn hoặc nhập ngành học" /></label>
-              <label>Học kỳ *<input placeholder="Chọn học kỳ" /></label>
-              <label>Mã môn học * <small>[1 môn]</small><input placeholder="Nhập mã môn học" /></label>
-              <label>Loại tài liệu *<input placeholder="Chọn loại tài liệu" /></label>
+              {uploadSelectFields.map((field) => (
+                <label key={field.label}>
+                  {field.label} {field.hint && <small>{field.hint}</small>}
+                  <select defaultValue="">
+                    <option disabled value="">{field.placeholder}</option>
+                    {field.options.map((option) => <option key={option}>{option}</option>)}
+                  </select>
+                </label>
+              ))}
             </div>
             <div className="upload-form__actions">
-              <button className="upload-submit" onClick={isStudyUpload ? startStudySession : undefined} type="button">
+              <button className="upload-submit" onClick={startStudySession} type="button">
                 {isStudyUpload ? 'Bắt đầu học với AI' : 'Tải lên'}
               </button>
               <button className="cancel-button" onClick={clearSelectedFile} type="button">Hủy</button>
@@ -298,7 +327,9 @@ export function DocumentDetailPage({ onBack, onReport }) {
 export function PricingPage({ onNavigate }) {
   return (
     <main className="page-surface pricing-page">
-      <button className="back-pill" onClick={() => onNavigate('library')} type="button">←</button>
+      <button aria-label="Quay lại" className="back-pill" onClick={() => onNavigate('library')} type="button">
+        <StudyHubIcon name="arrow-left" size={18} />
+      </button>
       <PageTitle title="Chọn gói phù hợp với bạn" subtitle="Nâng cấp để trải nghiệm đầy đủ tính năng học tập AI" centered />
       <button className="billing-pill" type="button">Hằng tháng</button>
       <div className="pricing-grid">

@@ -132,7 +132,7 @@ export default function StudyHubApp() {
           activeTab={studyTab}
           file={studyFile}
           mode={studyMode}
-          onNavigate={navigate}
+          onBack={() => navigate(previousRoute || 'library')}
           onModeChange={setStudyMode}
           onTabChange={(tab) => {
             setStudyTab(tab)

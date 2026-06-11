@@ -1,4 +1,5 @@
 :root {
+  --app-header-height: 72px;
   --color-blue: #155dfc;
   --color-blue-soft: #eff6ff;
   --color-border: #e5e7eb;
@@ -43,11 +44,11 @@
 }
 
 .brand {
-  min-height: 85px;
+  height: var(--app-header-height);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 20px 24px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -162,11 +163,11 @@
 }
 
 .topbar {
-  height: 69px;
+  height: var(--app-header-height);
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding: 16px 24px 17px;
+  padding: 0 24px;
   background: #ffffff;
   border-bottom: 1px solid var(--color-border);
 }
@@ -209,7 +210,7 @@
 }
 
 .home-main {
-  min-height: calc(100vh - 69px);
+  min-height: calc(100vh - var(--app-header-height));
   background: linear-gradient(180deg, #eff6ff 0%, #ffffff 54%);
 }
 
@@ -645,7 +646,7 @@
 }
 
 .page-surface {
-  min-height: calc(100vh - 69px);
+  min-height: calc(100vh - var(--app-header-height));
   padding: 48px clamp(24px, 8vw, 180px);
   background: #f8fafc;
 }
@@ -715,6 +716,7 @@
 .search-line select,
 .filter-grid select,
 .upload-form input,
+.upload-form select,
 .upload-form textarea,
 .field input,
 .report-modal input,
@@ -756,6 +758,7 @@
 
 .filter-grid select,
 .upload-form input,
+.upload-form select,
 .upload-form textarea,
 .report-modal input,
 .report-modal textarea,
@@ -856,7 +859,7 @@
 }
 
 .library-shell {
-  min-height: calc(100vh - 69px);
+  min-height: calc(100vh - var(--app-header-height));
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   background: #f8fafc;
@@ -864,8 +867,8 @@
 
 .library-rail {
   position: sticky;
-  top: 69px;
-  height: calc(100vh - 69px);
+  top: var(--app-header-height);
+  height: calc(100vh - var(--app-header-height));
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -1844,32 +1847,78 @@
 }
 
 .back-pill {
-  width: 50px;
+  width: 48px;
   height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  place-items: center;
   color: var(--color-blue);
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  background: #eff6ff;
   border: 1px solid #bfdbfe;
-  border-radius: 12px;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.12);
-  font-size: 18px;
-  font-weight: 800;
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.1);
   cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
 .back-pill:hover {
   transform: translateY(-1px);
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18);
+  color: #155dfc;
+  background: #dbeafe;
+  border-color: #93c5fd;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.16);
+}
+
+.back-pill svg {
+  transition: transform 160ms ease;
+}
+
+.back-pill:hover svg {
+  transform: translateX(-2px);
 }
 
 .back-pill:active {
   transform: translateY(0);
   box-shadow: 0 6px 14px rgba(37, 99, 235, 0.12);
+}
+
+.back-pill:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.22);
+  outline-offset: 2px;
+}
+
+.study-back-button {
+  width: auto;
+  min-width: 104px;
+  gap: 8px;
+  padding: 0 14px 0 10px;
+  color: #155dfc;
+  background: #ffffff;
+  border-color: #c7ddff;
+  border-radius: 999px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.study-back-button .back-pill__icon {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff6ff;
+  border-radius: 999px;
+}
+
+.study-back-button:hover {
+  background: #f8fbff;
+  border-color: #93c5fd;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.14);
+}
+
+.study-back-button:hover .back-pill__icon {
+  background: #dbeafe;
 }
 
 .billing-pill {
@@ -1991,7 +2040,7 @@
 }
 
 .study-shell {
-  min-height: calc(100vh - 69px);
+  min-height: calc(100vh - var(--app-header-height));
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   background: #ffffff;
@@ -2104,6 +2153,71 @@
 
 .notes-view h1 span {
   color: #7c7bff;
+}
+
+.ai-generate-panel {
+  width: min(980px, calc(100% - 76px));
+  min-height: 214px;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 24px;
+  margin: 0 auto 40px;
+  padding: 28px;
+  text-align: center;
+  background: #ffffff;
+  border: 1px solid #cfd8ff;
+  border-radius: 22px;
+  box-shadow: 0 2px 7px rgba(37, 99, 235, 0.08);
+}
+
+.ai-generate-panel h2 {
+  margin: 0 0 4px;
+  color: #000000;
+  font-size: 29px;
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+.ai-generate-panel h2 span {
+  color: #7475ff;
+  font-weight: 800;
+}
+
+.ai-generate-panel p {
+  max-width: 520px;
+  margin: 0;
+  color: #000000;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.ai-generate-button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 28px;
+  color: #ffffff;
+  background: #7475f8;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: 0 10px 20px rgba(116, 117, 248, 0.22);
+  font-size: 14px;
+  font-weight: 800;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.ai-generate-button:hover {
+  transform: translateY(-1px);
+  background: #6264ed;
+  box-shadow: 0 14px 26px rgba(116, 117, 248, 0.3);
+}
+
+.ai-generate-button:active {
+  transform: translateY(0);
+  box-shadow: 0 8px 16px rgba(116, 117, 248, 0.22);
 }
 
 .editor-toolbar {
@@ -2222,6 +2336,39 @@
 .quiz-create {
   display: grid;
   gap: 20px;
+}
+
+.quiz-empty-view {
+  width: min(1044px, calc(100% - 56px));
+  margin: 0 auto 40px;
+}
+
+.quiz-empty-view header {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.quiz-empty-view h2 {
+  margin: 0;
+  color: #000000;
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 800;
+}
+
+.quiz-empty-card {
+  min-height: 68px;
+  display: grid;
+  place-items: center;
+  color: #747784;
+  background: linear-gradient(100deg, #f3f7ff 0%, #f6f1ff 100%);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .quiz-types {
