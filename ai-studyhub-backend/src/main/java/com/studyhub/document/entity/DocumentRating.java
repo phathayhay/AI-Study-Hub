@@ -28,7 +28,7 @@ public class DocumentRating {
 
     @Min(1) @Max(5)
     @Column(nullable = false)
-    private Integer rating;
+    private Byte rating;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
