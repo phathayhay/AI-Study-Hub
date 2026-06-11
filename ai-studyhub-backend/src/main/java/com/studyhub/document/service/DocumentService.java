@@ -112,7 +112,7 @@ public class DocumentService {
                 .fileUrl(fileUrl)
                 .fileSize(file.getSize())
                 .fileType(fileType)
-                .visibility(request.getVisibility() != null ? request.getVisibility() : Visibility.PUBLIC)
+                .visibility(request.getVisibility() != null ? request.getVisibility() : Visibility.PRIVATE)
                 .moderationStatus(ModerationStatus.APPROVED) // Auto approved for development/testing
                 .averageRating(BigDecimal.ZERO)
                 .totalViews(0)

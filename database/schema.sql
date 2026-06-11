@@ -337,7 +337,7 @@ CREATE TABLE documents (
     visibility ENUM(
         'PUBLIC',
         'PRIVATE'
-    ) DEFAULT 'PUBLIC',
+    ) DEFAULT 'PRIVATE',
     moderation_status ENUM(
         'PENDING',
         'APPROVED',
