@@ -13,16 +13,17 @@ import java.util.Map;
 /**
  * Gọi Gemini API (REST) để sinh câu trả lời cho chatbot.
  *
- * Endpoint: POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
+ * Endpoint: POST
+ * https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent
  *
  * Payload cơ bản:
  * {
- *   "contents": [
- *     { "role": "user", "parts": [{ "text": "..." }] },
- *     { "role": "model", "parts": [{ "text": "..." }] },
- *     ...
- *   ],
- *   "generationConfig": { "maxOutputTokens": 2048, "temperature": 0.7 }
+ * "contents": [
+ * { "role": "user", "parts": [{ "text": "..." }] },
+ * { "role": "model", "parts": [{ "text": "..." }] },
+ * ...
+ * ],
+ * "generationConfig": { "maxOutputTokens": 2048, "temperature": 0.7 }
  * }
  */
 @Slf4j
@@ -33,39 +34,36 @@ public class GeminiApiService {
     private final GeminiConfig geminiConfig;
     private final RestTemplate restTemplate;
 
-    private static final String GEMINI_BASE_URL =
-        "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s";
+    private static final String GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s";
 
     /**
-     * @param systemPrompt  Ngữ cảnh tài liệu (document context)
-     * @param history       Lịch sử chat [ {role, text}, ... ]
-     * @param userQuestion  Câu hỏi mới của user
-     * @return              Câu trả lời từ Gemini
+     * @param systemPrompt Ngữ cảnh tài liệu (document context)
+     * @param history      Lịch sử chat [ {role, text}, ... ]
+     * @param userQuestion Câu hỏi mới của user
+     * @return Câu trả lời từ Gemini
      */
     public GeminiResponse chat(String systemPrompt,
-                               List<Map<String, String>> history,
-                               String userQuestion) {
+            List<Map<String, String>> history,
+            String userQuestion) {
         String url = String.format(GEMINI_BASE_URL,
                 geminiConfig.getModel(), geminiConfig.getApiKey());
 
         List<Map<String, Object>> contents = buildContents(systemPrompt, history, userQuestion);
 
         Map<String, Object> requestBody = Map.of(
-            "contents", contents,
-            "generationConfig", Map.of(
-                "maxOutputTokens", geminiConfig.getMaxTokens(),
-                "temperature",     geminiConfig.getTemperature()
-            )
-        );
+                "contents", contents,
+                "generationConfig", Map.of(
+                        "maxOutputTokens", geminiConfig.getMaxTokens(),
+                        "temperature", geminiConfig.getTemperature()));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         try {
             ResponseEntity<Map> response = restTemplate.exchange(
-                url, HttpMethod.POST,
-                new HttpEntity<>(requestBody, headers),
-                Map.class);
+                    url, HttpMethod.POST,
+                    new HttpEntity<>(requestBody, headers),
+                    Map.class);
 
             return parseResponse(response.getBody());
         } catch (Exception e) {
@@ -84,32 +82,28 @@ public class GeminiApiService {
         // System context as first user turn
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             contents.add(Map.of(
-                "role", "user",
-                "parts", List.of(Map.of("text",
-                    "Bạn là trợ lý học tập AI. Hãy trả lời dựa trên tài liệu sau:\n\n"
-                    + systemPrompt))
-            ));
+                    "role", "user",
+                    "parts", List.of(Map.of("text",
+                            "Bạn là trợ lý học tập AI. Hãy trả lời dựa trên tài liệu sau:\n\n"
+                                    + systemPrompt))));
             contents.add(Map.of(
-                "role", "model",
-                "parts", List.of(Map.of("text",
-                    "Tôi đã đọc tài liệu. Hãy hỏi bất kỳ điều gì liên quan!"))
-            ));
+                    "role", "model",
+                    "parts", List.of(Map.of("text",
+                            "Tôi đã đọc tài liệu. Hãy hỏi bất kỳ điều gì liên quan!"))));
         }
 
         // Chat history
         for (Map<String, String> msg : history) {
             String role = "USER".equals(msg.get("senderType")) ? "user" : "model";
             contents.add(Map.of(
-                "role", role,
-                "parts", List.of(Map.of("text", msg.get("content")))
-            ));
+                    "role", role,
+                    "parts", List.of(Map.of("text", msg.get("content")))));
         }
 
         // Current question
         contents.add(Map.of(
-            "role", "user",
-            "parts", List.of(Map.of("text", userQuestion))
-        ));
+                "role", "user",
+                "parts", List.of(Map.of("text", userQuestion))));
 
         return contents;
     }
@@ -124,7 +118,8 @@ public class GeminiApiService {
 
             var usageMeta = (Map<?, ?>) body.get("usageMetadata");
             int totalTokens = usageMeta != null
-                ? ((Number) usageMeta.get("totalTokenCount")).intValue() : 0;
+                    ? ((Number) usageMeta.get("totalTokenCount")).intValue()
+                    : 0;
 
             return new GeminiResponse(text.trim(), geminiConfig.getModel(), totalTokens);
         } catch (Exception e) {
@@ -133,5 +128,6 @@ public class GeminiApiService {
         }
     }
 
-    public record GeminiResponse(String text, String model, int tokensUsed) {}
+    public record GeminiResponse(String text, String model, int tokensUsed) {
+    }
 }
