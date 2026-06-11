@@ -1,4 +1,4 @@
-gipackage com.studyhub.document.entity;
+package com.studyhub.document.entity;
 
 import com.studyhub.common.enums.FileType;
 import com.studyhub.common.enums.ModerationStatus;
