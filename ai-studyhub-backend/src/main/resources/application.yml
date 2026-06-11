@@ -3,14 +3,15 @@ spring:
     name: ai-studyhub-backend
 
   datasource:
-    url: jdbc:mysql://localhost:3306/ai_studyhub?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/ai_studyhub_fpt?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
-      ddl-auto: validate
+#      ddl-auto: validate
+    ddl-auto: update
     show-sql: false
     properties:
       hibernate:
@@ -49,10 +50,10 @@ firebase:
 
 # ── Gemini AI ────────────────────────────────────────────────
 gemini:
-  api-key: ${GEMINI_API_KEY}
+  api-key: $....$
   model: gemini-1.5-flash
-  project-id: ${GOOGLE_CLOUD_PROJECT_ID}
   location: us-central1
+  project-id: dummy
   max-tokens: 2048
   temperature: 0.7
 
@@ -71,3 +72,5 @@ app:
   upload:
     allowed-types: PDF,DOCX,PPTX
     max-size-bytes: 52428800  # 50 MB
+server:
+  port: 8081

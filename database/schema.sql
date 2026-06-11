@@ -1,8 +1,8 @@
 
 CREATE DATABASE IF NOT EXISTS ai_studyhub_fpt
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
-USE ai_studyhub_fpt;    
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+USE ai_studyhub_fpt;
 
 -- =====================================================
 -- 1. SUBSCRIPTION PLANS
@@ -85,7 +85,7 @@ CREATE TABLE users (
         'QN'
     ) DEFAULT 'HCM',
     major_id BIGINT,
-    plan_id BIGINT DEFAULT 1,
+    plan_id BIGINT NULL,
     role_id BIGINT,
     current_semester VARCHAR(20),
     status ENUM(
@@ -343,7 +343,7 @@ CREATE TABLE documents (
         'APPROVED',
         'REJECTED'
     ) DEFAULT 'APPROVED',
-    average_rating DECIMAL(2,1) DEFAULT 0,
+    average_rating DECIMAL(3,2) DEFAULT 0,
     total_views INT DEFAULT 0,
     total_downloads INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -364,6 +364,8 @@ CREATE TABLE documents (
 		REFERENCES folders(id)
 		ON DELETE SET NULL
 );
+ALTER TABLE documents
+ADD FULLTEXT idx_documents_search(title, description);
 
 
 
@@ -465,24 +467,30 @@ CREATE TABLE document_shares (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     document_id BIGINT NOT NULL,
     shared_user_id BIGINT NOT NULL,
-    owner_id BIGINT NOT NULL
+    owner_id BIGINT NOT NULL,
+
     permission ENUM(
         'VIEW',
         'EDIT'
     ) DEFAULT 'VIEW',
+
     UNIQUE KEY uk_document_share (
-		document_id,
-		shared_user_id
-	),
+        document_id,
+        shared_user_id
+    ),
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     CONSTRAINT fk_share_document
         FOREIGN KEY(document_id)
         REFERENCES documents(id)
         ON DELETE CASCADE,
+
     CONSTRAINT fk_share_owner
         FOREIGN KEY(owner_id)
         REFERENCES users(id)
         ON DELETE CASCADE,
+
     CONSTRAINT fk_share_user
         FOREIGN KEY(shared_user_id)
         REFERENCES users(id)
