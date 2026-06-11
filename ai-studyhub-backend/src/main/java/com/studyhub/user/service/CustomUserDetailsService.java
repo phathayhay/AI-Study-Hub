@@ -6,6 +6,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
@@ -17,11 +19,13 @@ public class CustomUserDetailsService implements UserDetailsService {
         var user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
 
-        var authorities = user.getRoles().stream()
-                .map(r -> new SimpleGrantedAuthority("ROLE_" + r.getRoleName()))
-                .toList();
+        var role = user.getRole();
+        var authorities = role != null
+                ? List.of(new SimpleGrantedAuthority("ROLE_" + role.getRoleName()))
+                : List.<SimpleGrantedAuthority>of();
 
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(), user.getPasswordHash(), authorities);
     }
 }
+

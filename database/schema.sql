@@ -1,3 +1,4 @@
+
 CREATE DATABASE IF NOT EXISTS ai_studyhub_fpt
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
@@ -44,7 +45,20 @@ CREATE TABLE majors (
 );
 
 -- =====================================================
--- 3. USERS
+-- 3. ROLES
+-- ADMIN
+-- USER
+-- hệ thống phân quyền
+-- =====================================================
+
+CREATE TABLE roles (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT NOT NULL,
+    role_name VARCHAR(50)
+        UNIQUE NOT NULL
+);
+
+-- =====================================================
+-- 4. USERS
 -- Thông tin tài khoản sinh viên
 -- Chứa:
 -- Student Code
@@ -53,6 +67,7 @@ CREATE TABLE majors (
 -- Campus
 -- Major
 -- Subscription Plan
+-- Role (mỗi user 1 role duy nhất)
 -- =====================================================
 
 CREATE TABLE users (
@@ -71,6 +86,7 @@ CREATE TABLE users (
     ) DEFAULT 'HCM',
     major_id BIGINT,
     plan_id BIGINT DEFAULT 1,
+    role_id BIGINT,
     current_semester VARCHAR(20),
     status ENUM(
         'ACTIVE',
@@ -94,42 +110,16 @@ CREATE TABLE users (
         REFERENCES majors(id),
     CONSTRAINT fk_users_plan
         FOREIGN KEY (plan_id)
-        REFERENCES subscription_plans(id)
-);
-
--- =====================================================
--- 4. ROLES
--- ADMIN
--- USER
--- hệ thống phân quyền
--- =====================================================
-
-CREATE TABLE roles (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    role_name VARCHAR(50)
-        UNIQUE NOT NULL
-);
-
--- =====================================================
--- 5. USER ROLES
--- Many-to-Many
--- User <-> Role
--- một user có thể có nhiều role
--- =====================================================
-
-CREATE TABLE user_roles (
-    user_id BIGINT NOT NULL,
-    role_id BIGINT NOT NULL,
-    PRIMARY KEY(user_id, role_id),
-    CONSTRAINT fk_user_roles_user
-        FOREIGN KEY(user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_user_roles_role
-        FOREIGN KEY(role_id)
+        REFERENCES subscription_plans(id),
+    CONSTRAINT fk_users_role
+        FOREIGN KEY (role_id)
         REFERENCES roles(id)
-        ON DELETE CASCADE
 );
+
+-- =====================================================
+-- 5. USER ROLES (REMOVED)
+-- Trực tiếp lưu role_id trong bảng users (mỗi user 1 role duy nhất)
+-- =====================================================
 
 -- =====================================================
 -- 6. REFRESH TOKENS
@@ -261,6 +251,9 @@ ON users(major_id);
 CREATE INDEX idx_users_plan
 ON users(plan_id);
 
+CREATE INDEX idx_users_role
+ON users(role_id);
+
 -- REFRESH TOKENS
 CREATE INDEX idx_refresh_token
 ON refresh_tokens(token);
@@ -293,6 +286,7 @@ CREATE TABLE folders (
     user_id BIGINT NOT NULL,
     folder_name VARCHAR(255) NOT NULL,
     parent_folder_id BIGINT NULL,
+    UNIQUE(user_id, parent_folder_id, folder_name),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
@@ -331,6 +325,7 @@ CREATE TABLE documents (
     file_url VARCHAR(500) NOT NULL,
     thumbnail_url VARCHAR(500),
     file_size BIGINT NOT NULL,
+    UNIQUE(file_url),
     file_type ENUM(
         'PDF',
         'DOCX',
@@ -469,7 +464,6 @@ CREATE TABLE comments (
 CREATE TABLE document_shares (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     document_id BIGINT NOT NULL,
-    owner_id BIGINT NOT NULL,
     shared_user_id BIGINT NOT NULL,
     permission ENUM(
         'VIEW',
@@ -566,7 +560,6 @@ ON favorites(document_id);
 CREATE INDEX idx_comments_document
 ON comments(document_id);
 
--- COMMENTS USER
 CREATE INDEX idx_comments_user
 ON comments(user_id);
 
@@ -639,6 +632,7 @@ CREATE TABLE reports (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     reporter_id BIGINT NOT NULL,
     document_id BIGINT NOT NULL,
+    UNIQUE(reporter_id, document_id),
     report_type ENUM(
     'SPAM',
     'COPYRIGHT',
@@ -763,6 +757,97 @@ CREATE TABLE user_subscriptions (
     CONSTRAINT fk_user_subscriptions_plan
         FOREIGN KEY(plan_id)
         REFERENCES subscription_plans(id)
+);
+
+
+
+-- ====================================================================================
+-- 25. DOCUMENT SUMMARIES
+-- Lưu trữ nội dung tóm tắt, luận điểm chính và từ khóa cốt lõi do AI trích xuất từ file.
+-- 1-1 đặc biệt với bảng `documents` thông qua ràng buộc `UNIQUE` ở trường `document_id`.
+-- ====================================================================================
+CREATE TABLE document_summaries (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,                         
+    document_id BIGINT NOT NULL UNIQUE,                       
+    short_summary VARCHAR(1000) NOT NULL,                   
+    long_summary LONGTEXT NOT NULL,                         
+    key_takeaways JSON NOT NULL,                           
+    tokens_used INT DEFAULT 0,                                  
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,           
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, 
+    
+    CONSTRAINT fk_summaries_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+);
+
+-- ====================================================================================
+-- 26. AI QUIZZES
+--  Quản lý thông tin chung của các bộ đề trắc nghiệm ôn tập do AI tự động tạo từ tài liệu.
+--  1 tài liệu có thể sinh ra nhiều bộ đề trắc nghiệm khác nhau (1:N).
+-- ====================================================================================
+CREATE TABLE ai_quizzes (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,                        
+    document_id BIGINT NOT NULL,                              
+    user_id BIGINT NOT NULL,                                   
+    quiz_title VARCHAR(255) NOT NULL,                            
+    total_questions INT NOT NULL DEFAULT 0,                      
+    difficulty_level ENUM('EASY', 'MEDIUM', 'HARD') DEFAULT 'MEDIUM',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,             
+    
+    CONSTRAINT fk_quizzes_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+    CONSTRAINT fk_quizzes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ====================================================================================
+-- 27. AI QUIZ QUESTIONS
+-- Lưu trữ nội dung câu hỏi, các phương án lựa chọn, đáp án đúng và lời giải thích từ AI.
+-- 1 bộ đề trắc nghiệm (`ai_quizzes`) chứa nhiều câu hỏi chi tiết (1:N).
+-- ====================================================================================
+CREATE TABLE ai_quiz_questions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,                         -- Khóa chính tự tăng của câu hỏi
+    quiz_id BIGINT NOT NULL,                                     -- Khóa ngoại: Câu hỏi này nằm trong bộ đề trắc nghiệm nào?
+    question_text TEXT NOT NULL,                                 -- Nội dung câu hỏi trắc nghiệm (Ví dụ: "Khóa ngoại dùng để làm gì?")
+    option_a TEXT NOT NULL,                                      -- Nội dung phương án lựa chọn A
+    option_b TEXT NOT NULL,                                      -- Nội dung phương án lựa chọn B
+    option_c TEXT NOT NULL,                                      -- Nội dung phương án lựa chọn C
+    option_d TEXT NOT NULL,                                      -- Nội dung phương án lựa chọn D
+    correct_option ENUM('A', 'B', 'C', 'D') NOT NULL,            -- Đáp án chính xác do AI thiết lập
+    explanation TEXT,                                            -- Lời giải thích chi tiết tại sao đáp án đó đúng giúp sinh viên học hiểu bản chất
+    sort_order INT DEFAULT 0,                                    -- Thứ tự sắp xếp hiển thị của câu hỏi trong bộ đề (Câu 1, Câu 2, Câu 3...)
+    
+    CONSTRAINT fk_questions_quiz FOREIGN KEY (quiz_id) REFERENCES ai_quizzes(id) ON DELETE CASCADE
+);
+
+-- ====================================================================================
+-- 28. AI FLASHCARD SETS
+-- Mục đích: Quản lý các bộ sưu tập thẻ ghi nhớ (Flashcard) dùng để học thuộc lòng thuật ngữ hoặc công thức định nghĩa.
+-- Quan hệ: 1 tài liệu có thể tạo được nhiều bộ thẻ ghi nhớ tùy chọn (1:N).
+-- ====================================================================================
+CREATE TABLE ai_flashcard_sets (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,                        
+    document_id BIGINT NOT NULL,                                 
+    user_id BIGINT NOT NULL,                                     
+    set_name VARCHAR(255) NOT NULL,                             
+    description VARCHAR(255),                                   
+    total_cards INT NOT NULL DEFAULT 0,                        
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,             
+    
+    CONSTRAINT fk_flashcard_sets_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+    CONSTRAINT fk_flashcard_sets_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ====================================================================================
+-- 29. AI FLASHCARDS
+-- Lưu trữ nội dung hai mặt của từng tấm thẻ ghi nhớ (Thuật ngữ và Định nghĩa).
+-- Quan hệ: 1 bộ thẻ (`ai_flashcard_sets`) chứa nhiều thẻ flashcard nhỏ bên trong (1:N).
+-- ====================================================================================
+CREATE TABLE ai_flashcards (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,               
+    set_id BIGINT NOT NULL,                       
+    front_content TEXT NOT NULL,                               
+    back_content TEXT NOT NULL,                                  
+    sort_order INT DEFAULT 0,                                    
+    
+    CONSTRAINT fk_flashcards_set FOREIGN KEY (set_id) REFERENCES ai_flashcard_sets(id) ON DELETE CASCADE
 );
 
 -- =====================================================

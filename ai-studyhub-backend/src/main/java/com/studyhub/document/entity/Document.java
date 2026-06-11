@@ -48,7 +48,7 @@ public class Document {
     @Column(name = "file_name", nullable = false, length = 255)
     private String fileName;
 
-    @Column(name = "file_url", nullable = false, length = 500)
+    @Column(name = "file_url", unique = true, nullable = false, length = 500)
     private String fileUrl;
 
     @Column(name = "thumbnail_url", length = 500)
@@ -100,6 +100,9 @@ public class Document {
     )
     @Builder.Default
     private Set<Tag> tags = new HashSet<>();
+
+    @OneToOne(mappedBy = "document", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private DocumentSummary summary;
 
     @PrePersist
     protected void onCreate() {
