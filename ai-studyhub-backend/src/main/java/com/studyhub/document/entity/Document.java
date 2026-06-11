@@ -1,4 +1,4 @@
-package com.studyhub.document.entity;
+gipackage com.studyhub.document.entity;
 
 import com.studyhub.common.enums.FileType;
 import com.studyhub.common.enums.ModerationStatus;
@@ -64,7 +64,7 @@ public class Document {
     @Enumerated(EnumType.STRING)
     @Column(name = "visibility")
     @Builder.Default
-    private Visibility visibility = Visibility.PUBLIC;
+    private Visibility visibility = Visibility.PRIVATE;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "moderation_status")
