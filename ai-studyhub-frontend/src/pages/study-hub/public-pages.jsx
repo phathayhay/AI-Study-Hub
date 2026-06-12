@@ -5,33 +5,8 @@ import HeroSearch from '../../components/home/HeroSearch'
 import StatsSummary from '../../components/home/StatsSummary'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
-import { appUser, featuredDocuments, featuredFolders, recentActivities } from '../../data/studyHubData'
-import { pricingPlans } from './config'
+import { appUser, featuredDocuments, featuredFolders, pricingPlans, recentActivities, uploadSelectFields } from '../../packages/mooc-data'
 import { DocumentCardMini, ExploreFolderCard, InfoLine, PageTitle, SectionTitle } from './shared'
-
-const uploadSelectFields = [
-  {
-    label: 'Ngành học *',
-    placeholder: 'Chọn ngành học',
-    options: ['Công nghệ thông tin', 'Kỹ thuật phần mềm', 'Trí tuệ nhân tạo', 'An toàn thông tin', 'Thiết kế đồ họa', 'Ngôn ngữ Nhật'],
-  },
-  {
-    label: 'Học kỳ *',
-    placeholder: 'Chọn học kỳ',
-    options: ['Kỳ 1', 'Kỳ 2', 'Kỳ 3', 'Kỳ 4', 'Kỳ 5', 'Kỳ 6', 'Kỳ 7', 'Kỳ 8', 'Kỳ 9'],
-  },
-  {
-    label: 'Mã môn học *',
-    hint: '[1 môn]',
-    placeholder: 'Chọn mã môn học',
-    options: ['PRF192', 'PRO192', 'CSD201', 'DBI202', 'SWP391', 'CEA201', 'JPD316', 'MAS291'],
-  },
-  {
-    label: 'Loại tài liệu *',
-    placeholder: 'Chọn loại tài liệu',
-    options: ['Slide', 'Notes', 'Assignment', 'Lab', 'Exam', 'Source Code', 'Project'],
-  },
-]
 
 export function HomeScreen({ guest = false, onNavigate }) {
   return (

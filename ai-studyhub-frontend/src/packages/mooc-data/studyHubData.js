@@ -14,6 +14,13 @@ export const guestUser = {
   notifications: 0,
 }
 
+export const defaultStudyFile = {
+  name: '漢字--JPD316 Lesson 5-NEW.pptx',
+  attachmentName: 'BTVN-BAI_PART3.docx',
+  subject: 'Japanese',
+  content: '',
+}
+
 export const mainNavItems = [
   { id: 'home', label: 'Trang chủ', icon: 'home' },
   { id: 'explore', label: 'Khám phá', icon: 'compass' },
@@ -286,6 +293,36 @@ export const libraryFolders = [
   { id: 1, name: 'CEA201 Materials', count: 5, date: 'Created May 20, 2026' },
   { id: 2, name: 'PRF192 Labs', count: 8, date: 'Created May 18, 2026' },
   { id: 3, name: 'Final Exam Prep', count: 3, date: 'Created May 15, 2026' },
+]
+
+export const libraryFolderFileMap = {
+  1: [libraryFiles[1], libraryFiles[3], libraryFiles[4], libraryFiles[6], libraryFiles[8]],
+  2: [libraryFiles[2], libraryFiles[5], libraryFiles[8], libraryFiles[0], libraryFiles[3], libraryFiles[4], libraryFiles[6], libraryFiles[7]],
+  3: [libraryFiles[0], libraryFiles[2], libraryFiles[7]],
+}
+
+export const uploadSelectFields = [
+  {
+    label: 'Ngành học *',
+    placeholder: 'Chọn ngành học',
+    options: ['Công nghệ thông tin', 'Kỹ thuật phần mềm', 'Trí tuệ nhân tạo', 'An toàn thông tin', 'Thiết kế đồ họa', 'Ngôn ngữ Nhật'],
+  },
+  {
+    label: 'Học kỳ *',
+    placeholder: 'Chọn học kỳ',
+    options: ['Kỳ 1', 'Kỳ 2', 'Kỳ 3', 'Kỳ 4', 'Kỳ 5', 'Kỳ 6', 'Kỳ 7', 'Kỳ 8', 'Kỳ 9'],
+  },
+  {
+    label: 'Mã môn học *',
+    hint: '[1 môn]',
+    placeholder: 'Chọn mã môn học',
+    options: ['PRF192', 'PRO192', 'CSD201', 'DBI202', 'SWP391', 'CEA201', 'JPD316', 'MAS291'],
+  },
+  {
+    label: 'Loại tài liệu *',
+    placeholder: 'Chọn loại tài liệu',
+    options: ['Slide', 'Notes', 'Assignment', 'Lab', 'Exam', 'Source Code', 'Project'],
+  },
 ]
 
 export const recentActivities = [

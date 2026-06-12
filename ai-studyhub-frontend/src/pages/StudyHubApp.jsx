@@ -13,14 +13,8 @@ import {
   ProfilePage,
   UploadPage,
 } from './study-hub/public-pages'
+import { defaultStudyFile } from '../packages/mooc-data'
 import { StudyDocumentPage } from './study-hub/study-document'
-
-const defaultStudyFile = {
-  name: '漢字--JPD316 Lesson 5-NEW.pptx',
-  attachmentName: 'BTVN-BAI_PART3.docx',
-  subject: 'Japanese',
-  content: '',
-}
 
 export default function StudyHubApp() {
   const [route, setRoute] = useState('guest-home')

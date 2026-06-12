@@ -1,4 +1,4 @@
-import { majors, popularCourses } from '../../data/studyHubData'
+import { majors, popularCourses } from '../../packages/mooc-data'
 import StudyHubIcon from '../icons/StudyHubIcons'
 
 function FilterRow({ label, items, accent = false }) {

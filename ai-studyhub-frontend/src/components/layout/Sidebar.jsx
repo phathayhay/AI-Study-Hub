@@ -1,4 +1,4 @@
-import { appUser, guestUser, mainNavItems, publicNavItems } from '../../data/studyHubData'
+import { appUser, guestUser, mainNavItems, publicNavItems } from '../../packages/mooc-data'
 import StudyHubIcon from '../icons/StudyHubIcons'
 import Brand from './Brand'
 

@@ -1,4 +1,4 @@
-import { featuredFolders } from '../../data/studyHubData'
+import { featuredFolders } from '../../packages/mooc-data'
 import FeaturedFolderCard from './FeaturedFolderCard'
 import SectionHeader from './SectionHeader'
 

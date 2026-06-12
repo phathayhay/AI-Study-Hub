@@ -1,4 +1,4 @@
-import { stats } from '../../data/studyHubData'
+import { stats } from '../../packages/mooc-data'
 import StudyHubIcon from '../icons/StudyHubIcons'
 
 export default function StatsSummary() {

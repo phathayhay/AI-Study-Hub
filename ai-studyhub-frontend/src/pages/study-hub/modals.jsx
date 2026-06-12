@@ -1,6 +1,6 @@
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
-import { featuredDocuments, notifications } from '../../data/studyHubData'
+import { featuredDocuments, notifications } from '../../packages/mooc-data'
 import { InfoBlock } from './shared'
 
 export function NotificationPanel({ onClose }) {

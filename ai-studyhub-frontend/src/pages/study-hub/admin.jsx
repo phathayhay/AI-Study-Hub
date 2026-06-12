@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
-import { adminCourses, adminDocuments, adminNavItems, adminUsers } from './config'
+import { adminCourses, adminDocuments, adminNavItems, adminUsers } from '../../packages/mooc-data'
 import { InfoBlock } from './shared'
 
 export function AdminApp({ route, onNavigate }) {

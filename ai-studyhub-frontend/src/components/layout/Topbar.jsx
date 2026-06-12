@@ -1,4 +1,4 @@
-import { appUser } from '../../data/studyHubData'
+import { appUser } from '../../packages/mooc-data'
 import StudyHubIcon from '../icons/StudyHubIcons'
 
 export default function Topbar({ onNotifications, onNavigate, guest = false }) {

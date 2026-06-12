@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
-import { studyTabs } from '../../data/studyHubData'
+import { studyTabs } from '../../packages/mooc-data'
 
 export function StudyDocumentPage({ activeTab, file, mode, onBack, onModeChange, onTabChange }) {
   const currentFile = file ?? {

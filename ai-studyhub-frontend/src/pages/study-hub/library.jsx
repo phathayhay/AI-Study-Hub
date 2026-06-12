@@ -1,21 +1,14 @@
 import { useMemo, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
-import { libraryFiles, libraryFolders } from '../../data/studyHubData'
-import { libraryTabs } from './config'
-
-const folderFileMap = {
-  1: [libraryFiles[1], libraryFiles[3], libraryFiles[4], libraryFiles[6], libraryFiles[8]],
-  2: [libraryFiles[2], libraryFiles[5], libraryFiles[8], libraryFiles[0], libraryFiles[3], libraryFiles[4], libraryFiles[6], libraryFiles[7]],
-  3: [libraryFiles[0], libraryFiles[2], libraryFiles[7]],
-}
+import { libraryFiles, libraryFolderFileMap, libraryFolders, libraryTabs } from '../../packages/mooc-data'
 
 export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) {
   const [selectedFolder, setSelectedFolder] = useState(null)
   const [folders, setFolders] = useState(libraryFolders)
   const [filesById, setFilesById] = useState(() => Object.fromEntries(libraryFiles.map((file) => [file.id, file])))
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null)
-  const [folderFiles, setFolderFiles] = useState(folderFileMap)
+  const [folderFiles, setFolderFiles] = useState(libraryFolderFileMap)
   const [openFileMenuId, setOpenFileMenuId] = useState(null)
   const managedFiles = useMemo(() => Object.values(filesById), [filesById])
   const files = useMemo(() => {
