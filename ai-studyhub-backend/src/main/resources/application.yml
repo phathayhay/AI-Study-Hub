@@ -64,6 +64,7 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: alpha
     tags-sorter: alpha
+    persist-authorization: true
 
 # ── App config ───────────────────────────────────────────────
 app:
