@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import FeaturedDocuments from '../../components/home/FeaturedDocuments'
 import FeaturedFolders from '../../components/home/FeaturedFolders'
 import HeroSearch from '../../components/home/HeroSearch'
@@ -7,6 +7,8 @@ import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { appUser, featuredDocuments, featuredFolders, pricingPlans, recentActivities, uploadSelectFields } from '../../packages/mooc-data'
 import { DocumentCardMini, ExploreFolderCard, InfoLine, PageTitle, SectionTitle } from './shared'
+import { uploadDocument } from '../../services/documentService'
+import { getRootFolders } from '../../services/folderService'
 
 export function HomeScreen({ guest = false, onNavigate }) {
   return (
@@ -66,6 +68,184 @@ export function ExplorePage({ onNavigate }) {
 }
 
 export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
+  const [selectedUploadFile, setSelectedUploadFile] = useState(null)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [folderId, setFolderId] = useState('')
+  const [visibility, setVisibility] = useState('PRIVATE')
+  const [tags, setTags] = useState('')
+  const [folders, setFolders] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [status, setStatus] = useState('')
+  const [error, setError] = useState('')
+  const fileInputRef = useRef(null)
+  const isStudyUpload = mode === 'study'
+
+  useEffect(() => {
+    let active = true
+    getRootFolders()
+      .then((data) => {
+        if (active) setFolders(data)
+      })
+      .catch(() => {
+        if (active) setFolders([])
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const handleFileSelect = (files) => {
+    const [file] = Array.from(files ?? [])
+    if (!file) return
+    setSelectedUploadFile(file)
+    setTitle(file.name.replace(/\.[^.]+$/, ''))
+    setStatus('')
+    setError('')
+  }
+
+  const clearSelectedFile = () => {
+    setSelectedUploadFile(null)
+    setTitle('')
+    setDescription('')
+    setTags('')
+    setStatus('')
+    setError('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleUpload = async () => {
+    if (!selectedUploadFile || !title.trim()) {
+      setError('Vui long chon file va nhap tieu de.')
+      return
+    }
+
+    setUploading(true)
+    setError('')
+    setStatus('')
+    try {
+      const document = await uploadDocument(selectedUploadFile, {
+        title: title.trim(),
+        description: description.trim(),
+        folderId: folderId || null,
+        visibility,
+        tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+      })
+
+      setStatus('Tai lieu da duoc tai len thanh cong.')
+      if (isStudyUpload && onStudyFileUploaded) {
+        onStudyFileUploaded({
+          id: document.id,
+          documentId: document.id,
+          name: document.title,
+          attachmentName: document.fileName,
+          subject: document.description || document.fileType,
+          sizeLabel: formatFileSize(document.fileSize),
+          fileUrl: document.fileUrl,
+          content: '',
+        })
+      }
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <main className="page-surface upload-page">
+      <PageTitle
+        title={isStudyUpload ? 'Tao Study Session moi' : 'Tai len tai lieu'}
+        subtitle={isStudyUpload ? 'Tai file len de AI tao workspace hoc tap' : 'Chia se tai lieu hoac luu tru ca nhan'}
+      />
+      <section className="upload-card">
+        {!selectedUploadFile ? (
+          <>
+            <input
+              ref={fileInputRef}
+              className="visually-hidden"
+              type="file"
+              accept=".pdf,.docx,.pptx,.txt,.zip"
+              onChange={(event) => handleFileSelect(event.target.files)}
+            />
+            <div
+              className="drop-zone"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault()
+                handleFileSelect(event.dataTransfer.files)
+              }}
+            >
+              <StudyHubIcon name="upload" size={46} />
+              <h3>Keo tha file vao day</h3>
+              <p>hoac</p>
+              <button className="file-picker-button" onClick={() => fileInputRef.current?.click()} type="button">
+                <StudyHubIcon name="file" size={18} /> Chon file
+              </button>
+              <small>Ho tro: PDF, DOCX, PPTX, TXT, ZIP (toi da 50MB)</small>
+            </div>
+          </>
+        ) : (
+          <div className="upload-form">
+            <h3>File da chon</h3>
+            <div className="selected-file">
+              <StudyHubIcon name="file" size={18} />
+              <span><strong>{selectedUploadFile.name}</strong><small>{formatFileSize(selectedUploadFile.size)}</small></span>
+              <button onClick={clearSelectedFile} type="button">x</button>
+            </div>
+
+            <label>
+              Tieu de tai lieu *
+              <input value={title} onChange={(event) => setTitle(event.target.value)} />
+            </label>
+            <label>
+              Mo ta
+              <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
+            </label>
+            <div className="upload-form__grid">
+              <label>
+                Thu muc
+                <select value={folderId} onChange={(event) => setFolderId(event.target.value)}>
+                  <option value="">Ngoai thu muc goc</option>
+                  {folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>{folder.folderName}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Quyen truy cap
+                <select value={visibility} onChange={(event) => setVisibility(event.target.value)}>
+                  <option value="PRIVATE">Private</option>
+                  <option value="PUBLIC">Public</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Tags
+              <input
+                placeholder="Java, Spring Boot"
+                value={tags}
+                onChange={(event) => setTags(event.target.value)}
+              />
+            </label>
+
+            {status && <p className="api-status api-status--success">{status}</p>}
+            {error && <p className="api-status api-status--error">{error}</p>}
+
+            <div className="upload-form__actions">
+              <button className="upload-submit" disabled={uploading} onClick={handleUpload} type="button">
+                {uploading ? 'Dang tai len...' : isStudyUpload ? 'Bat dau hoc voi AI' : 'Tai len'}
+              </button>
+              <button className="cancel-button" disabled={uploading} onClick={clearSelectedFile} type="button">Huy</button>
+            </div>
+          </div>
+        )}
+      </section>
+    </main>
+  )
+}
+
+export function LegacyUploadPage({ mode = 'document', onStudyFileUploaded }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
   const [readStatus, setReadStatus] = useState('')

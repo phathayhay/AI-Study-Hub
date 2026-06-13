@@ -1,3 +1,3 @@
-export function saveNotes(notes) {
+export function saveNotes() {
   return Promise.resolve({ saved: true })
 }

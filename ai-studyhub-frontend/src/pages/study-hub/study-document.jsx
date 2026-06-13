@@ -2,8 +2,357 @@ import { useEffect, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { studyTabs } from '../../packages/mooc-data'
+import {
+  generateFlashcards,
+  generateQuiz,
+  generateSummary,
+  getDocumentFlashcardSets,
+  getDocumentQuizzes,
+  getFlashcardSetDetails,
+  getQuizDetails,
+} from '../../features/ai/aiService'
 
-export function StudyDocumentPage({ activeTab, file, mode, onBack, onModeChange, onTabChange }) {
+export function StudyDocumentPage({ activeTab, file, onBack, onTabChange }) {
+  const currentFile = file ?? { name: 'Tai lieu hoc tap', content: '' }
+  const documentId = currentFile.documentId ?? currentFile.id
+  const [notesGenerated, setNotesGenerated] = useState(false)
+  const [summary, setSummary] = useState(null)
+  const [quizzes, setQuizzes] = useState([])
+  const [activeQuiz, setActiveQuiz] = useState(null)
+  const [flashcardSets, setFlashcardSets] = useState([])
+  const [activeFlashcardSet, setActiveFlashcardSet] = useState(null)
+  const [quizStage, setQuizStage] = useState('list')
+  const [loadingAction, setLoadingAction] = useState('')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    if (!documentId) {
+      return () => {
+        active = false
+      }
+    }
+
+    Promise.all([
+      getDocumentQuizzes(documentId),
+      getDocumentFlashcardSets(documentId),
+    ])
+      .then(([quizData, flashcardData]) => {
+        if (!active) return
+        setQuizzes(quizData)
+        setFlashcardSets(flashcardData)
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [documentId])
+
+  const runAiAction = async (actionName, request) => {
+    if (!documentId) {
+      setError('Tai lieu nay chua co documentId tren backend.')
+      return null
+    }
+
+    setLoadingAction(actionName)
+    setError('')
+    try {
+      return await request()
+    } catch (requestError) {
+      setError(requestError.message)
+      return null
+    } finally {
+      setLoadingAction('')
+    }
+  }
+
+  const handleGenerateSummary = async () => {
+    const result = await runAiAction('summary', () => generateSummary(documentId))
+    if (result) setSummary(result)
+  }
+
+  const handleGenerateQuiz = async (difficulty) => {
+    const result = await runAiAction('quiz', () => generateQuiz(documentId, difficulty))
+    if (!result) return
+    setQuizzes((current) => [result, ...current])
+    setActiveQuiz(result)
+    setQuizStage('taking')
+  }
+
+  const handleOpenQuiz = async (quizId) => {
+    const result = await runAiAction('quiz-detail', () => getQuizDetails(quizId))
+    if (!result) return
+    setActiveQuiz(result)
+    setQuizStage('taking')
+  }
+
+  const handleGenerateFlashcards = async () => {
+    const result = await runAiAction('flashcards', () => generateFlashcards(documentId))
+    if (!result) return
+    setFlashcardSets((current) => [result, ...current])
+    setActiveFlashcardSet(result)
+  }
+
+  const handleOpenFlashcards = async (setId) => {
+    if (!setId) {
+      setActiveFlashcardSet(null)
+      return
+    }
+    const result = await runAiAction('flashcard-detail', () => getFlashcardSetDetails(setId))
+    if (result) setActiveFlashcardSet(result)
+  }
+
+  return (
+    <div className="study-shell">
+      <main className="study-main">
+        <div className="study-header">
+          <button className="back-pill study-back-button" onClick={onBack} type="button">
+            <span className="back-pill__icon"><StudyHubIcon name="arrow-left" size={16} /></span>
+            <span>Tro lai</span>
+          </button>
+          <span>&gt;</span>
+          <strong>{currentFile.name}</strong>
+          <StudyHubIcon name="file" size={14} />
+        </div>
+        <nav className="study-tabs">
+          {studyTabs.map((tab) => (
+            <button className={activeTab === tab.id ? 'is-active' : ''} key={tab.id} onClick={() => onTabChange(tab.id)} type="button">
+              <StudyHubIcon name={tab.icon} size={15} /> {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        {error && <p className="api-status api-status--error">{error}</p>}
+        {loadingAction && <p className="api-status">AI dang xu ly, vui long cho...</p>}
+
+        {activeTab === 'original' && <div className="study-doc-pill"><StudyHubIcon name="file" size={16} /> {currentFile.attachmentName || currentFile.name}</div>}
+        {activeTab === 'original' && <OriginalContent file={currentFile} />}
+        {activeTab === 'notes' && (notesGenerated
+          ? <AiNotes file={currentFile} />
+          : <AiGeneratePrompt description="Generate study notes from this document" label="Notes" onGenerate={() => setNotesGenerated(true)} />)}
+        {activeTab === 'summary' && (summary
+          ? <ApiSummary summary={summary} />
+          : <AiGeneratePrompt description="Create a Vietnamese summary with key takeaways" label="Summary" onGenerate={handleGenerateSummary} />)}
+        {activeTab === 'flashcards' && (
+          <ApiFlashcards
+            key={activeFlashcardSet?.id ?? 'flashcard-sets'}
+            activeSet={activeFlashcardSet}
+            loading={loadingAction === 'flashcards' || loadingAction === 'flashcard-detail'}
+            onGenerate={handleGenerateFlashcards}
+            onOpenSet={handleOpenFlashcards}
+            sets={flashcardSets}
+          />
+        )}
+        {activeTab === 'quizzes' && (
+          quizStage === 'taking' && activeQuiz
+            ? <ApiQuizTaking quiz={activeQuiz} onQuit={() => setQuizStage('list')} />
+            : quizStage === 'create'
+              ? <ApiCreateQuiz loading={loadingAction === 'quiz'} onGenerate={handleGenerateQuiz} />
+              : <ApiQuizList quizzes={quizzes} onCreate={() => setQuizStage('create')} onOpen={handleOpenQuiz} />
+        )}
+      </main>
+      <AiTutor />
+    </div>
+  )
+}
+
+function ApiSummary({ summary }) {
+  return (
+    <section className="document-paper summary-paper">
+      <h2>AI Summary</h2>
+      <p>{summary.shortSummary}</p>
+      <h3>Tom tat chi tiet</h3>
+      <p className="summary-long-text">{summary.longSummary}</p>
+      <h3>Y chinh</h3>
+      <ul>
+        {(summary.keyTakeaways ?? []).map((item) => <li key={item}>{item}</li>)}
+      </ul>
+    </section>
+  )
+}
+
+function ApiFlashcards({ activeSet, loading, onGenerate, onOpenSet, sets }) {
+  const [cardIndex, setCardIndex] = useState(0)
+  const [flipped, setFlipped] = useState(false)
+  const cards = activeSet?.cards ?? []
+  const card = cards[cardIndex]
+
+  if (!activeSet) {
+    return (
+      <section className="quiz-empty-view">
+        <header>
+          <h2>Your Flashcards</h2>
+          <button className="ai-generate-button" disabled={loading} onClick={onGenerate} type="button">
+            Generate Flashcards
+          </button>
+        </header>
+        {sets.length ? (
+          <div className="api-collection-list">
+            {sets.map((set) => (
+              <button key={set.id} onClick={() => onOpenSet(set.id)} type="button">
+                <strong>{set.setName}</strong>
+                <small>{set.totalCards} cards</small>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="quiz-empty-card">No flashcards found</div>
+        )}
+      </section>
+    )
+  }
+
+  return (
+    <section className="flashcard-view">
+      <div className="manage-header">
+        <button onClick={() => onOpenSet(null)} type="button">Flashcard sets</button>
+        <h2>{activeSet.setName}</h2>
+      </div>
+      <button className="flashcard api-flashcard" onClick={() => setFlipped((current) => !current)} type="button">
+        <small>{flipped ? 'Answer' : 'Question'}</small>
+        <h3>{flipped ? card?.backContent : card?.frontContent}</h3>
+        <p>Click to flip</p>
+      </button>
+      <div className="flash-controls">
+        <button
+          disabled={cardIndex === 0}
+          onClick={() => {
+            setCardIndex((current) => current - 1)
+            setFlipped(false)
+          }}
+          type="button"
+        >
+          &lt;-
+        </button>
+        <span>{cards.length ? cardIndex + 1 : 0} of {cards.length}</span>
+        <button
+          disabled={cardIndex >= cards.length - 1}
+          onClick={() => {
+            setCardIndex((current) => current + 1)
+            setFlipped(false)
+          }}
+          type="button"
+        >
+          -&gt;
+        </button>
+      </div>
+    </section>
+  )
+}
+
+function ApiQuizList({ onCreate, onOpen, quizzes }) {
+  return (
+    <section className="quiz-empty-view">
+      <header>
+        <h2>Your Quizzes</h2>
+        <button className="ai-generate-button" onClick={onCreate} type="button">Create Quiz</button>
+      </header>
+      {quizzes.length ? (
+        <div className="api-collection-list">
+          {quizzes.map((quiz) => (
+            <button key={quiz.id} onClick={() => onOpen(quiz.id)} type="button">
+              <strong>{quiz.quizTitle}</strong>
+              <small>{quiz.totalQuestions} questions - {quiz.difficultyLevel}</small>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="quiz-empty-card">No quizzes found</div>
+      )}
+    </section>
+  )
+}
+
+function ApiCreateQuiz({ loading, onGenerate }) {
+  const [difficulty, setDifficulty] = useState('MEDIUM')
+
+  return (
+    <section className="quiz-create document-paper">
+      <h2>Create Quiz</h2>
+      <label>
+        Difficulty
+        <select value={difficulty} onChange={(event) => setDifficulty(event.target.value)}>
+          <option value="EASY">Easy</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HARD">Hard</option>
+        </select>
+      </label>
+      <p>Gemini will generate 5-10 multiple-choice questions from this document.</p>
+      <button className="primary-action wide" disabled={loading} onClick={() => onGenerate(difficulty)} type="button">
+        {loading ? 'Generating...' : 'Generate'}
+      </button>
+    </section>
+  )
+}
+
+function ApiQuizTaking({ onQuit, quiz }) {
+  const [questionIndex, setQuestionIndex] = useState(0)
+  const [selectedOption, setSelectedOption] = useState('')
+  const [revealed, setRevealed] = useState(false)
+  const questions = quiz.questions ?? []
+  const question = questions[questionIndex]
+  const options = question ? [
+    ['A', question.optionA],
+    ['B', question.optionB],
+    ['C', question.optionC],
+    ['D', question.optionD],
+  ] : []
+
+  const goToQuestion = (nextIndex) => {
+    setQuestionIndex(nextIndex)
+    setSelectedOption('')
+    setRevealed(false)
+  }
+
+  return (
+    <section className="quiz-taking">
+      <div className="quiz-nav">
+        <button onClick={onQuit} type="button">Quit</button>
+        <strong>{quiz.quizTitle}</strong>
+      </div>
+      {question ? (
+        <article className="question-card">
+          <p>Question {questionIndex + 1}/{questions.length}</p>
+          <h2>{question.questionText}</h2>
+          <div className="api-quiz-options">
+            {options.map(([key, value]) => (
+              <button
+                className={selectedOption === key ? 'is-selected' : ''}
+                key={key}
+                onClick={() => {
+                  setSelectedOption(key)
+                  setRevealed(false)
+                }}
+                type="button"
+              >
+                <strong>{key}.</strong> {value}
+              </button>
+            ))}
+          </div>
+          {revealed && (
+            <div className={selectedOption === question.correctOption ? 'quiz-result is-correct' : 'quiz-result is-wrong'}>
+              <strong>{selectedOption === question.correctOption ? 'Correct' : `Correct answer: ${question.correctOption}`}</strong>
+              <p>{question.explanation}</p>
+            </div>
+          )}
+          <div>
+            <button disabled={questionIndex === 0} onClick={() => goToQuestion(questionIndex - 1)} type="button">Previous</button>
+            <button disabled={!selectedOption} onClick={() => setRevealed(true)} type="button">Check</button>
+            <button disabled={questionIndex >= questions.length - 1} onClick={() => goToQuestion(questionIndex + 1)} type="button">Next</button>
+          </div>
+        </article>
+      ) : (
+        <div className="quiz-empty-card">Quiz has no questions</div>
+      )}
+    </section>
+  )
+}
+
+export function LegacyStudyDocumentPage({ activeTab, file, mode, onBack, onModeChange, onTabChange }) {
   const currentFile = file ?? {
     name: '漢字--JPD316 Lesson 5-NEW.pptx',
     attachmentName: 'BTVN-BAI_PART3.docx',
@@ -13,6 +362,7 @@ export function StudyDocumentPage({ activeTab, file, mode, onBack, onModeChange,
   const [quizStage, setQuizStage] = useState('empty')
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setGeneratedTabs({ notes: false, summary: false })
     setQuizStage('empty')
   }, [currentFile.name, currentFile.attachmentName])
