@@ -1,9 +1,7 @@
 package com.studyhub.user.dto;
 
-import com.studyhub.common.enums.Campus;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
@@ -30,13 +28,4 @@ public class RegisterRequest {
     @NotBlank(message = "Password cannot be blank")
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
-
-    @NotNull(message = "Campus cannot be null")
-    private Campus campus;
-
-    @NotNull(message = "Major ID cannot be null")
-    private Long majorId;
-
-    @Size(max = 20, message = "Current semester must be at most 20 characters")
-    private String currentSemester;
 }

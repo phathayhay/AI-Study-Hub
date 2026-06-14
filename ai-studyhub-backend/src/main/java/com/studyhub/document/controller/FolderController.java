@@ -5,6 +5,9 @@ import com.studyhub.document.dto.FolderResponse;
 import com.studyhub.document.service.FolderService;
 import com.studyhub.security.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,9 +31,9 @@ public class FolderController {
     @Operation(summary = "Create a new folder", description = "Creates a new folder for the currently authenticated user.")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Folder created successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid folder details provided"),
-        @ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
+        @ApiResponse(responseCode = "400", description = "Invalid folder details provided", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Invalid folder details provided\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"User is not logged in / Invalid access token\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<FolderResponse> createFolder(@Valid @RequestBody FolderRequest request) {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -42,8 +45,8 @@ public class FolderController {
     @Operation(summary = "Get root folders", description = "Retrieves all root-level folders belonging to the authenticated user.")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "List of root folders retrieved successfully"),
-        @ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
+        @ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"User is not logged in / Invalid access token\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<List<FolderResponse>> getRootFolders() {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -55,9 +58,9 @@ public class FolderController {
     @Operation(summary = "Get folder details", description = "Retrieves details of a folder and its children by its unique folder ID.")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Folder details retrieved successfully"),
-        @ApiResponse(responseCode = "404", description = "Folder not found"),
-        @ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
+        @ApiResponse(responseCode = "404", description = "Folder not found", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Folder not found\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"User is not logged in / Invalid access token\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<FolderResponse> getFolderDetails(@PathVariable Long id) {
         String email = SecurityUtils.getCurrentUserEmail();
@@ -69,10 +72,10 @@ public class FolderController {
     @Operation(summary = "Rename an existing folder", description = "Renames a folder owned by the authenticated user.")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Folder renamed successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid folder details provided"),
-        @ApiResponse(responseCode = "404", description = "Folder not found"),
-        @ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
+        @ApiResponse(responseCode = "400", description = "Invalid folder details provided", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Invalid folder details provided\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @ApiResponse(responseCode = "404", description = "Folder not found", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Folder not found\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"User is not logged in / Invalid access token\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<FolderResponse> renameFolder(
             @PathVariable Long id,
@@ -86,9 +89,9 @@ public class FolderController {
     @Operation(summary = "Delete a folder", description = "Deletes a folder and all its contents (cascade) by folder ID.")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "204", description = "Folder deleted successfully"),
-        @ApiResponse(responseCode = "404", description = "Folder not found"),
-        @ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token"),
-        @ApiResponse(responseCode = "500", description = "Internal server error")
+        @ApiResponse(responseCode = "404", description = "Folder not found", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Folder not found\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"User is not logged in / Invalid access token\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<Void> deleteFolder(@PathVariable Long id) {
         String email = SecurityUtils.getCurrentUserEmail();
