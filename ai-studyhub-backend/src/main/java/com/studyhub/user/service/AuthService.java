@@ -1,5 +1,6 @@
 package com.studyhub.user.service;
 
+import com.studyhub.common.enums.Campus;
 import com.studyhub.common.enums.UserStatus;
 import com.studyhub.common.enums.VerificationStatus;
 import com.studyhub.course.entity.Major;
@@ -65,9 +66,6 @@ public class AuthService {
             throw new IllegalArgumentException("Email is already in use");
         }
 
-        Major major = majorRepository.findById(request.getMajorId())
-                .orElseThrow(() -> new IllegalArgumentException("Major does not exist"));
-
         // Lấy hoặc tạo vai trò USER mặc định
         Role userRole = roleRepository.findByRoleName("USER")
                 .orElseGet(() -> roleRepository.save(new Role(null, "USER")));
@@ -91,11 +89,11 @@ public class AuthService {
                 .fullName(request.getFullName())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .campus(request.getCampus())
-                .major(major)
+                .campus(Campus.HCM)
+                .major(null)
                 .plan(freePlan)
                 .role(userRole)
-                .currentSemester(request.getCurrentSemester())
+                .currentSemester(null)
                 .status(UserStatus.ACTIVE)
                 .verificationStatus(VerificationStatus.PENDING)
                 .build();

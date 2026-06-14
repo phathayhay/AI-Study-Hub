@@ -11,6 +11,9 @@ import com.studyhub.user.dto.ChangePasswordRequest;
 import com.studyhub.security.SecurityUtils;
 import com.studyhub.user.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -35,9 +38,9 @@ public class AuthController {
     @PostMapping("/register")
     @Operation(summary = "Register a new student account", description = "Creates a new student account with default USER role and FREE subscription plan.")
     @ApiResponses(value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Registration successful, returns access and refresh tokens"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid input data or email already in use"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Registration successful, returns access and refresh tokens", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"User registered successfully\", \"data\": {\"accessToken\": \"eyJhbGciOiJIUzI1NiJ9...\", \"refreshToken\": \"7b47e4b9-87a4-4a41-b0e6-b63e800ebefc\", \"email\": \"student@fpt.edu.vn\", \"role\": \"USER\", \"fullName\": \"Nguyen Van A\", \"studentCode\": \"SE160000\"}, \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid input data or email already in use", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Email is already in use\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<ApiResponse<TokenResponse>> register(@Valid @RequestBody RegisterRequest request) {
         log.info("API: Registering user with email {}", request.getEmail());
@@ -49,10 +52,10 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "User login authentication", description = "Validates user credentials and issues JWT Access Token and Refresh Token.")
     @ApiResponses(value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Login successful, returns token pair"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Incorrect email or password"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "User account has been banned"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Login successful, returns token pair", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"Login successful\", \"data\": {\"accessToken\": \"eyJhbGciOiJIUzI1NiJ9...\", \"refreshToken\": \"7b47e4b9-87a4-4a41-b0e6-b63e800ebefc\", \"email\": \"student@fpt.edu.vn\", \"role\": \"USER\", \"fullName\": \"Nguyen Van A\", \"studentCode\": \"SE160000\"}, \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Incorrect email or password", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Incorrect email or password\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "User account has been banned", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Your account has been banned\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<ApiResponse<TokenResponse>> login(@Valid @RequestBody LoginRequest request) {
         log.info("API: Logging in user with email {}", request.getEmail());
@@ -64,9 +67,9 @@ public class AuthController {
     @PostMapping("/refresh")
     @Operation(summary = "Refresh JWT Access Token", description = "Accepts a valid refresh token and issues a new access token and rotated refresh token.")
     @ApiResponses(value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Token refreshed successfully"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid, revoked, or expired refresh token"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Token refreshed successfully", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"Token refreshed successfully\", \"data\": {\"accessToken\": \"eyJhbGciOiJIUzI1NiJ9...\", \"refreshToken\": \"7b47e4b9-87a4-4a41-b0e6-b63e800ebefc\", \"email\": \"student@fpt.edu.vn\", \"role\": \"USER\", \"fullName\": \"Nguyen Van A\", \"studentCode\": \"SE160000\"}, \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid, revoked, or expired refresh token", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Invalid refresh token\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<ApiResponse<TokenResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         log.info("API: Refreshing token");
@@ -78,8 +81,8 @@ public class AuthController {
     @PostMapping("/logout")
     @Operation(summary = "Logout user session", description = "Revokes and deletes the active session refresh token from database.")
     @ApiResponses(value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Logged out successfully"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Logged out successfully", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"Logged out successfully\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody RefreshTokenRequest request) {
         log.info("API: Logging out and revoking token");
@@ -91,9 +94,9 @@ public class AuthController {
     @PostMapping("/forgot-password")
     @Operation(summary = "Request password recovery link", description = "Accepts user email and sends a password recovery email containing a reset link valid for 15 minutes.")
     @ApiResponses(value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Recovery link sent successfully"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Email address not found in the system"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error or email dispatch failure")
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Recovery link sent successfully", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"Password reset link has been sent to your email\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Email address not found in the system", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Account with this email does not exist\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error or email dispatch failure", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Failed to send email, please try again later\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         log.info("API: Forgot password request for email {}", request.getEmail());
@@ -105,9 +108,9 @@ public class AuthController {
     @PostMapping("/reset-password")
     @Operation(summary = "Reset password using recovery token", description = "Accepts a recovery token and updates the account password.")
     @ApiResponses(value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Password reset successful"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Token is invalid, revoked, or expired"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Password reset successful", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"Password reset successful\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Token is invalid, revoked, or expired", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Reset token is invalid or has expired\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         log.info("API: Reset password request");
@@ -119,10 +122,10 @@ public class AuthController {
     @PostMapping("/change-password")
     @Operation(summary = "Change password (Authenticated)", description = "Updates password for currently authenticated user after validating their old password.")
     @ApiResponses(value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Password changed successfully"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Incorrect old password or invalid new password"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Password changed successfully", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"Password changed successfully\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Incorrect old password or invalid new password", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Incorrect old password\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"User is not logged in / Invalid access token\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         String currentEmail = SecurityUtils.getCurrentUserEmail();
