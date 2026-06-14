@@ -1,3 +1,6 @@
+server:
+  forward-headers-strategy: framework
+
 spring:
   application:
     name: ai-studyhub-backend
@@ -64,6 +67,7 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: alpha
     tags-sorter: alpha
+    persist-authorization: true
 
 # ── App config ───────────────────────────────────────────────
 app:
