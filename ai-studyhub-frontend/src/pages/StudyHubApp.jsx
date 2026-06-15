@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import AppLayout from '../components/layout/AppLayout'
 import { AdminApp } from './study-hub/admin'
-import { LoginPage, RegisterPage } from './study-hub/auth'
+import { LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage } from './study-hub/auth'
 import { LibraryPage } from './study-hub/library'
 import { FilePreviewModal, NotificationPanel, ReportModal } from './study-hub/modals'
 import {
@@ -92,6 +92,8 @@ export default function StudyHubApp() {
 
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
   if (route === 'register') return <RegisterPage onRegister={handleRegister} onNavigate={navigate} />
+  if (route === 'forgot-password') return <ForgotPasswordPage onNavigate={navigate} />
+  if (route === 'reset-password') return <ResetPasswordPage onNavigate={navigate} />
   if (route.startsWith('admin-')) return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />
 
   const guest = !user || !role
