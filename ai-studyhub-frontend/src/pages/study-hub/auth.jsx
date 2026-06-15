@@ -1,55 +1,80 @@
 import { useState } from 'react'
 import Brand from '../../components/layout/Brand'
-import StudyHubIcon from '../../components/icons/StudyHubIcons'
 
 export function LoginPage({ onLogin, onNavigate }) {
-  const [role, setRole] = useState('student')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (!email || !password) { setError('Vui lòng nhập email và mật khẩu'); return }
+    setBusy(true)
+    try {
+      await onLogin(email, password)
+    } catch (err) {
+      setError(err?.message || 'Đăng nhập thất bại')
+    } finally { setBusy(false) }
+  }
 
   return (
     <AuthShell title="Đăng nhập" subtitle="Chào mừng trở lại!" onNavigate={onNavigate}>
-      <div className="auth-shortcuts">
-        <button
-          className={role === 'admin' ? 'is-active' : ''}
-          onClick={() => setRole('admin')}
-          type="button"
-        >
-          Admin
-        </button>
-        <button
-          className={role === 'student' ? 'is-active' : ''}
-          onClick={() => setRole('student')}
-          type="button"
-        >
-          Sinh viên
-        </button>
-      </div>
-      <AuthCard>
-        <Field icon="mail" label="Email FPT" value={role === 'admin' ? 'admin@fpt.edu.vn' : 'student@fpt.edu.vn'} />
-        <Field icon="lock" label="Mật khẩu" value={role === 'admin' ? 'admin123' : 'student123'} type="password" />
+      <form className="auth-card" onSubmit={submit}>
+        <label className="field">
+          Email FPT
+          <span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@fpt.edu.vn" required /></span>
+        </label>
+        <label className="field">
+          Mật khẩu
+          <span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required /></span>
+        </label>
+        {error && <p className="auth-error">{error}</p>}
         <div className="auth-row"><label><input type="checkbox" /> Ghi nhớ đăng nhập</label><a>Quên mật khẩu?</a></div>
-        <button className="auth-submit" type="button" onClick={() => onLogin(role)}>Đăng nhập</button>
+        <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Đang xử lý...' : 'Đăng nhập'}</button>
         <p>Chưa có tài khoản?<button onClick={() => onNavigate('register')} type="button">Đăng ký ngay</button></p>
         <hr />
-        <small><strong>Demo Accounts:</strong><br />Admin: admin@fpt.edu.vn / admin123<br />User: student@fpt.edu.vn / student123</small>
-      </AuthCard>
+        <small><strong>Demo:</strong> admin@fpt.edu.vn / admin123 – student@fpt.edu.vn / student123</small>
+      </form>
     </AuthShell>
   )
 }
 
 export function RegisterPage({ onNavigate }) {
+  const [form, setForm] = useState({ studentCode: '', fullName: '', email: '', password: '', confirm: '', campus: 'HCM' })
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const set = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }))
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (form.password !== form.confirm) { setError('Mật khẩu xác nhận không khớp'); return }
+    if (!form.studentCode || !form.fullName || !form.email || !form.password) { setError('Vui lòng điền đầy đủ'); return }
+    setBusy(true)
+    try {
+      await onNavigate('login')
+    } catch (err) {
+      setError(err?.message || 'Đăng ký thất bại')
+    } finally { setBusy(false) }
+  }
+
   return (
     <AuthShell title="Đăng ký tài khoản" subtitle="Xác minh sinh viên để tham gia cộng đồng" onNavigate={onNavigate}>
-      <AuthCard>
-        <Field icon="user" label="Họ và tên" value="Nguyễn Văn A" />
-        <Field icon="mail" label="Email" value="email@example.com" />
-        <Field icon="lock" label="Mật khẩu" value="••••••••" />
-        <Field icon="lock" label="Xác nhận mật khẩu" value="••••••••" />
-        <label className="verify-upload">Xác minh sinh viên *<span><StudyHubIcon name="upload" size={34} />Tải lên ảnh thẻ sinh viên<small>PNG, JPG, JPEG (tối đa 5MB)</small></span></label>
-        <div className="notice">Lưu ý: Ảnh xác minh giúp đảm bảo bạn là sinh viên FPT.</div>
-        <label className="terms"><input type="checkbox" /> Tôi đồng ý với điều khoản sử dụng và chính sách bảo mật</label>
-        <button className="auth-submit is-disabled" type="button">Đăng ký</button>
+      <form className="auth-card" onSubmit={submit}>
+        <label className="field">Mã SV<span><input type="text" value={form.studentCode} onChange={set('studentCode')} placeholder="SE123456" required /></span></label>
+        <label className="field">Họ và tên<span><input type="text" value={form.fullName} onChange={set('fullName')} placeholder="Nguyễn Văn A" required /></span></label>
+        <label className="field">Email FPT<span><input type="email" value={form.email} onChange={set('email')} placeholder="email@fpt.edu.vn" required /></span></label>
+        <label className="field">Mật khẩu<span><input type="password" value={form.password} onChange={set('password')} placeholder="••••••••" required minLength={6} /></span></label>
+        <label className="field">Xác nhận mk<span><input type="password" value={form.confirm} onChange={set('confirm')} placeholder="••••••••" required /></span></label>
+        <label className="field">Campus<span><select value={form.campus} onChange={set('campus')}><option value="HCM">Hồ Chí Minh</option><option value="HN">Hà Nội</option><option value="DN">Đà Nẵng</option><option value="CT">Cần Thơ</option><option value="QN">Quy Nhơn</option></select></span></label>
+        {error && <p className="auth-error">{error}</p>}
+        <label className="terms"><input type="checkbox" required /> Tôi đồng ý với điều khoản sử dụng</label>
+        <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Đang xử lý...' : 'Đăng ký'}</button>
         <p>Đã có tài khoản?<button onClick={() => onNavigate('login')} type="button">Đăng nhập</button></p>
-      </AuthCard>
+      </form>
     </AuthShell>
   )
 }
@@ -63,18 +88,5 @@ function AuthShell({ children, onNavigate, subtitle, title }) {
       {children}
       <button className="auth-back" onClick={() => onNavigate('guest-home')} type="button">← Quay về trang chủ</button>
     </main>
-  )
-}
-
-function AuthCard({ children }) {
-  return <section className="auth-card">{children}</section>
-}
-
-function Field({ icon, label, type = 'text', value }) {
-  return (
-    <label className="field">
-      {label}
-      <span><StudyHubIcon name={icon} size={18} /><input key={value} defaultValue={value} type={type} /></span>
-    </label>
   )
 }
