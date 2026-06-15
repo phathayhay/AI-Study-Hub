@@ -1,6 +1,6 @@
 import './App.css'
-import StudyHubApp from './pages/StudyHubApp'
+import AppRoutes from './routes/AppRoutes'
 
 export default function App() {
-  return <StudyHubApp />
+  return <AppRoutes />
 }

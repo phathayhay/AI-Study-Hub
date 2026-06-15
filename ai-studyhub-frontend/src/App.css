@@ -1455,6 +1455,16 @@
   font-size: 13px;
 }
 
+.api-status {
+  margin: 12px 0;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.api-status--error {
+  color: #dc2626;
+}
+
 .selected-file button {
   color: #e7000b;
   background: transparent;

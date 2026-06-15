@@ -6,16 +6,18 @@ export default function AppLayout({
   children,
   className = '',
   guest = false,
+  onLogout,
   onNavigate,
   onNotifications,
+  user,
   withTopbar = true,
 }) {
   return (
     <div className={`app-shell ${className}`}>
-      <Sidebar active={active} guest={guest} onNavigate={onNavigate} />
+      <Sidebar active={active} guest={guest} onLogout={onLogout} onNavigate={onNavigate} user={user} />
       <div className="app-shell__body">
         {withTopbar && (
-          <Topbar guest={guest} onNavigate={onNavigate} onNotifications={onNotifications} />
+          <Topbar guest={guest} onNavigate={onNavigate} onNotifications={onNotifications} user={user} />
         )}
         {children}
       </div>

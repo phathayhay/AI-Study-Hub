@@ -1,0 +1,185 @@
+import { useEffect, useRef, useState } from 'react'
+import StudyHubIcon from '../../components/icons/StudyHubIcons'
+import { uploadDocument } from '../../services/documentService'
+import { getRootFolders } from '../../services/folderService'
+import { PageTitle } from './shared'
+
+export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }) {
+  const [file, setFile] = useState(null)
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [courseId, setCourseId] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [folderId, setFolderId] = useState('')
+  const [visibility, setVisibility] = useState('PRIVATE')
+  const [tags, setTags] = useState('')
+  const [folders, setFolders] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [status, setStatus] = useState('')
+  const [error, setError] = useState('')
+  const inputRef = useRef(null)
+  const isStudyUpload = mode === 'study'
+
+  useEffect(() => {
+    let active = true
+    getRootFolders()
+      .then((data) => {
+        if (active) setFolders(data)
+      })
+      .catch(() => {
+        if (active) setFolders([])
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const selectFile = (files) => {
+    const [selected] = Array.from(files ?? [])
+    if (!selected) return
+    setFile(selected)
+    setTitle(selected.name.replace(/\.[^.]+$/, ''))
+    setStatus('')
+    setError('')
+  }
+
+  const clearFile = () => {
+    setFile(null)
+    setTitle('')
+    setDescription('')
+    setCourseId('')
+    setCategoryId('')
+    setTags('')
+    setStatus('')
+    setError('')
+    if (inputRef.current) inputRef.current.value = ''
+  }
+
+  const handleUpload = async () => {
+    if (!file || !title.trim()) {
+      setError('Vui lòng chọn file và nhập tiêu đề.')
+      return
+    }
+
+    setUploading(true)
+    setStatus('')
+    setError('')
+    try {
+      const document = await uploadDocument(file, {
+        title: title.trim(),
+        description: description.trim(),
+        courseId: courseId || null,
+        categoryId: categoryId || null,
+        folderId: folderId || null,
+        visibility,
+        tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+      })
+      setStatus('Tài liệu đã được tải lên thành công.')
+      if (isStudyUpload && onStudyFileUploaded) {
+        onStudyFileUploaded({
+          id: document.id,
+          documentId: document.id,
+          name: document.title,
+          attachmentName: document.fileName,
+          subject: document.description || document.fileType,
+          sizeLabel: formatFileSize(document.fileSize),
+          fileUrl: document.fileUrl,
+          content: '',
+        })
+      }
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <main className="page-surface upload-page">
+      <PageTitle
+        title={isStudyUpload ? 'Tạo Study Session mới' : 'Tải lên tài liệu'}
+        subtitle={isStudyUpload ? 'Tải file lên để AI tạo workspace học tập' : 'Chia sẻ tài liệu hoặc lưu trữ cá nhân'}
+      />
+      <section className="upload-card">
+        {!file ? (
+          <>
+            <input
+              ref={inputRef}
+              className="visually-hidden"
+              type="file"
+              accept=".pdf,.docx,.pptx"
+              onChange={(event) => selectFile(event.target.files)}
+            />
+            <div
+              className="drop-zone"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault()
+                selectFile(event.dataTransfer.files)
+              }}
+            >
+              <StudyHubIcon name="upload" size={46} />
+              <h3>Kéo thả file vào đây</h3>
+              <p>hoặc</p>
+              <button className="file-picker-button" onClick={() => inputRef.current?.click()} type="button">
+                <StudyHubIcon name="file" size={18} /> Chọn file
+              </button>
+              <small>Hỗ trợ: PDF, DOCX, PPTX (tối đa 50MB)</small>
+            </div>
+          </>
+        ) : (
+          <div className="upload-form">
+            <h3>File đã chọn</h3>
+            <div className="selected-file">
+              <StudyHubIcon name="file" size={18} />
+              <span><strong>{file.name}</strong><small>{formatFileSize(file.size)}</small></span>
+              <button onClick={clearFile} type="button">×</button>
+            </div>
+            <label>Tiêu đề tài liệu *<input onChange={(event) => setTitle(event.target.value)} value={title} /></label>
+            <label>Mô tả<textarea onChange={(event) => setDescription(event.target.value)} value={description} /></label>
+            <div className="upload-form__grid">
+              <label>
+                Course ID
+                <input min="1" onChange={(event) => setCourseId(event.target.value)} type="number" value={courseId} />
+              </label>
+              <label>
+                Category ID
+                <input min="1" onChange={(event) => setCategoryId(event.target.value)} type="number" value={categoryId} />
+              </label>
+              <label>
+                Thư mục
+                <select onChange={(event) => setFolderId(event.target.value)} value={folderId}>
+                  <option value="">Thư mục gốc</option>
+                  {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.folderName}</option>)}
+                </select>
+              </label>
+              <label>
+                Quyền xem
+                <select onChange={(event) => setVisibility(event.target.value)} value={visibility}>
+                  <option value="PRIVATE">Riêng tư</option>
+                  <option value="PUBLIC">Công khai</option>
+                </select>
+              </label>
+            </div>
+            <label>Tags<input onChange={(event) => setTags(event.target.value)} placeholder="java, database, exam" value={tags} /></label>
+            {status && <p className="api-status">{status}</p>}
+            {error && <p className="api-status api-status--error">{error}</p>}
+            <div className="upload-form__actions">
+              <button className="upload-submit" disabled={uploading} onClick={handleUpload} type="button">
+                {uploading ? 'Đang tải lên...' : isStudyUpload ? 'Tải lên và học với AI' : 'Tải lên'}
+              </button>
+              <button className="cancel-button" onClick={clearFile} type="button">Hủy</button>
+            </div>
+          </div>
+        )}
+      </section>
+    </main>
+  )
+}
+
+function formatFileSize(bytes = 0) {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${(bytes / (1024 ** unitIndex)).toFixed(unitIndex ? 1 : 0)} ${units[unitIndex]}`
+}

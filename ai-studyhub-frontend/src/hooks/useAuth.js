@@ -1,11 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 export default function useAuth() {
-  const [user, setUser] = useState(null)
-
-  useEffect(() => {
-    setUser(null)
-  }, [])
+  const [user] = useState(null)
 
   return { user, login: () => {}, logout: () => {} }
 }

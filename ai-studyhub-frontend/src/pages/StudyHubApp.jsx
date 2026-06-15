@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import AppLayout from '../components/layout/AppLayout'
 import { AdminApp } from './study-hub/admin'
 import { LoginPage, RegisterPage } from './study-hub/auth'
@@ -11,9 +12,13 @@ import {
   HomeScreen,
   PricingPage,
   ProfilePage,
-  UploadPage,
 } from './study-hub/public-pages'
-import { StudyDocumentPage } from './study-hub/study-document'
+import { getStoredUser, logout } from '../features/auth/authService'
+import { getDocumentDetails } from '../services/documentService'
+import { fillRoute, ROUTES, ROUTE_PATHS } from '../constants/routes'
+import UploadPage from './study-hub/UploadPageApi'
+import StudyDocumentPage from './study-hub/StudyDocumentApi'
+import NotFound from './NotFound'
 
 const defaultStudyFile = {
   name: '漢字--JPD316 Lesson 5-NEW.pptx',
@@ -22,69 +27,127 @@ const defaultStudyFile = {
   content: '',
 }
 
-export default function StudyHubApp() {
-  const [route, setRoute] = useState('guest-home')
-  const [previousRoute, setPreviousRoute] = useState('guest-home')
-  const [role, setRole] = useState(null)
+const protectedRoutes = new Set(['library', 'upload', 'profile', 'pricing', 'study'])
+
+export default function StudyHubApp({ notFound = false }) {
+  const location = useLocation()
+  const routerNavigate = useNavigate()
+  const params = useParams()
+  const storedUser = getStoredUser()
+  const [role, setRole] = useState(() => mapRole(storedUser?.role))
+  const [authUser, setAuthUser] = useState(storedUser)
   const [libraryTab, setLibraryTab] = useState('sessions')
   const [studyTab, setStudyTab] = useState('original')
   const [studyMode, setStudyMode] = useState('default')
-  const [uploadMode, setUploadMode] = useState('document')
-  const [studyFile, setStudyFile] = useState(defaultStudyFile)
+  const [studyFile, setStudyFile] = useState(() => location.state?.file ?? {
+    ...defaultStudyFile,
+    id: params.documentId,
+    documentId: params.documentId,
+  })
   const [selectedFile, setSelectedFile] = useState(null)
   const [showReport, setShowReport] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const route = notFound ? 'not-found' : getRouteFromPath(location.pathname, role)
+  const uploadMode = location.pathname === ROUTES.NEW_STUDY_SESSION ? 'study' : 'document'
+  const activeStudyFile = location.state?.file ?? (
+    String(studyFile.documentId) === params.documentId
+      ? studyFile
+      : { ...defaultStudyFile, id: params.documentId, documentId: params.documentId }
+  )
+
+  useEffect(() => {
+    if (route !== 'study' || !params.documentId) return undefined
+    if (location.state?.file) return undefined
+
+    let active = true
+    getDocumentDetails(params.documentId)
+      .then((document) => {
+        if (active) setStudyFile(mapStudyDocument(document))
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [location.state, params.documentId, route])
 
   const navigate = (nextRoute) => {
-    if (nextRoute === 'new-study-session') {
-      setPreviousRoute(route)
-      setUploadMode('study')
-      setRoute('upload')
-      setShowNotifications(false)
-      setShowReport(false)
-      setSelectedFile(null)
-      return
-    }
-
-    setPreviousRoute(route)
-    setRoute(nextRoute)
     setShowNotifications(false)
     setShowReport(false)
     setSelectedFile(null)
-    if (nextRoute === 'guest-home') setRole(null)
-    if (nextRoute === 'upload') setUploadMode('document')
+
+    if (nextRoute === 'new-study-session') {
+      routerNavigate(ROUTES.NEW_STUDY_SESSION, { state: { from: location.pathname } })
+      return
+    }
+
     if (nextRoute === 'library') setLibraryTab('sessions')
     if (nextRoute === 'study') {
       setStudyTab('original')
       setStudyMode('default')
     }
+    const path = getPathForRoute(nextRoute)
+    routerNavigate(path, { state: { from: location.pathname } })
   }
 
-  const handleLogin = (nextRole) => {
+  const handleLogin = (session) => {
+    const nextRole = mapRole(session.role)
     setRole(nextRole)
-    navigate(nextRole === 'admin' ? 'admin-overview' : 'home')
+    setAuthUser(session)
+    const requestedPath = location.state?.from
+    const nextPath = nextRole === 'admin'
+      ? ROUTES.ADMIN_OVERVIEW
+      : requestedPath && !requestedPath.startsWith('/admin') ? requestedPath : ROUTES.HOME
+    routerNavigate(nextPath, { replace: true })
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } finally {
+      setRole(null)
+      setAuthUser(null)
+      routerNavigate(ROUTES.HOME, { replace: true })
+    }
   }
 
   const openStudyFile = (file) => {
-    setStudyFile({
+    const nextFile = {
+      id: file.id,
+      documentId: file.documentId ?? file.id,
       name: file.name,
-      attachmentName: file.name,
+      attachmentName: file.attachmentName ?? file.name,
       subject: file.subject,
       content: '',
       sizeLabel: file.sizeLabel,
-    })
-    navigate('study')
+      fileUrl: file.fileUrl,
+    }
+    setStudyFile(nextFile)
+    routerNavigate(
+      fillRoute(ROUTES.STUDY_DOCUMENT, { documentId: nextFile.documentId }),
+      { state: { file: nextFile, from: location.pathname } },
+    )
   }
 
   const handleStudyUpload = (file) => {
     setStudyFile(file)
-    setUploadMode('document')
-    navigate('study')
+    routerNavigate(
+      fillRoute(ROUTES.STUDY_DOCUMENT, { documentId: file.documentId ?? file.id }),
+      { replace: true, state: { file, from: ROUTES.LIBRARY } },
+    )
   }
 
+  if (route === 'not-found') return <NotFound />
+  if (route.startsWith('admin-') && role !== 'admin') {
+    return <Navigate replace state={{ from: location.pathname }} to={role ? ROUTES.HOME : ROUTES.LOGIN} />
+  }
+  if (protectedRoutes.has(route) && !role) {
+    return <Navigate replace state={{ from: location.pathname }} to={ROUTES.LOGIN} />
+  }
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
-  if (route === 'register') return <RegisterPage onNavigate={navigate} />
-  if (route.startsWith('admin-')) return <AdminApp route={route} onNavigate={navigate} />
+  if (route === 'register') return <RegisterPage onNavigate={navigate} onRegister={handleLogin} />
+  if (route.startsWith('admin-')) {
+    return <AdminApp onLogout={handleLogout} route={route} onNavigate={navigate} />
+  }
 
   const guest = !role
   const activeRoute = guest
@@ -96,8 +159,10 @@ export default function StudyHubApp() {
       active={activeRoute}
       className={route === 'study' ? 'app-shell--study' : ''}
       guest={guest}
+      user={authUser}
       onNavigate={navigate}
       onNotifications={() => setShowNotifications((open) => !open)}
+      onLogout={handleLogout}
     >
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
 
@@ -123,16 +188,16 @@ export default function StudyHubApp() {
       {route === 'pricing' && <PricingPage onNavigate={navigate} />}
       {route === 'doc-detail' && (
         <DocumentDetailPage
-          onBack={() => navigate(previousRoute || (role ? 'home' : 'guest-home'))}
+          onBack={() => navigateBack(routerNavigate, location.state?.from, ROUTES.HOME)}
           onReport={() => setShowReport(true)}
         />
       )}
       {route === 'study' && (
         <StudyDocumentPage
           activeTab={studyTab}
-          file={studyFile}
+          file={activeStudyFile}
           mode={studyMode}
-          onBack={() => navigate(previousRoute || 'library')}
+          onBack={() => navigateBack(routerNavigate, location.state?.from, ROUTES.LIBRARY)}
           onModeChange={setStudyMode}
           onTabChange={(tab) => {
             setStudyTab(tab)
@@ -145,4 +210,68 @@ export default function StudyHubApp() {
       {showReport && <ReportModal onClose={() => setShowReport(false)} />}
     </AppLayout>
   )
+}
+
+function mapRole(role) {
+  if (!role) return null
+  return role.toUpperCase() === 'ADMIN' ? 'admin' : 'student'
+}
+
+function getRouteFromPath(pathname, role) {
+  const path = pathname !== '/' ? pathname.replace(/\/+$/, '') : pathname
+  const routesByPath = {
+    [ROUTES.HOME]: role ? 'home' : 'guest-home',
+    [ROUTES.LOGIN]: 'login',
+    [ROUTES.REGISTER]: 'register',
+    [ROUTES.EXPLORE]: 'explore',
+    [ROUTES.LIBRARY]: 'library',
+    [ROUTES.UPLOAD]: 'upload',
+    [ROUTES.NEW_STUDY_SESSION]: 'upload',
+    [ROUTES.PROFILE]: 'profile',
+    [ROUTES.PRICING]: 'pricing',
+    [ROUTES.ADMIN_OVERVIEW]: 'admin-overview',
+    [ROUTES.ADMIN_USERS]: 'admin-users',
+    [ROUTES.ADMIN_DOCUMENTS]: 'admin-documents',
+    [ROUTES.ADMIN_COURSES]: 'admin-courses',
+    [ROUTES.ADMIN_STORAGE]: 'admin-storage',
+    [ROUTES.ADMIN_REPORTS]: 'admin-reports',
+    [ROUTES.ADMIN_LOGS]: 'admin-logs',
+    [ROUTES.ADMIN_SETTINGS]: 'admin-settings',
+  }
+
+  if (routesByPath[path]) return routesByPath[path]
+  if (/^\/folders\/[^/]+$/.test(path)) return 'folder-detail'
+  if (/^\/documents\/[^/]+$/.test(path)) return 'doc-detail'
+  if (/^\/study\/[^/]+$/.test(path)) return 'study'
+  return 'not-found'
+}
+
+function getPathForRoute(route) {
+  if (route === 'folder-detail') return fillRoute(ROUTES.FOLDER_DETAIL, { folderId: 'featured' })
+  if (route === 'doc-detail') return fillRoute(ROUTES.DOCUMENT_DETAIL, { documentId: 'featured' })
+  return ROUTE_PATHS[route] ?? ROUTES.HOME
+}
+
+function navigateBack(navigate, previousPath, fallbackPath) {
+  navigate(previousPath || fallbackPath)
+}
+
+function mapStudyDocument(document) {
+  return {
+    id: document.id,
+    documentId: document.id,
+    name: document.title || document.fileName,
+    attachmentName: document.fileName,
+    subject: document.description || document.fileType,
+    sizeLabel: formatFileSize(document.fileSize),
+    fileUrl: document.fileUrl,
+    content: '',
+  }
+}
+
+function formatFileSize(bytes = 0) {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${(bytes / (1024 ** unitIndex)).toFixed(unitIndex ? 1 : 0)} ${units[unitIndex]}`
 }
