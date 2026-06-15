@@ -17,4 +17,7 @@ public class ChangePasswordRequest {
     @NotBlank(message = "New password cannot be blank")
     @Size(min = 6, message = "New password must be at least 6 characters")
     private String newPassword;
+
+    @NotBlank(message = "Confirm password cannot be blank")
+    private String confirmPassword;
 }
