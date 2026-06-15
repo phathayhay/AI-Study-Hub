@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { featuredDocuments, notifications } from '../../data/studyHubData'
@@ -24,6 +25,14 @@ export function NotificationPanel({ onClose }) {
 }
 
 export function FilePreviewModal({ file, onClose, onView }) {
+  const [opening, setOpening] = useState(false)
+
+  const handleView = () => {
+    if (opening) return
+    setOpening(true)
+    onView()
+  }
+
   return (
     <div className="modal-backdrop">
       <section className="file-modal">
@@ -33,7 +42,12 @@ export function FilePreviewModal({ file, onClose, onView }) {
         <InfoBlock label="Type" value={file.kind} />
         <InfoBlock label="Category" value={file.category ?? file.subject} />
         <InfoBlock label="Upload Date" value={file.date} />
-        <footer><button onClick={onClose} type="button">Close</button><button className="purple-button" onClick={onView} type="button"><StudyHubIcon name="eye" size={16} /> View Full Document</button></footer>
+        <footer>
+          <button disabled={opening} onClick={onClose} type="button">Close</button>
+          <button className="purple-button" disabled={opening} onClick={handleView} type="button">
+            <StudyHubIcon name="eye" size={16} /> {opening ? 'Opening...' : 'View Full Document'}
+          </button>
+        </footer>
       </section>
     </div>
   )

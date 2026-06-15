@@ -1,5 +1,8 @@
 const DEFAULT_API_BASE_URL = 'https://ai-study-hub-mpmz.onrender.com'
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '')
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+const API_BASE_URL = (
+  configuredApiBaseUrl || (import.meta.env.DEV ? '' : DEFAULT_API_BASE_URL)
+).replace(/\/$/, '')
 
 function getAccessToken() {
   return localStorage.getItem('accessToken') ?? sessionStorage.getItem('accessToken')

@@ -121,6 +121,7 @@ export default function StudyHubApp({ notFound = false }) {
       sizeLabel: file.sizeLabel,
       fileUrl: file.fileUrl,
     }
+    setSelectedFile(null)
     setStudyFile(nextFile)
     routerNavigate(
       fillRoute(ROUTES.STUDY_DOCUMENT, { documentId: nextFile.documentId }),

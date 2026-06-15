@@ -4,6 +4,9 @@ import { uploadDocument } from '../../services/documentService'
 import { getRootFolders } from '../../services/folderService'
 import { PageTitle } from './shared'
 
+const MAX_FILE_SIZE = 50 * 1024 * 1024
+const ALLOWED_EXTENSIONS = ['pdf', 'docx', 'pptx']
+
 export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }) {
   const [file, setFile] = useState(null)
   const [title, setTitle] = useState('')
@@ -37,6 +40,19 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
   const selectFile = (files) => {
     const [selected] = Array.from(files ?? [])
     if (!selected) return
+
+    const extension = selected.name.split('.').pop()?.toLowerCase()
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      setError('Chỉ hỗ trợ file PDF, DOCX hoặc PPTX.')
+      resetFileInput()
+      return
+    }
+    if (selected.size > MAX_FILE_SIZE) {
+      setError('Dung lượng file không được vượt quá 50MB.')
+      resetFileInput()
+      return
+    }
+
     setFile(selected)
     setTitle(selected.name.replace(/\.[^.]+$/, ''))
     setStatus('')
@@ -49,9 +65,15 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
     setDescription('')
     setCourseId('')
     setCategoryId('')
+    setFolderId('')
+    setVisibility('PRIVATE')
     setTags('')
     setStatus('')
     setError('')
+    resetFileInput()
+  }
+
+  const resetFileInput = () => {
     if (inputRef.current) inputRef.current.value = ''
   }
 
@@ -66,14 +88,15 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
     setError('')
     try {
       const document = await uploadDocument(file, {
-        title: title.trim(),
-        description: description.trim(),
-        courseId: courseId || null,
-        categoryId: categoryId || null,
-        folderId: folderId || null,
+        title,
+        description,
+        courseId,
+        categoryId,
+        folderId,
         visibility,
-        tags: tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+        tags: tags.split(','),
       })
+
       setStatus('Tài liệu đã được tải lên thành công.')
       if (isStudyUpload && onStudyFileUploaded) {
         onStudyFileUploaded({
@@ -88,7 +111,7 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
         })
       }
     } catch (requestError) {
-      setError(requestError.message)
+      setError(getUploadErrorMessage(requestError))
     } finally {
       setUploading(false)
     }
@@ -126,6 +149,7 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
               </button>
               <small>Hỗ trợ: PDF, DOCX, PPTX (tối đa 50MB)</small>
             </div>
+            {error && <p className="api-status api-status--error">{error}</p>}
           </>
         ) : (
           <div className="upload-form">
@@ -133,7 +157,7 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
             <div className="selected-file">
               <StudyHubIcon name="file" size={18} />
               <span><strong>{file.name}</strong><small>{formatFileSize(file.size)}</small></span>
-              <button onClick={clearFile} type="button">×</button>
+              <button aria-label="Bỏ file đã chọn" disabled={uploading} onClick={clearFile} type="button">×</button>
             </div>
             <label>Tiêu đề tài liệu *<input onChange={(event) => setTitle(event.target.value)} value={title} /></label>
             <label>Mô tả<textarea onChange={(event) => setDescription(event.target.value)} value={description} /></label>
@@ -168,13 +192,20 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
               <button className="upload-submit" disabled={uploading} onClick={handleUpload} type="button">
                 {uploading ? 'Đang tải lên...' : isStudyUpload ? 'Tải lên và học với AI' : 'Tải lên'}
               </button>
-              <button className="cancel-button" onClick={clearFile} type="button">Hủy</button>
+              <button className="cancel-button" disabled={uploading} onClick={clearFile} type="button">Hủy</button>
             </div>
           </div>
         )}
       </section>
     </main>
   )
+}
+
+function getUploadErrorMessage(error) {
+  if (error.status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+  if (error.status === 413) return 'Dung lượng file vượt quá giới hạn 50MB.'
+  if (error.status === 400) return error.message || 'Thông tin tài liệu hoặc định dạng file không hợp lệ.'
+  return error.message || 'Không thể tải tài liệu lên. Vui lòng thử lại.'
 }
 
 function formatFileSize(bytes = 0) {

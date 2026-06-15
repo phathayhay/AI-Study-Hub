@@ -3,17 +3,29 @@ import { apiDelete, apiGet, apiPost, apiPut } from './api'
 export function uploadDocument(file, metadata) {
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('title', metadata.title)
-
-  for (const field of ['description', 'courseId', 'categoryId', 'folderId', 'visibility']) {
-    const value = metadata[field]
-    if (value !== undefined && value !== null && value !== '') formData.append(field, value)
-  }
-  for (const tag of metadata.tags ?? []) {
-    if (tag.trim()) formData.append('tags', tag.trim())
-  }
+  formData.append(
+    'request',
+    new Blob([JSON.stringify(buildUploadRequest(metadata))], { type: 'application/json' }),
+  )
 
   return apiPost('/api/documents/upload', formData)
+}
+
+function buildUploadRequest(metadata) {
+  const request = {
+    title: metadata.title.trim(),
+    description: metadata.description?.trim() || null,
+    visibility: metadata.visibility || 'PRIVATE',
+    tags: (metadata.tags ?? []).map((tag) => tag.trim()).filter(Boolean),
+  }
+
+  for (const field of ['courseId', 'categoryId', 'folderId']) {
+    if (metadata[field] !== undefined && metadata[field] !== null && metadata[field] !== '') {
+      request[field] = Number(metadata[field])
+    }
+  }
+
+  return request
 }
 
 export function moveDocument(documentId, folderId = null) {
