@@ -59,7 +59,7 @@ cloudinary:
 # ── Gemini AI ────────────────────────────────────────────────
 gemini:
   api-key: ${GEMINI_API_KEY}
-  model: gemini-1.5-flash
+  model: gemini-2.5-flash
   project-id: ${GOOGLE_CLOUD_PROJECT_ID}
   location: us-central1
   max-tokens: 2048
