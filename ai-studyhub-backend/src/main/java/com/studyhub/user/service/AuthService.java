@@ -267,6 +267,10 @@ public class AuthService {
             throw new IllegalArgumentException("Incorrect old password");
         }
 
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("Confirm password does not match new password");
+        }
+
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
     }
