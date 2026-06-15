@@ -1,4 +1,5 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+const DEFAULT_API_BASE_URL = 'https://ai-study-hub-mpmz.onrender.com'
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '')
 
 function getAccessToken() {
   return localStorage.getItem('accessToken')
@@ -42,7 +43,16 @@ export async function apiRequest(path, options = {}) {
     throw new ApiError(message, response.status, data)
   }
 
-  return response.status === 204 ? null : data
+  if (response.status === 204) return null
+
+  const isApiResponse = data
+    && typeof data === 'object'
+    && typeof data.success === 'boolean'
+    && Object.prototype.hasOwnProperty.call(data, 'message')
+
+  return isApiResponse && Object.prototype.hasOwnProperty.call(data, 'data')
+    ? data.data
+    : data
 }
 
 export function apiGet(path, options) {

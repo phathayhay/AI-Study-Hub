@@ -15,11 +15,13 @@ import {
 } from './study-hub/public-pages'
 import { defaultStudyFile } from '../packages/mooc-data'
 import { StudyDocumentPage } from './study-hub/study-document'
+import { getStoredUser, logout } from '../features/auth/authService'
 
 export default function StudyHubApp() {
-  const [route, setRoute] = useState('guest-home')
+  const storedUser = getStoredUser()
+  const [route, setRoute] = useState(storedUser ? 'home' : 'guest-home')
   const [previousRoute, setPreviousRoute] = useState('guest-home')
-  const [role, setRole] = useState(null)
+  const [role, setRole] = useState(() => mapRole(storedUser?.role))
   const [libraryTab, setLibraryTab] = useState('sessions')
   const [studyTab, setStudyTab] = useState('original')
   const [studyMode, setStudyMode] = useState('default')
@@ -54,9 +56,19 @@ export default function StudyHubApp() {
     }
   }
 
-  const handleLogin = (nextRole) => {
+  const handleLogin = (session) => {
+    const nextRole = mapRole(session.role)
     setRole(nextRole)
     navigate(nextRole === 'admin' ? 'admin-overview' : 'home')
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } finally {
+      setRole(null)
+      navigate('guest-home')
+    }
   }
 
   const openStudyFile = (file) => {
@@ -80,7 +92,7 @@ export default function StudyHubApp() {
   }
 
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
-  if (route === 'register') return <RegisterPage onNavigate={navigate} />
+  if (route === 'register') return <RegisterPage onNavigate={navigate} onRegister={handleLogin} />
   if (route.startsWith('admin-')) return <AdminApp route={route} onNavigate={navigate} />
 
   const guest = !role
@@ -95,6 +107,7 @@ export default function StudyHubApp() {
       guest={guest}
       onNavigate={navigate}
       onNotifications={() => setShowNotifications((open) => !open)}
+      onLogout={handleLogout}
     >
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
 
@@ -142,4 +155,9 @@ export default function StudyHubApp() {
       {showReport && <ReportModal onClose={() => setShowReport(false)} />}
     </AppLayout>
   )
+}
+
+function mapRole(role) {
+  if (!role) return null
+  return role.toUpperCase() === 'ADMIN' ? 'admin' : 'student'
 }

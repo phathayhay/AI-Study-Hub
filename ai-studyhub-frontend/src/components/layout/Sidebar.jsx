@@ -2,7 +2,7 @@ import { appUser, guestUser, mainNavItems, publicNavItems } from '../../packages
 import StudyHubIcon from '../icons/StudyHubIcons'
 import Brand from './Brand'
 
-export default function Sidebar({ active = 'home', guest = false, onNavigate }) {
+export default function Sidebar({ active = 'home', guest = false, onLogout, onNavigate }) {
   const navItems = guest ? publicNavItems : mainNavItems
   const user = guest ? guestUser : appUser
 
@@ -35,7 +35,7 @@ export default function Sidebar({ active = 'home', guest = false, onNavigate }) 
           </span>
         </div>
         {!guest && (
-          <button className="logout-button" onClick={() => onNavigate?.('guest-home')} type="button">
+          <button className="logout-button" onClick={onLogout} type="button">
             <StudyHubIcon name="logout" size={20} />
             <span>Đăng xuất</span>
           </button>
