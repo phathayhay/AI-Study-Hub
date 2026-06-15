@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import Brand from '../../components/layout/Brand'
-import { register as authRegister } from '../../features/auth/authService'
 
 export function LoginPage({ onLogin, onNavigate }) {
   const [email, setEmail] = useState('')
@@ -42,8 +41,8 @@ export function LoginPage({ onLogin, onNavigate }) {
   )
 }
 
-export function RegisterPage({ onNavigate }) {
-  const [form, setForm] = useState({ studentCode: '', fullName: '', email: '', password: '', confirm: '', campus: 'HCM' })
+export function RegisterPage({ onRegister, onNavigate }) {
+  const [form, setForm] = useState({ studentCode: '', fullName: '', email: '', password: '', confirm: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -56,8 +55,7 @@ export function RegisterPage({ onNavigate }) {
     if (!form.studentCode || !form.fullName || !form.email || !form.password) { setError('Vui lòng điền đầy đủ'); return }
     setBusy(true)
     try {
-      await authRegister({ studentCode: form.studentCode, fullName: form.fullName, email: form.email, password: form.password, campus: form.campus })
-      onNavigate('login')
+      await onRegister({ studentCode: form.studentCode, fullName: form.fullName, email: form.email, password: form.password })
     } catch (err) {
       setError(err?.message || 'Đăng ký thất bại')
     } finally { setBusy(false) }
@@ -71,7 +69,6 @@ export function RegisterPage({ onNavigate }) {
         <label className="field">Email FPT<span><input type="email" value={form.email} onChange={set('email')} placeholder="email@fpt.edu.vn" required /></span></label>
         <label className="field">Mật khẩu<span><input type="password" value={form.password} onChange={set('password')} placeholder="••••••••" required minLength={6} /></span></label>
         <label className="field">Xác nhận mk<span><input type="password" value={form.confirm} onChange={set('confirm')} placeholder="••••••••" required /></span></label>
-        <label className="field">Campus<span><select value={form.campus} onChange={set('campus')}><option value="HCM">Hồ Chí Minh</option><option value="HN">Hà Nội</option><option value="DN">Đà Nẵng</option><option value="CT">Cần Thơ</option><option value="QN">Quy Nhơn</option></select></span></label>
         {error && <p className="auth-error">{error}</p>}
         <label className="terms"><input type="checkbox" required /> Tôi đồng ý với điều khoản sử dụng</label>
         <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Đang xử lý...' : 'Đăng ký'}</button>

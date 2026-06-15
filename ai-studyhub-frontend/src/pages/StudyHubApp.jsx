@@ -19,7 +19,7 @@ const defaultStudyFile = {
 }
 
 export default function StudyHubApp() {
-  const { user, loading, login: authLogin, logout: authLogout } = useAuth()
+  const { user, loading, login: authLogin, register: authRegister, logout: authLogout } = useAuth()
   const [route, setRoute] = useState('guest-home')
   const [previousRoute, setPreviousRoute] = useState('guest-home')
   const [role, setRole] = useState(null)
@@ -61,6 +61,13 @@ export default function StudyHubApp() {
     navigate(r === 'admin' ? 'admin-overview' : 'home')
   }
 
+  const handleRegister = async (data) => {
+    const u = await authRegister(data)
+    const r = u.role === 'ADMIN' ? 'admin' : 'student'
+    setRole(r)
+    navigate(r === 'admin' ? 'admin-overview' : 'home')
+  }
+
   const handleLogout = async () => {
     await authLogout()
     setRole(null)
@@ -84,7 +91,7 @@ export default function StudyHubApp() {
   if (loading) return null
 
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
-  if (route === 'register') return <RegisterPage onNavigate={navigate} />
+  if (route === 'register') return <RegisterPage onRegister={handleRegister} onNavigate={navigate} />
   if (route.startsWith('admin-')) return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />
 
   const guest = !user || !role
