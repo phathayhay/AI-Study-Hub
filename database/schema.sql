@@ -1,8 +1,8 @@
 
-CREATE DATABASE IF NOT EXISTS ai_studyhub_fpt
+CREATE DATABASE IF NOT EXISTS ai_studyhub
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
-USE ai_studyhub_fpt;    
+USE ai_studyhub;    
 
 -- =====================================================
 -- 1. SUBSCRIPTION PLANS
@@ -465,7 +465,7 @@ CREATE TABLE document_shares (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     document_id BIGINT NOT NULL,
     shared_user_id BIGINT NOT NULL,
-    owner_id BIGINT NOT NULL
+    owner_id BIGINT NOT NULL,
     permission ENUM(
         'VIEW',
         'EDIT'
