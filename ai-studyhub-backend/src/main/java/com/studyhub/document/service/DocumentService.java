@@ -15,7 +15,7 @@ import com.studyhub.document.repository.DocumentCategoryRepository;
 import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.document.repository.FolderRepository;
 import com.studyhub.document.repository.TagRepository;
-import com.studyhub.storage.service.FirebaseStorageService;
+import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +42,7 @@ public class DocumentService {
     private final CourseRepository courseRepository;
     private final DocumentCategoryRepository categoryRepository;
     private final TagRepository tagRepository;
-    private final FirebaseStorageService storageService;
+    private final CloudinaryStorageService storageService;
 
     @Transactional
     public DocumentResponse uploadDocument(MultipartFile file, DocumentUploadRequest request, String userEmail) throws IOException {
@@ -97,7 +97,7 @@ public class DocumentService {
             }
         }
 
-        // Upload to Firebase Storage
+        // Upload to Cloudinary
         String fileUrl = storageService.uploadFile(file, "documents");
 
         // Build and Save Document
@@ -190,7 +190,7 @@ public class DocumentService {
             throw new SecurityException("Permission denied");
         }
 
-        // Delete from Firebase storage first
+        // Delete from Cloudinary first
         storageService.deleteFile(doc.getFileUrl());
 
         documentRepository.delete(doc);

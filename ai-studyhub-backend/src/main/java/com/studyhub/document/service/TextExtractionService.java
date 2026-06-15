@@ -36,21 +36,18 @@ public class TextExtractionService {
     }
 
     public String extractTextFromUrl(String fileUrl) throws IOException {
-        if (fileUrl == null || !fileUrl.contains("/o/")) {
+        if (fileUrl == null || fileUrl.isEmpty()) {
             throw new IllegalArgumentException("Invalid file URL");
         }
         try {
-            String pathPart = fileUrl.split("/o/")[1].split("\\?")[0];
-            String filePath = java.net.URLDecoder.decode(pathPart, StandardCharsets.UTF_8);
+            // Find the file extension from the URL (excluding query params)
+            String cleanUrl = fileUrl.split("\\?")[0];
+            String extension = cleanUrl.substring(cleanUrl.lastIndexOf(".") + 1).toLowerCase();
 
-            com.google.cloud.storage.Bucket bucket = com.google.firebase.cloud.StorageClient.getInstance().bucket();
-            com.google.cloud.storage.Blob blob = bucket.get(filePath);
-            if (blob == null) {
-                throw new IOException("File not found in Firebase Storage: " + filePath);
-            }
+            log.info("Extracting text from URL: {}, detected extension: {}", fileUrl, extension);
 
-            String extension = filePath.substring(filePath.lastIndexOf(".") + 1).toLowerCase();
-            try (InputStream inputStream = new java.io.ByteArrayInputStream(blob.getContent())) {
+            java.net.URL url = new java.net.URL(fileUrl);
+            try (InputStream inputStream = url.openStream()) {
                 return switch (extension) {
                     case "pdf" -> extractTextFromPdf(inputStream);
                     case "docx" -> extractTextFromDocx(inputStream);
