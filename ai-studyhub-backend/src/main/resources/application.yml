@@ -50,6 +50,12 @@ firebase:
   storage-bucket: ${FIREBASE_STORAGE_BUCKET:your-project-id.appspot.com}
   project-id: ${FIREBASE_PROJECT_ID:your-project-id}
 
+# ── Cloudinary ───────────────────────────────────────────────
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
+
 # ── Gemini AI ────────────────────────────────────────────────
 gemini:
   api-key: ${GEMINI_API_KEY}

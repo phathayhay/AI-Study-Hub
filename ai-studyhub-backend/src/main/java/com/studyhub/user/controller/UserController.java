@@ -2,7 +2,7 @@ package com.studyhub.user.controller;
 
 import com.studyhub.common.ApiResponse;
 import com.studyhub.security.SecurityUtils;
-import com.studyhub.storage.service.FirebaseStorageService;
+import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,7 +27,7 @@ import java.io.IOException;
 public class UserController {
 
     private final UserRepository userRepository;
-    private final FirebaseStorageService firebaseStorageService;
+    private final CloudinaryStorageService cloudinaryStorageService;
 
     // API tải lên ảnh đại diện của người dùng
     @PostMapping(value = "/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -50,14 +50,14 @@ public class UserController {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         try {
-            // Xóa ảnh đại diện cũ trên Firebase Storage nếu có
+            // Xóa ảnh đại diện cũ trên Cloudinary nếu có
             String oldAvatarUrl = user.getAvatarUrl();
             if (oldAvatarUrl != null && !oldAvatarUrl.isEmpty()) {
-                firebaseStorageService.deleteFile(oldAvatarUrl);
+                cloudinaryStorageService.deleteFile(oldAvatarUrl);
             }
 
-            // Tải ảnh đại diện mới lên Firebase Storage
-            String newAvatarUrl = firebaseStorageService.uploadFile(file, "avatars");
+            // Tải ảnh đại diện mới lên Cloudinary
+            String newAvatarUrl = cloudinaryStorageService.uploadFile(file, "avatars");
 
             // Cập nhật đường dẫn ảnh mới vào Database
             user.setAvatarUrl(newAvatarUrl);
