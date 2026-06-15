@@ -42,7 +42,7 @@ public class DocumentController {
     })
     public ResponseEntity<DocumentResponse> uploadDocument(
             @RequestPart("file") MultipartFile file,
-            @RequestParam("request") String requestJson) throws IOException {
+            @RequestPart("request") String requestJson) throws IOException {
         
         DocumentUploadRequest request;
         try {
