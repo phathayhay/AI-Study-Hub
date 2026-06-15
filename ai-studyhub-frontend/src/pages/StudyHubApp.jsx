@@ -56,7 +56,7 @@ export default function StudyHubApp() {
 
   const handleLogin = async (email, password) => {
     const u = await authLogin(email, password)
-    const r = u.roleName === 'ADMIN' ? 'admin' : 'student'
+    const r = u.role === 'ADMIN' ? 'admin' : 'student'
     setRole(r)
     navigate(r === 'admin' ? 'admin-overview' : 'home')
   }

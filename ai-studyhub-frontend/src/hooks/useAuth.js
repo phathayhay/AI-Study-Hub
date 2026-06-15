@@ -9,7 +9,10 @@ export default function useAuth() {
     const token = localStorage.getItem('accessToken')
     if (!token) { setLoading(false); return }
     authService.getMe().then((res) => {
-      if (res?.data) setUser(res.data)
+      if (res?.data) {
+        const d = res.data
+        setUser({ email: d.email, fullName: d.fullName, studentCode: d.studentCode, role: d.roleName })
+      }
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
@@ -19,7 +22,7 @@ export default function useAuth() {
     const d = res.data || res
     if (d.accessToken) localStorage.setItem('accessToken', d.accessToken)
     if (d.refreshToken) localStorage.setItem('refreshToken', d.refreshToken)
-    const u = d.user || d
+    const u = { email: d.email, fullName: d.fullName, studentCode: d.studentCode, role: d.role }
     setUser(u)
     return u
   }, [])

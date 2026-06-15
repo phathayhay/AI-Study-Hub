@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Brand from '../../components/layout/Brand'
+import { register as authRegister } from '../../features/auth/authService'
 
 export function LoginPage({ onLogin, onNavigate }) {
   const [email, setEmail] = useState('')
@@ -55,7 +56,8 @@ export function RegisterPage({ onNavigate }) {
     if (!form.studentCode || !form.fullName || !form.email || !form.password) { setError('Vui lòng điền đầy đủ'); return }
     setBusy(true)
     try {
-      await onNavigate('login')
+      await authRegister({ studentCode: form.studentCode, fullName: form.fullName, email: form.email, password: form.password, campus: form.campus })
+      onNavigate('login')
     } catch (err) {
       setError(err?.message || 'Đăng ký thất bại')
     } finally { setBusy(false) }
