@@ -1,5 +1,6 @@
 package com.studyhub.document.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.studyhub.document.dto.DocumentResponse;
 import com.studyhub.document.dto.DocumentUploadRequest;
 import com.studyhub.document.service.DocumentService;
@@ -28,6 +29,7 @@ import java.util.List;
 public class DocumentController {
 
     private final DocumentService documentService;
+    private final ObjectMapper objectMapper;
 
     // API tải lên tài liệu học tập mới
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -40,7 +42,19 @@ public class DocumentController {
     })
     public ResponseEntity<DocumentResponse> uploadDocument(
             @RequestPart("file") MultipartFile file,
-            @Valid @RequestPart("request") DocumentUploadRequest request) throws IOException {
+            @RequestParam("request") String requestJson) throws IOException {
+        
+        DocumentUploadRequest request;
+        try {
+            request = objectMapper.readValue(requestJson, DocumentUploadRequest.class);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid JSON format in 'request' field");
+        }
+        
+        if (request == null || request.getTitle() == null || request.getTitle().trim().isEmpty()) {
+            throw new IllegalArgumentException("Title is required");
+        }
+        
         String email = SecurityUtils.getCurrentUserEmail();
         return ResponseEntity.ok(documentService.uploadDocument(file, request, email));
     }
