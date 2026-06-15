@@ -39,8 +39,8 @@ public class DocumentController {
         @ApiResponse(responseCode = "500", description = "Internal server or storage error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
     public ResponseEntity<DocumentResponse> uploadDocument(
-            @RequestParam("file") MultipartFile file,
-            @Valid @ModelAttribute DocumentUploadRequest request) throws IOException {
+            @RequestPart("file") MultipartFile file,
+            @Valid @RequestPart("request") DocumentUploadRequest request) throws IOException {
         String email = SecurityUtils.getCurrentUserEmail();
         return ResponseEntity.ok(documentService.uploadDocument(file, request, email));
     }
