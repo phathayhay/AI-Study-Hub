@@ -16,9 +16,15 @@ public class DocumentSummary {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "document_id", nullable = false, unique = true)
     private Document document;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("documentId")
+    public Long getDocumentId() {
+        return document != null ? document.getId() : null;
+    }
 
     @Column(name = "short_summary", nullable = false, length = 1000)
     private String shortSummary;
