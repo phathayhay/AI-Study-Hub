@@ -87,7 +87,14 @@ export default function StudyHubApp() {
   }
 
   const handleStudyUpload = (file) => {
-    setStudyFile(file)
+    setStudyFile({
+      id: file.id,
+      name: file.name, attachmentName: file.attachmentName || file.name,
+      subject: file.subject || '',
+      content: file.content || '',
+      sizeLabel: file.sizeLabel || '',
+      fileUrl: file.fileUrl || '',
+    })
     setUploadMode('document')
     navigate('study')
   }

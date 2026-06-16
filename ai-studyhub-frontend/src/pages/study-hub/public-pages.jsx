@@ -174,12 +174,15 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
 
   const startStudySession = () => {
     if (!selectedUploadFile || !onStudyFileUploaded) return
+    const fileUrl = !uploadedText ? URL.createObjectURL(selectedUploadFile) : ''
     onStudyFileUploaded({
+      id: Date.now(),
       name: selectedUploadFile.name,
       attachmentName: selectedUploadFile.name,
       subject: selectedUploadFile.type || 'Imported file',
       sizeLabel: formatFileSize(selectedUploadFile.size),
       content: uploadedText,
+      fileUrl,
       readStatus,
     })
   }
@@ -201,7 +204,13 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
       setTimeout(() => {
         clearSelectedFile()
         if (onStudyFileUploaded) {
-          onStudyFileUploaded({ name: title, attachmentName: selectedUploadFile.name, content: '', id: doc?.id || doc?.documentId })
+          onStudyFileUploaded({
+            id: doc?.id || doc?.documentId,
+            name: title,
+            attachmentName: selectedUploadFile.name,
+            content: '',
+            fileUrl: doc?.fileUrl || '',
+          })
         }
         if (onNavigate) onNavigate('study')
       }, 1000)
