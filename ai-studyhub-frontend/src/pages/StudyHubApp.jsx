@@ -29,6 +29,8 @@ export default function StudyHubApp() {
   const [uploadMode, setUploadMode] = useState('document')
   const [studyFile, setStudyFile] = useState(defaultStudyFile)
   const [selectedFile, setSelectedFile] = useState(null)
+  const [selectedDocId, setSelectedDocId] = useState(null)
+  const [selectedFolderId, setSelectedFolderId] = useState(null)
   const [showReport, setShowReport] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
 
@@ -112,8 +114,8 @@ export default function StudyHubApp() {
 
       {route === 'guest-home' && <HomeScreen guest={guest} onNavigate={navigate} />}
       {route === 'home' && <HomeScreen onNavigate={navigate} />}
-      {route === 'explore' && <ExplorePage onNavigate={navigate} />}
-      {route === 'folder-detail' && <FolderDetailPage onNavigate={navigate} />}
+      {route === 'explore' && <ExplorePage onNavigate={navigate} onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail') }} onOpenFolder={(id) => { setSelectedFolderId(id); navigate('folder-detail') }} />}
+      {route === 'folder-detail' && <FolderDetailPage id={selectedFolderId} onNavigate={navigate} />}
       {route === 'library' && (
         <LibraryPage activeTab={libraryTab} onNavigate={navigate} onOpenFile={setSelectedFile} onTabChange={setLibraryTab} />
       )}
@@ -121,7 +123,7 @@ export default function StudyHubApp() {
       {route === 'profile' && <ProfilePage />}
       {route === 'pricing' && <PricingPage onNavigate={navigate} />}
       {route === 'doc-detail' && (
-        <DocumentDetailPage onBack={() => navigate(previousRoute || (role ? 'home' : 'guest-home'))} onReport={() => setShowReport(true)} />
+        <DocumentDetailPage id={selectedDocId} onBack={() => navigate(previousRoute || (role ? 'home' : 'guest-home'))} onReport={() => setShowReport(true)} />
       )}
       {route === 'study' && (
         <StudyDocumentPage
