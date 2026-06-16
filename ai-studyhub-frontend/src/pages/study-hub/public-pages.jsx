@@ -8,6 +8,7 @@ import Badge from '../../components/ui/Badge'
 import { appUser, featuredDocuments, featuredFolders, recentActivities } from '../../data/studyHubData'
 import { pricingPlans } from './config'
 import { DocumentCardMini, ExploreFolderCard, InfoLine, PageTitle, SectionTitle } from './shared'
+import { uploadDocument } from '../../features/documents/documentService'
 
 const uploadSelectFields = [
   {
@@ -94,6 +95,9 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
   const [readStatus, setReadStatus] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const [uploadSuccess, setUploadSuccess] = useState(false)
   const fileInputRef = useRef(null)
   const isStudyUpload = mode === 'study'
 
@@ -104,18 +108,19 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
     setSelectedUploadFile(file)
     setUploadedText('')
     setReadStatus('')
+    setUploadError('')
+    setUploadSuccess(false)
 
-    if (!canReadAsText(file)) {
-      setReadStatus('File đã được chọn. Định dạng này cần parser/backend để đọc nội dung trực tiếp.')
-      return
-    }
-
-    try {
-      const text = await file.text()
-      setUploadedText(text.trim())
-      setReadStatus(text.trim() ? 'Đã đọc nội dung file.' : 'File không có nội dung text để hiển thị.')
-    } catch {
-      setReadStatus('Chưa đọc được nội dung file. Vui lòng thử file khác.')
+    if (canReadAsText(file)) {
+      try {
+        const text = await file.text()
+        setUploadedText(text.trim())
+        setReadStatus(text.trim() ? 'Đã đọc nội dung file.' : 'File không có nội dung text để hiển thị.')
+      } catch {
+        setReadStatus('Chưa đọc được nội dung file.')
+      }
+    } else {
+      setReadStatus('File sẽ được xử lý bởi backend sau khi tải lên.')
     }
   }
 
@@ -123,12 +128,13 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
     setSelectedUploadFile(null)
     setUploadedText('')
     setReadStatus('')
+    setUploadError('')
+    setUploadSuccess(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const startStudySession = () => {
     if (!selectedUploadFile || !onStudyFileUploaded) return
-
     onStudyFileUploaded({
       name: selectedUploadFile.name,
       attachmentName: selectedUploadFile.name,
@@ -137,6 +143,20 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
       content: uploadedText,
       readStatus,
     })
+  }
+
+  const handleUpload = async () => {
+    if (!selectedUploadFile) return
+    setUploading(true)
+    setUploadError('')
+    setUploadSuccess(false)
+    try {
+      await uploadDocument(selectedUploadFile, { title: selectedUploadFile.name, description: '' })
+      setUploadSuccess(true)
+      setTimeout(clearSelectedFile, 2000)
+    } catch (err) {
+      setUploadError(err?.message || 'Tải lên thất bại')
+    } finally { setUploading(false) }
   }
 
   return (
@@ -152,7 +172,7 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
               ref={fileInputRef}
               className="visually-hidden"
               type="file"
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.zip,.txt,.md,.csv,.json"
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.zip,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.gif,.webp"
               onChange={(event) => handleFileSelect(event.target.files)}
             />
             <div
@@ -182,6 +202,8 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
               <button onClick={clearSelectedFile} type="button">×</button>
             </div>
             {readStatus && <p className="upload-read-status">{readStatus}</p>}
+            {uploadError && <p className="auth-error">{uploadError}</p>}
+            {uploadSuccess && <p className="upload-success">Tải lên thành công!</p>}
             <label>Tiêu đề tài liệu *<input defaultValue={selectedUploadFile.name} placeholder="Nhập tiêu đề tài liệu" /></label>
             <label>Mô tả<textarea placeholder="Mô tả ngắn gọn nội dung tài liệu..." /></label>
             <div className="upload-form__grid">
@@ -196,8 +218,8 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
               ))}
             </div>
             <div className="upload-form__actions">
-              <button className="upload-submit" onClick={startStudySession} type="button">
-                {isStudyUpload ? 'Bắt đầu học với AI' : 'Tải lên'}
+              <button className="upload-submit" onClick={isStudyUpload ? startStudySession : handleUpload} type="button" disabled={uploading}>
+                {uploading ? 'Đang tải lên...' : isStudyUpload ? 'Bắt đầu học với AI' : 'Tải lên'}
               </button>
               <button className="cancel-button" onClick={clearSelectedFile} type="button">Hủy</button>
             </div>
