@@ -1,8 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { libraryFiles, libraryFolders } from '../../data/studyHubData'
 import { libraryTabs } from './config'
+import { getMyDocuments } from '../../features/documents/documentService'
+
+function mapDoc(doc) {
+  return {
+    id: doc.id,
+    name: doc.title || doc.fileName || 'Untitled',
+    subject: doc.fileType || 'Document',
+    kind: 'document',
+    group: 'This Week',
+    date: doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : '',
+    shared: doc.visibility === 'PUBLIC',
+    public: doc.visibility === 'PUBLIC',
+    favorite: false,
+  }
+}
 
 const folderFileMap = {
   1: [libraryFiles[1], libraryFiles[3], libraryFiles[4], libraryFiles[6], libraryFiles[8]],
@@ -17,7 +32,21 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null)
   const [folderFiles, setFolderFiles] = useState(folderFileMap)
   const [openFileMenuId, setOpenFileMenuId] = useState(null)
-  const managedFiles = useMemo(() => Object.values(filesById), [filesById])
+  const [apiDocs, setApiDocs] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getMyDocuments().then((res) => {
+      const list = Array.isArray(res) ? res : res?.data || []
+      setApiDocs(list.map(mapDoc))
+    }).catch(() => {}).finally(() => setLoading(false))
+  }, [])
+
+  const managedFiles = useMemo(() => {
+    const merged = [...apiDocs, ...Object.values(filesById)]
+    const seen = new Set()
+    return merged.filter((f) => { if (seen.has(f.id)) return false; seen.add(f.id); return true })
+  }, [apiDocs, filesById])
   const files = useMemo(() => {
     if (activeTab === 'shared') return managedFiles.filter((file) => file.shared)
     if (activeTab === 'favorites') return managedFiles.filter((file) => file.favorite)
