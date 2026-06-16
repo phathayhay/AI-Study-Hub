@@ -110,7 +110,7 @@ export function StudyDocumentPage({ activeTab, file, mode, onBack, onModeChange,
           <QuizList quizzes={quizList} onCreate={doGenerateQuiz} />
         ))}
       </main>
-      <AiTutor />
+      <AiTutor docId={docId} />
     </div>
   )
 }
@@ -352,11 +352,10 @@ function getTerms(file) {
   return terms.length ? terms.slice(0, 6) : [file.name]
 }
 
-function AiTutor() {
+function AiTutor({ docId }) {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
-  const [docId] = useState(() => { try { return JSON.parse(localStorage.getItem('user'))?.id || 1 } catch { return 1 } })
 
   const send = async () => {
     if (!input.trim()) return
