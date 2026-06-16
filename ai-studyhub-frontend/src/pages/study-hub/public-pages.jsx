@@ -91,7 +91,7 @@ export function ExplorePage({ onNavigate }) {
   )
 }
 
-export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
+export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
   const [readStatus, setReadStatus] = useState('')
@@ -160,9 +160,16 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
     setUploadError('')
     setUploadSuccess(false)
     try {
-      await uploadDocument(selectedUploadFile, { title, description, visibility, tags })
+      const res = await uploadDocument(selectedUploadFile, { title, description, visibility, tags })
+      const doc = res?.data || res
       setUploadSuccess(true)
-      setTimeout(clearSelectedFile, 2000)
+      setTimeout(() => {
+        clearSelectedFile()
+        if (onStudyFileUploaded) {
+          onStudyFileUploaded({ name: title, attachmentName: selectedUploadFile.name, content: '', id: doc?.id || doc?.documentId })
+        }
+        if (onNavigate) onNavigate('study')
+      }, 1000)
     } catch (err) {
       setUploadError(err?.message || 'Tải lên thất bại')
     } finally { setUploading(false) }
