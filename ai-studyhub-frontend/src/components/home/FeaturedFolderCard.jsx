@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import StudyHubIcon from '../icons/StudyHubIcons'
 import Badge from '../ui/Badge'
 
 export default function FeaturedFolderCard({ folder }) {
+  const [favorite, setFavorite] = useState(Boolean(folder.favorite))
+
   return (
     <article className={`folder-card ${folder.active ? 'is-highlighted' : ''}`}>
       <div className="folder-card__icon">
@@ -11,7 +14,15 @@ export default function FeaturedFolderCard({ folder }) {
       <div className="folder-card__body">
         <div className="folder-card__meta">
           <Badge tone="blue">{folder.code}</Badge>
-          <button className="icon-button" type="button" aria-label={`Lưu ${folder.title}`}>
+          <button
+            className={`icon-button ${favorite ? 'is-active' : ''}`}
+            type="button"
+            aria-label={`Lưu ${folder.title}`}
+            onClick={(event) => {
+              event.stopPropagation()
+              setFavorite((value) => !value)
+            }}
+          >
             <StudyHubIcon name="heart" size={20} />
           </button>
         </div>

@@ -335,7 +335,6 @@ export const notifications = [
 
 export const studyTabs = [
   { id: 'original', label: 'Original Content', icon: 'file' },
-  { id: 'notes', label: 'AI Notes', icon: 'sparkle' },
   { id: 'summary', label: 'AI Summary', icon: 'book' },
   { id: 'flashcards', label: 'Flashcards', icon: 'card' },
   { id: 'quizzes', label: 'Quizzes', icon: 'help' },

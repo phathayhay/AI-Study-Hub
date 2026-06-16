@@ -276,6 +276,8 @@ export function FolderDetailPage({ onNavigate }) {
 
 export function DocumentDetailPage({ onBack, onReport }) {
   const doc = featuredDocuments[1]
+  const [favorite, setFavorite] = useState(Boolean(doc.favorite))
+
   return (
     <main className="page-surface document-detail-page">
       <div className="doc-layout">
@@ -304,7 +306,7 @@ export function DocumentDetailPage({ onBack, onReport }) {
           <button className="primary-action" type="button"><StudyHubIcon name="download" size={16} /> Tải xuống</button>
           <button className="purple-button" type="button"><StudyHubIcon name="message" size={16} /> Chat với AI</button>
           <button className="success-button" type="button"><StudyHubIcon name="share" size={16} /> Chia sẻ</button>
-          <button className="muted-button" type="button"><StudyHubIcon name="heart" size={16} /> Yêu thích</button>
+          <button className={`muted-button ${favorite ? 'is-active' : ''}`} onClick={() => setFavorite((value) => !value)} type="button"><StudyHubIcon name="heart" size={16} /> Yêu thích</button>
           <button className="danger-outline" onClick={onReport} type="button"><StudyHubIcon name="flag" size={16} /> Báo cáo</button>
           <div className="rating-row">☆ ☆ ☆ ☆ ☆</div>
         </aside>

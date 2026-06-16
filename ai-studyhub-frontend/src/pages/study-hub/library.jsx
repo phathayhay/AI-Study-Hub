@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
+import { fillRoute, ROUTES } from '../../constants/routes'
 import { libraryTabs } from './config'
 import {
   createFolder,
@@ -9,7 +10,13 @@ import {
   getRootFolders,
   renameFolder,
 } from '../../services/folderService'
-import { deleteDocument, getMyDocuments } from '../../services/documentService'
+import {
+  addDocumentFavorite,
+  deleteDocument,
+  getMyDocuments,
+  publishDocument,
+  removeDocumentFavorite,
+} from '../../services/documentService'
 
 export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) {
   const [selectedFolder, setSelectedFolder] = useState(null)
@@ -17,6 +24,8 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
   const [documents, setDocuments] = useState([])
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null)
   const [openFileMenuId, setOpenFileMenuId] = useState(null)
+  const [shareFile, setShareFile] = useState(null)
+  const [sharing, setSharing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -41,7 +50,7 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
 
   const visibleDocuments = useMemo(() => {
     if (activeTab === 'shared') return documents.filter((document) => document.public)
-    if (activeTab === 'favorites') return []
+    if (activeTab === 'favorites') return documents.filter((document) => document.favorite)
     return activeTab === 'recent' ? documents : documents.slice(0, 4)
   }, [activeTab, documents])
 
@@ -99,6 +108,45 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
     setOpenFileMenuId(null)
   })
 
+  const updateDocumentState = (updatedDocument) => {
+    setDocuments((current) => current.map((item) => (
+      item.id === updatedDocument.id ? { ...item, ...updatedDocument } : item
+    )))
+    setSelectedFolder((current) => current
+      ? {
+        ...current,
+        documents: current.documents.map((item) => (
+          item.id === updatedDocument.id ? { ...item, ...updatedDocument } : item
+        )),
+      }
+      : current)
+  }
+
+  const handleToggleFavorite = (file) => runRequest(async () => {
+    const updated = file.favorite
+      ? await removeDocumentFavorite(file.id)
+      : await addDocumentFavorite(file.id)
+    updateDocumentState(mapDocument(updated))
+  })
+
+  const handleOpenShare = (file) => {
+    setOpenFileMenuId(null)
+    setShareFile(file)
+  }
+
+  const handlePublishDocument = () => runRequest(async () => {
+    if (!shareFile || sharing) return
+    setSharing(true)
+    try {
+      const updated = mapDocument(await publishDocument(shareFile.id))
+      updateDocumentState(updated)
+      setShareFile(null)
+      onTabChange('shared')
+    } finally {
+      setSharing(false)
+    }
+  })
+
   return (
     <div className="library-shell">
       <LibraryRail activeTab={activeTab} onNavigate={onNavigate} onTabChange={onTabChange} />
@@ -130,6 +178,8 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
               onBack={() => setSelectedFolder(null)}
               onDeleteFile={handleDeleteDocument}
               onOpenFile={onOpenFile}
+              onShareFile={handleOpenShare}
+              onToggleFavorite={handleToggleFavorite}
               onToggleFileMenu={setOpenFileMenuId}
               openFileMenuId={openFileMenuId}
             />
@@ -148,8 +198,18 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
             files={visibleDocuments}
             onDeleteFile={handleDeleteDocument}
             onOpenFile={onOpenFile}
+            onShareFile={handleOpenShare}
+            onToggleFavorite={handleToggleFavorite}
             onToggleFileMenu={setOpenFileMenuId}
             openFileMenuId={openFileMenuId}
+          />
+        )}
+        {shareFile && (
+          <ShareDocumentModal
+            file={shareFile}
+            loading={sharing}
+            onClose={() => setShareFile(null)}
+            onPublish={handlePublishDocument}
           />
         )}
       </main>
@@ -188,7 +248,7 @@ function FolderGrid({ folders, onDeleteFolder, onRenameFolder, onSelectFolder, o
   )
 }
 
-function FolderFilesView({ files, folder, onBack, onDeleteFile, onOpenFile, onToggleFileMenu, openFileMenuId }) {
+function FolderFilesView({ files, folder, onBack, onDeleteFile, onOpenFile, onShareFile, onToggleFavorite, onToggleFileMenu, openFileMenuId }) {
   return (
     <section className="folder-files-view">
       <header className="folder-files-header">
@@ -202,6 +262,8 @@ function FolderFilesView({ files, folder, onBack, onDeleteFile, onOpenFile, onTo
         files={files}
         onDeleteFile={onDeleteFile}
         onOpenFile={onOpenFile}
+        onShareFile={onShareFile}
+        onToggleFavorite={onToggleFavorite}
         onToggleFileMenu={onToggleFileMenu}
         openFileMenuId={openFileMenuId}
       />
@@ -209,7 +271,7 @@ function FolderFilesView({ files, folder, onBack, onDeleteFile, onOpenFile, onTo
   )
 }
 
-function DocumentList({ files, onDeleteFile, onOpenFile, onToggleFileMenu, openFileMenuId }) {
+function DocumentList({ files, onDeleteFile, onOpenFile, onShareFile, onToggleFavorite, onToggleFileMenu, openFileMenuId }) {
   if (!files.length) return <div className="quiz-empty-card">Không có tài liệu</div>
   return (
     <div className="file-list">
@@ -217,10 +279,11 @@ function DocumentList({ files, onDeleteFile, onOpenFile, onToggleFileMenu, openF
         <h2>Documents</h2>
         {files.map((file) => (
           <div className="folder-file-row" key={file.id}>
-            <FileRow file={file} onClick={() => onOpenFile(file)} />
+            <FileRow file={file} onClick={() => onOpenFile(file)} onToggleFavorite={onToggleFavorite} />
             <button className="file-menu-trigger" onClick={() => onToggleFileMenu(openFileMenuId === file.id ? null : file.id)} type="button">...</button>
             {openFileMenuId === file.id && (
               <div className="file-action-menu">
+                {!file.public && <button onClick={() => onShareFile(file)} type="button">Chia sẻ</button>}
                 <button className="is-danger" onClick={() => onDeleteFile(file)} type="button">Xóa file</button>
               </div>
             )}
@@ -255,17 +318,93 @@ function LibraryRail({ activeTab, onNavigate, onTabChange }) {
   )
 }
 
-function FileRow({ file, onClick }) {
+function FileRow({ file, onClick, onToggleFavorite }) {
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onClick()
+    }
+  }
+
   return (
-    <button className="file-row" onClick={onClick} type="button">
+    <div className="file-row" onClick={onClick} onKeyDown={handleKeyDown} role="button" tabIndex={0}>
       <span className="file-row__icon"><StudyHubIcon name="file" size={24} /></span>
       <span className="file-row__title"><strong>{file.name}</strong><small>{file.subject}</small></span>
       <span className="file-row__badges">
         {file.public && <Badge tone="green">Public</Badge>}
         <Badge tone="purple">{file.kind}</Badge>
         <small>{file.date}</small>
+        <button
+          aria-label={file.favorite ? `Bỏ yêu thích ${file.name}` : `Yêu thích ${file.name}`}
+          className={`icon-button file-favorite-button ${file.favorite ? 'is-active' : ''}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onToggleFavorite(file)
+          }}
+          type="button"
+        >
+          <StudyHubIcon name="heart" size={18} />
+        </button>
       </span>
-    </button>
+    </div>
+  )
+}
+
+function ShareDocumentModal({ file, loading, onClose, onPublish }) {
+  const [copied, setCopied] = useState(false)
+  const shareUrl = `${window.location.origin}${fillRoute(ROUTES.DOCUMENT_DETAIL, { documentId: file.documentId ?? file.id })}`
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1400)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <section className="share-document-modal">
+        <header>
+          <h2>Chia sẻ tài liệu</h2>
+          <button aria-label="Đóng" onClick={onClose} type="button"><StudyHubIcon name="close" size={18} /></button>
+        </header>
+
+        <div className="share-document-card">
+          <div>
+            <Badge tone="blue">{file.subject?.split(',')[0] || file.kind}</Badge>
+            <Badge>{file.kind}</Badge>
+          </div>
+          <strong>{file.name}</strong>
+        </div>
+
+        <label className="share-link-field">
+          Link tài liệu
+          <div>
+            <input readOnly value={shareUrl} />
+            <button onClick={handleCopy} type="button">
+              <StudyHubIcon name="card" size={16} />
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </label>
+
+        <div className="share-access">
+          <span><StudyHubIcon name="lock" size={18} /></span>
+          <div>
+            <strong>Hạn chế <StudyHubIcon name="chevron" size={14} /></strong>
+            <small>Chỉ những người được thêm mới có thể mở</small>
+          </div>
+        </div>
+
+        <button className="share-publish-button" disabled={loading} onClick={onPublish} type="button">
+          {loading ? 'Đang đăng...' : 'Đăng diễn đàn'}
+        </button>
+        <button className="share-close-button" disabled={loading} onClick={onClose} type="button">Đóng</button>
+      </section>
+    </div>
   )
 }
 
@@ -288,7 +427,9 @@ function mapDocument(document) {
     subject: document.description || document.tags?.join(', ') || 'Tài liệu cá nhân',
     kind: document.fileType?.toLowerCase() || 'document',
     date: formatApiDate(document.updatedAt || document.createdAt),
+    visibility: document.visibility,
     public: document.visibility === 'PUBLIC',
+    favorite: Boolean(document.favorite),
     fileUrl: document.fileUrl,
     sizeLabel: formatFileSize(document.fileSize),
   }

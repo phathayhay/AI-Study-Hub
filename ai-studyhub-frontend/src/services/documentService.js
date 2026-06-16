@@ -41,6 +41,22 @@ export function getMyDocuments() {
   return apiGet('/api/documents/my')
 }
 
+export function getFavoriteDocuments() {
+  return apiGet('/api/documents/favorites')
+}
+
+export function addDocumentFavorite(documentId) {
+  return apiPost(`/api/documents/${documentId}/favorite`, {})
+}
+
+export function removeDocumentFavorite(documentId) {
+  return apiDelete(`/api/documents/${documentId}/favorite`)
+}
+
+export function publishDocument(documentId) {
+  return apiPut(`/api/documents/${documentId}/publish`)
+}
+
 export function deleteDocument(documentId) {
   return apiDelete(`/api/documents/${documentId}`)
 }

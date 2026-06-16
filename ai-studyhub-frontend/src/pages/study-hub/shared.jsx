@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 
@@ -6,10 +7,25 @@ export function SectionTitle({ count, icon, title }) {
 }
 
 export function ExploreFolderCard({ folder, onOpen }) {
+  const [favorite, setFavorite] = useState(Boolean(folder.favorite))
+
   return (
     <article className="explore-folder-card" onClick={onOpen}>
       <span className="folder-card__icon"><StudyHubIcon name="folder" size={24} /></span>
-      <div className="folder-card__meta"><Badge tone="blue">{folder.code}</Badge><small>{folder.date}</small><button className="icon-button" type="button"><StudyHubIcon name="heart" size={16} /></button></div>
+      <div className="folder-card__meta">
+        <Badge tone="blue">{folder.code}</Badge>
+        <small>{folder.date}</small>
+        <button
+          className={`icon-button ${favorite ? 'is-active' : ''}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            setFavorite((value) => !value)
+          }}
+          type="button"
+        >
+          <StudyHubIcon name="heart" size={16} />
+        </button>
+      </div>
       <h3>{folder.title}</h3>
       <p>{folder.description}</p>
       <div className="card-stats"><span><StudyHubIcon name="file" size={14} /> {folder.files} tài liệu</span><span><StudyHubIcon name="download" size={14} /> {folder.downloads} lượt tải</span><button className="download-button" type="button">Tải về</button></div>
@@ -19,11 +35,22 @@ export function ExploreFolderCard({ folder, onOpen }) {
 }
 
 export function DocumentCardMini({ document, onOpen }) {
+  const [favorite, setFavorite] = useState(Boolean(document.favorite))
+
   return (
     <article className="document-card" onClick={onOpen}>
       <div className="document-card__header">
         <div className="document-card__badges"><Badge tone="blue">{document.code}</Badge><Badge>{document.type}</Badge></div>
-        <button className="icon-button" type="button"><StudyHubIcon name="heart" size={18} /></button>
+        <button
+          className={`icon-button ${favorite ? 'is-active' : ''}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            setFavorite((value) => !value)
+          }}
+          type="button"
+        >
+          <StudyHubIcon name="heart" size={18} />
+        </button>
       </div>
       <h3>{document.title}</h3>
       <p>{document.description}</p>

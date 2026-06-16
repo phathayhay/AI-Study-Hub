@@ -104,12 +104,6 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
         {!documentId && <p className="api-status api-status--error">Tài liệu này chưa có documentId từ backend.</p>}
         {error && <p className="api-status api-status--error">{error}</p>}
         {activeTab === 'original' && <OriginalDocument file={file} />}
-        {activeTab === 'notes' && (
-          <section className="ai-generate-panel">
-            <h2><span>AI</span> Notes</h2>
-            <p>Backend hiện chưa cung cấp endpoint tạo hoặc lưu AI Notes.</p>
-          </section>
-        )}
         {activeTab === 'summary' && (
           summary
             ? <SummaryView summary={summary} />
@@ -143,19 +137,32 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
 }
 
 function OriginalDocument({ file }) {
+  const documentName = file?.name || file?.attachmentName || 'Untitled document'
+  const attachmentName = file?.attachmentName && file.attachmentName !== documentName ? file.attachmentName : ''
+
   return (
-    <>
-      <div className="study-doc-pill"><StudyHubIcon name="file" size={16} /> {file?.attachmentName || file?.name}</div>
-      <section className="document-paper original-paper uploaded-paper">
-        <h2>{file?.name}</h2>
-        {file?.sizeLabel && <small>{file.sizeLabel}</small>}
-        {file?.fileUrl ? (
-          <p><a href={file.fileUrl} rel="noreferrer" target="_blank">Mở file gốc</a></p>
-        ) : (
-          <p>Không có URL file từ backend.</p>
-        )}
-      </section>
-    </>
+    <section className="original-content-panel">
+      <div className="original-file-icon">
+        <StudyHubIcon name="file" size={30} />
+      </div>
+      <div className="original-file-info">
+        <span className="original-file-kicker">Original Content</span>
+        <h2>{documentName}</h2>
+        <div className="original-file-meta">
+          {file?.sizeLabel && <span>{file.sizeLabel}</span>}
+          {file?.subject && <span>{file.subject}</span>}
+          {attachmentName && <span>{attachmentName}</span>}
+        </div>
+      </div>
+      {file?.fileUrl ? (
+        <a className="original-open-button" href={file.fileUrl} rel="noreferrer" target="_blank">
+          <StudyHubIcon name="eye" size={16} />
+          Mở file gốc
+        </a>
+      ) : (
+        <span className="original-file-empty">Không có URL file từ backend.</span>
+      )}
+    </section>
   )
 }
 
@@ -238,30 +245,48 @@ function FlashcardViewer({ onBack, set }) {
 function QuizPanel({ disabled, loading, onCreate, onOpen, quizzes }) {
   const [difficulty, setDifficulty] = useState('MEDIUM')
   return (
-    <section className="quiz-empty-view">
-      <header>
-        <h2>Your Quizzes</h2>
+    <section className="quiz-panel">
+      <header className="quiz-panel-header">
         <div>
-          <select onChange={(event) => setDifficulty(event.target.value)} value={difficulty}>
-            <option value="EASY">Easy</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HARD">Hard</option>
-          </select>
+          <span>Practice</span>
+          <h2>Your Quizzes</h2>
+        </div>
+        <div className="quiz-panel-actions">
+          <label className="quiz-difficulty-select">
+            <span>Difficulty</span>
+            <select onChange={(event) => setDifficulty(event.target.value)} value={difficulty}>
+              <option value="EASY">Easy</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HARD">Hard</option>
+            </select>
+          </label>
           <button className="ai-generate-button" disabled={disabled} onClick={() => onCreate(difficulty)} type="button">
+            <StudyHubIcon name="plus" size={16} />
             {loading ? 'Generating...' : 'Create Quiz'}
           </button>
         </div>
       </header>
       {quizzes.length ? (
-        <div className="file-list">
+        <div className="quiz-list">
           {quizzes.map((item) => (
-            <button className="file-row" key={item.id} onClick={() => onOpen(item.id)} type="button">
-              <strong>{item.quizTitle}</strong>
-              <small>{item.totalQuestions} questions · {item.difficultyLevel}</small>
+            <button className="quiz-list-card" key={item.id} onClick={() => onOpen(item.id)} type="button">
+              <span className="quiz-list-icon"><StudyHubIcon name="help" size={20} /></span>
+              <span className="quiz-list-title">
+                <strong>{item.quizTitle}</strong>
+                <small>{item.totalQuestions} questions</small>
+              </span>
+              <span className="quiz-difficulty-badge">{item.difficultyLevel}</span>
+              <StudyHubIcon name="chevron" size={18} />
             </button>
           ))}
         </div>
-      ) : <div className="quiz-empty-card">No quizzes found</div>}
+      ) : (
+        <div className="quiz-empty-card">
+          <StudyHubIcon name="help" size={24} />
+          <strong>No quizzes found</strong>
+          <span>Create one from this document to start practicing.</span>
+        </div>
+      )}
     </section>
   )
 }
@@ -284,20 +309,31 @@ function QuizViewer({ onBack, quiz }) {
 
   return (
     <section className="quiz-taking">
-      <div className="quiz-nav"><button onClick={onBack} type="button">Quit</button><strong>{quiz.quizTitle}</strong></div>
+      <div className="quiz-nav">
+        <button className="text-link" onClick={onBack} type="button">Quit</button>
+        <div>
+          <strong>{quiz.quizTitle}</strong>
+          <span>{questions.length} questions</span>
+        </div>
+      </div>
       {question ? (
         <article className="question-card">
-          <p>Question {index + 1}/{questions.length}</p>
+          <p className="question-progress">Question {index + 1} of {questions.length}</p>
           <h2>{question.questionText}</h2>
           <div className="quiz-types">
             {options.map(([key, value]) => (
               <button className={selected === key ? 'is-active' : ''} key={key} onClick={() => { setSelected(key); setRevealed(false) }} type="button">
-                {key}. {value}
+                <span>{key}</span>
+                {value}
               </button>
             ))}
           </div>
-          {revealed && <p>{selected === question.correctOption ? 'Correct' : `Correct answer: ${question.correctOption}`} · {question.explanation}</p>}
-          <div>
+          {revealed && (
+            <p className={selected === question.correctOption ? 'quiz-result is-correct' : 'quiz-result'}>
+              {selected === question.correctOption ? 'Correct' : `Correct answer: ${question.correctOption}`} - {question.explanation}
+            </p>
+          )}
+          <div className="quiz-answer-actions">
             <button disabled={index === 0} onClick={() => move(index - 1)} type="button">Previous</button>
             <button disabled={!selected} onClick={() => setRevealed(true)} type="button">Check</button>
             <button disabled={index >= questions.length - 1} onClick={() => move(index + 1)} type="button">Next</button>
