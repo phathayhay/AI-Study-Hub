@@ -99,6 +99,10 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
   const [uploadError, setUploadError] = useState('')
   const [uploadSuccess, setUploadSuccess] = useState(false)
   const fileInputRef = useRef(null)
+  const titleRef = useRef(null)
+  const descRef = useRef(null)
+  const visibilityRef = useRef(null)
+  const tagsRef = useRef(null)
   const isStudyUpload = mode === 'study'
 
   const handleFileSelect = async (files) => {
@@ -147,11 +151,16 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
 
   const handleUpload = async () => {
     if (!selectedUploadFile) return
+    const title = titleRef.current?.value?.trim() || selectedUploadFile.name
+    const description = descRef.current?.value?.trim() || ''
+    const visibility = visibilityRef.current?.value || 'PRIVATE'
+    const tagsRaw = tagsRef.current?.value?.trim() || ''
+    const tags = tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : []
     setUploading(true)
     setUploadError('')
     setUploadSuccess(false)
     try {
-      await uploadDocument(selectedUploadFile, { title: selectedUploadFile.name, description: '' })
+      await uploadDocument(selectedUploadFile, { title, description, visibility, tags })
       setUploadSuccess(true)
       setTimeout(clearSelectedFile, 2000)
     } catch (err) {
@@ -204,8 +213,8 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
             {readStatus && <p className="upload-read-status">{readStatus}</p>}
             {uploadError && <p className="auth-error">{uploadError}</p>}
             {uploadSuccess && <p className="upload-success">Tải lên thành công!</p>}
-            <label>Tiêu đề tài liệu *<input defaultValue={selectedUploadFile.name} placeholder="Nhập tiêu đề tài liệu" /></label>
-            <label>Mô tả<textarea placeholder="Mô tả ngắn gọn nội dung tài liệu..." /></label>
+            <label>Tiêu đề tài liệu *<input ref={titleRef} defaultValue={selectedUploadFile.name} placeholder="Nhập tiêu đề tài liệu" /></label>
+            <label>Mô tả<textarea ref={descRef} placeholder="Mô tả ngắn gọn nội dung tài liệu..." /></label>
             <div className="upload-form__grid">
               {uploadSelectFields.map((field) => (
                 <label key={field.label}>
@@ -216,6 +225,10 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
                   </select>
                 </label>
               ))}
+              <label>Hiển thị<select ref={visibilityRef} defaultValue="PRIVATE">
+                <option value="PUBLIC">Public</option><option value="PRIVATE">Private</option>
+              </select></label>
+              <label>Tags (phân cách bằng dấu phẩy)<input ref={tagsRef} placeholder="SWP, Study, ..." /></label>
             </div>
             <div className="upload-form__actions">
               <button className="upload-submit" onClick={isStudyUpload ? startStudySession : handleUpload} type="button" disabled={uploading}>
