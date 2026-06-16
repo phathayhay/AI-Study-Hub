@@ -69,7 +69,7 @@ export function RegisterPage({ onRegister, onNavigate }) {
         <label className="field">Họ và tên<span><input type="text" value={form.fullName} onChange={set('fullName')} placeholder="Nguyễn Văn A" required /></span></label>
         <label className="field">Email FPT<span><input type="email" value={form.email} onChange={set('email')} placeholder="email@fpt.edu.vn" required /></span></label>
         <label className="field">Mật khẩu<span><input type="password" value={form.password} onChange={set('password')} placeholder="••••••••" required minLength={6} /></span></label>
-        <label className="field">Xác nhận mk<span><input type="password" value={form.confirm} onChange={set('confirm')} placeholder="••••••••" required /></span></label>
+        <label className="field">Xác nhận mật khẩu<span><input type="password" value={form.confirm} onChange={set('confirm')} placeholder="••••••••" required /></span></label>
         {error && <p className="auth-error">{error}</p>}
         <label className="terms"><input type="checkbox" required /> Tôi đồng ý với điều khoản sử dụng</label>
         <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Đang xử lý...' : 'Đăng ký'}</button>

@@ -1,4 +1,4 @@
-const API_BASE = (import.meta.env.VITE_API_URL || 'https://ai-study-hub-mpmz.onrender.com/api').replace(/\/+$/, '')
+const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '')
 
 export class ApiError extends Error {
   constructor(message, status, data) {
