@@ -3,6 +3,7 @@ import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { studyTabs } from '../../data/studyHubData'
 import { generateSummary, generateQuiz, generateFlashcards, getDocumentQuizzes, getDocumentFlashcardSets } from '../../features/ai/aiService'
+import { fetchFileAsText, isParseable, getFileExtension } from '../../utils/fileParser'
 
 export function StudyDocumentPage({ activeTab, file, mode, onBack, onModeChange, onTabChange }) {
   const currentFile = file ?? {
@@ -144,6 +145,24 @@ function QuizList({ quizzes, onCreate }) {
 }
 
 function OriginalContent({ file }) {
+  const [parsedContent, setParsedContent] = useState(null)
+  const [parseError, setParseError] = useState('')
+  const [parsing, setParsing] = useState(false)
+
+  useEffect(() => {
+    if (!file || file.content) return
+    if (!file.fileUrl || !isParseable(file.name)) return
+    setParsing(true)
+    setParseError('')
+    fetchFileAsText(file.fileUrl, file.name)
+      .then((text) => {
+        if (text.trim()) setParsedContent(text)
+        else setParseError('Không thể trích xuất nội dung từ file này.')
+      })
+      .catch((err) => setParseError(err?.message || 'Lỗi khi đọc file.'))
+      .finally(() => setParsing(false))
+  }, [file?.fileUrl, file?.name])
+
   if (file.content) {
     return (
       <section className="document-paper original-paper uploaded-paper">
@@ -154,36 +173,75 @@ function OriginalContent({ file }) {
     )
   }
 
-  if (file.name !== '漢字--JPD316 Lesson 5-NEW.pptx') {
+  if (parsing) {
+    return (
+      <section className="document-paper original-paper">
+        <h2>{file.name}</h2>
+        <p style={{ color: '#6b7280' }}>Đang đọc file...</p>
+      </section>
+    )
+  }
+
+  if (parseError) {
+    return (
+      <section className="document-paper original-paper uploaded-paper">
+        <h2>{file.name}</h2>
+        <p>{parseError}</p>
+      </section>
+    )
+  }
+
+  if (parsedContent) {
     return (
       <section className="document-paper original-paper uploaded-paper">
         <h2>{file.name}</h2>
         {file.sizeLabel && <small>{file.sizeLabel}</small>}
-        <p>{file.readStatus || 'File đã được import vào AI Study Session.'}</p>
-        <p>Frontend hiện tại chưa có parser cho PDF/DOCX/PPTX, nên nội dung text cần được xử lý bởi backend trước khi hiển thị đầy đủ.</p>
+        <pre>{parsedContent}</pre>
+      </section>
+    )
+  }
+
+  if (file.fileUrl && isParseable(file.name)) {
+    return (
+      <section className="document-paper original-paper uploaded-paper">
+        <h2>{file.name}</h2>
+        {file.sizeLabel && <small>{file.sizeLabel}</small>}
+        <p>Đang chuẩn bị đọc file...</p>
+      </section>
+    )
+  }
+
+  if (!isParseable(file.name)) {
+    return (
+      <section className="document-paper original-paper">
+        <h2>{file.name}</h2>
+        <p>File này không hỗ trợ xem trước nội dung text. Vui lòng tải file về để xem.</p>
       </section>
     )
   }
 
   return (
     <section className="document-paper original-paper">
-      <h2>Yarunara Taikai - Giáo trình Project</h2>
-      <small>2018.4.10</small>
-      <h3>Dekiru Nihongo Shokyu - Bai 1.3 - Bai tap</h3>
-      <p>[1] Chon tu thich hop dien vao cho trong.</p>
-      <div className="choice-row">{['mae wa', 'jibun', 'kondo', 'tomodachi', 'zenbu'].map((item) => <button key={item}>{item}</button>)}</div>
-      <p>1. Hikkoshi no ( <a>ganbaru</a> ) wa taihen deshita.</p>
-      <p>2. Rai shu wa isogashii desu. ( <a>minna san</a> ) ni kimasu.</p>
-      <p>[2] Chon dong tu dung va viet vao cho trong.</p>
-      <div className="choice-row">{['wasureru', 'taberu', 'otosu', 'kieru'].map((item) => <button key={item}>{item}</button>)}</div>
+      <p>{file.readStatus || 'File đã được import vào AI Study Session.'}</p>
     </section>
   )
 }
 
 function AiNotes({ file }) {
-  const keyLines = getKeyLines(file)
+  const [parsedContent, setParsedContent] = useState(null)
 
-  if (file.content) {
+  useEffect(() => {
+    if (!file || file.content) return
+    if (!file.fileUrl || !isParseable(file.name)) return
+    fetchFileAsText(file.fileUrl, file.name)
+      .then((text) => { if (text.trim()) setParsedContent(text) })
+      .catch(() => {})
+  }, [file?.fileUrl, file?.name])
+
+  const effectiveContent = file.content || parsedContent || ''
+  const keyLines = getKeyLines(effectiveContent, file)
+
+  if (effectiveContent) {
     return (
       <section className="notes-view">
         <div className="editor-toolbar">↶ ↷ H1 H2 B I U S</div>
@@ -279,8 +337,19 @@ function FlashcardViewer({ data, onBack }) {
 }
 
 function ManageCards({ file }) {
-  const terms = getTerms(file)
-  const cards = file.content ? terms.slice(0, 2).map((term) => [file.name, `What does "${term}" mean?`, 'Generated from uploaded content.']) : [
+  const [parsedContent, setParsedContent] = useState(null)
+
+  useEffect(() => {
+    if (!file || file.content) return
+    if (!file.fileUrl || !isParseable(file.name)) return
+    fetchFileAsText(file.fileUrl, file.name)
+      .then((text) => { if (text.trim()) setParsedContent(text) })
+      .catch(() => {})
+  }, [file?.fileUrl, file?.name])
+
+  const effectiveContent = file.content || parsedContent || ''
+  const terms = getTerms(effectiveContent, file)
+  const cards = effectiveContent ? terms.slice(0, 2).map((term) => [file.name, `What does "${term}" mean?`, 'Generated from uploaded content.']) : [
     ['13課 ことば', 'What does "国際交流" mean?', 'It means international exchange.'],
     ['20課 ことば', 'Define "進歩".', 'It means progress or advancement.'],
   ]
@@ -327,29 +396,29 @@ function QuizTaking({ data, onBack }) {
   )
 }
 
-function getKeyLines(file) {
-  if (!file.content) return ['Vocabulary practice', 'Word choice in context', 'Review imported material']
+function getKeyLines(content, file) {
+  if (!content) return ['Vocabulary practice', 'Word choice in context', 'Review imported material']
 
-  const lines = file.content
+  const lines = content
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
 
-  return (lines.length ? lines : [file.content]).slice(0, 6)
+  return (lines.length ? lines : [content]).slice(0, 6)
 }
 
-function getTerms(file) {
-  if (!file.content) return ['市場', '交流', '進歩']
+function getTerms(content, file) {
+  if (!content) return ['市場', '交流', '進歩']
 
   const terms = Array.from(new Set(
-    file.content
+    content
       .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
       .split(/\s+/)
       .map((word) => word.trim())
       .filter((word) => word.length > 3)
   ))
 
-  return terms.length ? terms.slice(0, 6) : [file.name]
+  return terms.length ? terms.slice(0, 6) : [file?.name || 'Document']
 }
 
 function AiTutor({ docId }) {

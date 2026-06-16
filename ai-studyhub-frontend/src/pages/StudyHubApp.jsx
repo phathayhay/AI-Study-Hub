@@ -78,8 +78,10 @@ export default function StudyHubApp() {
 
   const openStudyFile = (file) => {
     setStudyFile({
+      id: file.id,
       name: file.name, attachmentName: file.name, subject: file.subject,
       content: '', sizeLabel: file.sizeLabel,
+      fileUrl: file.fileUrl || '',
     })
     navigate('study')
   }

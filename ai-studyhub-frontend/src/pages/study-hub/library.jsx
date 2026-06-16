@@ -16,6 +16,7 @@ function mapDoc(doc) {
     shared: doc.visibility === 'PUBLIC',
     public: doc.visibility === 'PUBLIC',
     favorite: false,
+    fileUrl: doc.fileUrl || '',
   }
 }
 
