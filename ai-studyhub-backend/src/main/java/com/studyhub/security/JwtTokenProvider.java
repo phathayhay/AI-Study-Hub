@@ -76,6 +76,33 @@ public class JwtTokenProvider {
         }
     }
 
+    public String generateEmailVerificationToken(String email) {
+        return Jwts.builder()
+                .subject(email)
+                .claim("purpose", "email_verification")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 86400000)) // 24 hours
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String validateEmailVerificationToken(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            String purpose = claims.get("purpose", String.class);
+            if (!"email_verification".equals(purpose)) {
+                return null;
+            }
+            if (claims.getExpiration().before(new Date())) {
+                return null;
+            }
+            return claims.getSubject();
+        } catch (JwtException e) {
+            log.warn("Invalid email verification token: {}", e.getMessage());
+            return null;
+        }
+    }
+
     private Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
