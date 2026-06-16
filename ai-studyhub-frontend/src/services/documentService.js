@@ -19,6 +19,9 @@ function buildUploadRequest(metadata) {
     tags: (metadata.tags ?? []).map((tag) => tag.trim()).filter(Boolean),
   }
 
+  if (metadata.courseCode?.trim()) request.courseCode = metadata.courseCode.trim()
+  if (metadata.categoryName?.trim()) request.categoryName = metadata.categoryName.trim()
+
   for (const field of ['courseId', 'categoryId', 'folderId']) {
     if (metadata[field] !== undefined && metadata[field] !== null && metadata[field] !== '') {
       request[field] = Number(metadata[field])

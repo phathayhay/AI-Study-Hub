@@ -11,8 +11,8 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
   const [file, setFile] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [courseId, setCourseId] = useState('')
-  const [categoryId, setCategoryId] = useState('')
+  const [courseCode, setCourseCode] = useState('')
+  const [categoryName, setCategoryName] = useState('')
   const [folderId, setFolderId] = useState('')
   const [visibility, setVisibility] = useState('PRIVATE')
   const [tags, setTags] = useState('')
@@ -63,8 +63,8 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
     setFile(null)
     setTitle('')
     setDescription('')
-    setCourseId('')
-    setCategoryId('')
+    setCourseCode('')
+    setCategoryName('')
     setFolderId('')
     setVisibility('PRIVATE')
     setTags('')
@@ -90,8 +90,8 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
       const document = await uploadDocument(file, {
         title,
         description,
-        courseId,
-        categoryId,
+        courseCode,
+        categoryName,
         folderId,
         visibility,
         tags: tags.split(','),
@@ -163,12 +163,12 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
             <label>Mô tả<textarea onChange={(event) => setDescription(event.target.value)} value={description} /></label>
             <div className="upload-form__grid">
               <label>
-                Course ID
-                <input min="1" onChange={(event) => setCourseId(event.target.value)} type="number" value={courseId} />
+                Mã môn học
+                <input onChange={(event) => setCourseCode(event.target.value)} placeholder="VD: PRF192" value={courseCode} />
               </label>
               <label>
-                Category ID
-                <input min="1" onChange={(event) => setCategoryId(event.target.value)} type="number" value={categoryId} />
+                Danh mục
+                <input onChange={(event) => setCategoryName(event.target.value)} placeholder="VD: Exam" value={categoryName} />
               </label>
               <label>
                 Thư mục
