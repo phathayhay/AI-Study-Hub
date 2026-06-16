@@ -353,18 +353,43 @@ function getTerms(file) {
 }
 
 function AiTutor() {
+  const [input, setInput] = useState('')
+  const [messages, setMessages] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [docId] = useState(() => { try { return JSON.parse(localStorage.getItem('user'))?.id || 1 } catch { return 1 } })
+
+  const send = async () => {
+    if (!input.trim()) return
+    const q = input.trim()
+    setInput('')
+    setMessages((prev) => [...prev, { role: 'user', text: q }])
+    setLoading(true)
+    try {
+      const res = await generateSummary(docId)
+      const d = res.data || res
+      const reply = d?.shortSummary || d?.longSummary || 'Đã tạo summary từ nội dung.'
+      setMessages((prev) => [...prev, { role: 'assistant', text: reply }])
+    } catch {
+      setMessages((prev) => [...prev, { role: 'assistant', text: 'Không thể kết nối AI, vui lòng thử lại.' }])
+    } finally { setLoading(false) }
+  }
+
   return (
     <aside className="ai-tutor">
       <header><h2>AI Tutor</h2><button type="button">This Session</button></header>
       <TutorTile icon="card" title="Flashcards" text="Study with active recall" />
       <TutorTile icon="help" title="Quizzes" text="Test your knowledge" />
       <div className="orb" />
-      <div className="question-box">
-        <h3>Have a Question about your import?</h3>
-        <p>You can ask questions about your imported content, and your answers will appear here</p>
-        <div><button>Write a paragraph...</button><button>Explain concept...</button><button>Compare with...</button></div>
+      <div className="question-box" style={{ maxHeight: 200, overflowY: 'auto' }}>
+        {messages.length === 0 && <><h3>Have a Question about your import?</h3><p>Ask anything, AI will answer based on your content.</p></>}
+        {messages.map((m, i) => <p key={i} style={{ fontSize: 13, margin: '4px 0', color: m.role === 'user' ? '#2563eb' : '#374151' }}><strong>{m.role === 'user' ? 'You' : 'AI'}:</strong> {m.text}</p>)}
+        {loading && <p style={{ fontSize: 13, color: '#9ca3af' }}>AI đang trả lời...</p>}
       </div>
-      <div className="ai-input"><StudyHubIcon name="sparkle" size={16} /><input placeholder="Ask AI assistant..." /><button>➤</button></div>
+      <div className="ai-input">
+        <StudyHubIcon name="sparkle" size={16} />
+        <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} placeholder="Ask AI assistant..." />
+        <button onClick={send} disabled={loading}>➤</button>
+      </div>
     </aside>
   )
 }
