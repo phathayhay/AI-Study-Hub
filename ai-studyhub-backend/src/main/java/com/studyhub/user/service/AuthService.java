@@ -62,8 +62,27 @@ public class AuthService {
     public void register(RegisterRequest request) {
         log.info("Registering user with email: {}", request.getEmail());
 
-        if (userRepository.existsByEmail(request.getEmail())) {
+        // 1. Determine Verification Status based on Email Domain
+        String email = request.getEmail().trim().toLowerCase();
+        VerificationStatus initialVerificationStatus = VerificationStatus.PENDING;
+        if (email.endsWith("@fpt.edu.vn") || email.endsWith("@fe.edu.vn")) {
+            initialVerificationStatus = VerificationStatus.APPROVED;
+        }
+
+        // 2. Validate Student Code format (e.g. SE160000, MC160000, MKT16000)
+        String studentCode = request.getStudentCode().trim().toUpperCase();
+        if (!studentCode.matches("^[A-Z]{2,4}\\d{5,7}$")) {
+            throw new IllegalArgumentException("Mã sinh viên không đúng định dạng (Ví dụ: SE160000)");
+        }
+
+        // 3. Validate Email Uniqueness
+        if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("Email is already in use");
+        }
+
+        // 4. Validate Student Code Uniqueness
+        if (userRepository.existsByStudentCode(studentCode)) {
+            throw new IllegalArgumentException("Student code is already in use");
         }
 
         // Lấy hoặc tạo vai trò USER mặc định
@@ -85,9 +104,9 @@ public class AuthService {
                 });
 
         User user = User.builder()
-                .studentCode(request.getStudentCode())
-                .fullName(request.getFullName())
-                .email(request.getEmail())
+                .studentCode(studentCode)
+                .fullName(request.getFullName().trim())
+                .email(email)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .campus(Campus.HCM)
                 .major(null)
@@ -95,7 +114,7 @@ public class AuthService {
                 .role(userRole)
                 .currentSemester(null)
                 .status(UserStatus.INACTIVE) // Requires email verification
-                .verificationStatus(VerificationStatus.PENDING)
+                .verificationStatus(initialVerificationStatus)
                 .build();
 
         userRepository.save(user);

@@ -9,10 +9,15 @@ import com.studyhub.document.dto.DocumentResponse;
 import com.studyhub.document.dto.DocumentUploadRequest;
 import com.studyhub.document.entity.Document;
 import com.studyhub.document.entity.DocumentCategory;
+import com.studyhub.document.entity.DocumentDownload;
+import com.studyhub.document.entity.DocumentView;
 import com.studyhub.document.entity.Folder;
 import com.studyhub.document.entity.Tag;
 import com.studyhub.document.repository.DocumentCategoryRepository;
+import com.studyhub.document.repository.DocumentDownloadRepository;
 import com.studyhub.document.repository.DocumentRepository;
+import com.studyhub.document.repository.DocumentSpecifications;
+import com.studyhub.document.repository.DocumentViewRepository;
 import com.studyhub.document.repository.FolderRepository;
 import com.studyhub.document.repository.TagRepository;
 import com.studyhub.storage.service.CloudinaryStorageService;
@@ -20,6 +25,9 @@ import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -43,6 +51,8 @@ public class DocumentService {
     private final DocumentCategoryRepository categoryRepository;
     private final TagRepository tagRepository;
     private final CloudinaryStorageService storageService;
+    private final DocumentViewRepository documentViewRepository;
+    private final DocumentDownloadRepository documentDownloadRepository;
 
     @Transactional
     public DocumentResponse uploadDocument(MultipartFile file, DocumentUploadRequest request, String userEmail) throws IOException {
@@ -152,20 +162,74 @@ public class DocumentService {
         return mapToResponse(savedDoc);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public DocumentResponse getDocumentDetails(Long documentId, String userEmail) {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
 
-        if (doc.getVisibility() == Visibility.PRIVATE) {
-            User user = userRepository.findByEmail(userEmail)
+        User user = null;
+        if (userEmail != null) {
+            user = userRepository.findByEmail(userEmail)
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
-            if (!doc.getUser().getId().equals(user.getId())) {
+        }
+
+        if (doc.getVisibility() == Visibility.PRIVATE) {
+            if (user == null || !doc.getUser().getId().equals(user.getId())) {
                 throw new SecurityException("Permission denied for private document");
             }
         }
 
+        // Increment total views
+        doc.setTotalViews(doc.getTotalViews() + 1);
+        documentRepository.save(doc);
+
+        // Save view history record
+        DocumentView view = DocumentView.builder()
+                .document(doc)
+                .user(user)
+                .build();
+        documentViewRepository.save(view);
+
         return mapToResponse(doc);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DocumentResponse> searchDocuments(String keyword, Long majorId, Long courseId, Long categoryId, Pageable pageable) {
+        Specification<Document> spec = Specification.where(DocumentSpecifications.isPublicAndApproved())
+                .and(DocumentSpecifications.hasKeyword(keyword))
+                .and(DocumentSpecifications.hasMajorId(majorId))
+                .and(DocumentSpecifications.hasCourseId(courseId))
+                .and(DocumentSpecifications.hasCategoryId(categoryId));
+
+        Page<Document> docs = documentRepository.findAll(spec, pageable);
+        return docs.map(this::mapToResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DocumentResponse> getViewHistory(String userEmail, Pageable pageable) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Page<Document> recentlyViewed = documentViewRepository.findRecentlyViewedDocuments(user.getId(), pageable);
+        return recentlyViewed.map(this::mapToResponse);
+    }
+
+    @Transactional
+    public DocumentResponse updateVisibility(Long documentId, Visibility visibility, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Document doc = documentRepository.findById(documentId)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found"));
+
+        if (!doc.getUser().getId().equals(user.getId())) {
+            throw new SecurityException("Bạn không có quyền thay đổi trạng thái chia sẻ của tài liệu này");
+        }
+
+        doc.setVisibility(visibility);
+        Document savedDoc = documentRepository.save(doc);
+        log.info("Document ID {} visibility updated to {} by user {}", documentId, visibility, userEmail);
+        return mapToResponse(savedDoc);
     }
 
     @Transactional(readOnly = true)
@@ -194,6 +258,36 @@ public class DocumentService {
         storageService.deleteFile(doc.getFileUrl());
 
         documentRepository.delete(doc);
+    }
+
+    @Transactional
+    public DocumentResponse downloadDocument(Long documentId, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Document doc = documentRepository.findById(documentId)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found"));
+
+        // Nếu tài liệu PRIVATE hoặc chưa được duyệt PUBLIC, chỉ chủ sở hữu được phép tải xuống
+        if (doc.getVisibility() == Visibility.PRIVATE || doc.getModerationStatus() != ModerationStatus.APPROVED) {
+            if (!doc.getUser().getId().equals(user.getId())) {
+                throw new SecurityException("Bạn không có quyền tải xuống tài liệu này");
+            }
+        }
+
+        // Tăng số lượt tải xuống
+        doc.setTotalDownloads(doc.getTotalDownloads() + 1);
+        documentRepository.save(doc);
+
+        // Lưu lịch sử tải xuống
+        DocumentDownload download = DocumentDownload.builder()
+                .document(doc)
+                .user(user)
+                .build();
+        documentDownloadRepository.save(download);
+
+        log.info("Document ID {} downloaded by user {}", documentId, userEmail);
+        return mapToResponse(doc);
     }
 
     public DocumentResponse mapToResponse(Document doc) {
