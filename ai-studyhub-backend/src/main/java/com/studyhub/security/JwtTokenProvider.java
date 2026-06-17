@@ -49,6 +49,33 @@ public class JwtTokenProvider {
         }
     }
 
+    public String generatePasswordResetToken(String email) {
+        return Jwts.builder()
+                .subject(email)
+                .claim("purpose", "password_reset")
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtConfig.getResetTokenExpiryMs()))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String validatePasswordResetToken(String token) {
+        try {
+            Claims claims = parseClaims(token);
+            String purpose = claims.get("purpose", String.class);
+            if (!"password_reset".equals(purpose)) {
+                return null;
+            }
+            if (claims.getExpiration().before(new Date())) {
+                return null;
+            }
+            return claims.getSubject();
+        } catch (JwtException e) {
+            log.warn("Invalid password reset token: {}", e.getMessage());
+            return null;
+        }
+    }
+
     private Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
@@ -61,3 +88,4 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(jwtConfig.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 }
+

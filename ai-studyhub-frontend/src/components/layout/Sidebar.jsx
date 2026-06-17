@@ -1,20 +1,16 @@
-import { appUser, guestUser, mainNavItems, publicNavItems } from '../../data/studyHubData'
+import { mainNavItems, publicNavItems } from '../../data/studyHubData'
 import StudyHubIcon from '../icons/StudyHubIcons'
 import Brand from './Brand'
 
-export default function Sidebar({ active = 'home', guest = false, onLogout, onNavigate, user: authenticatedUser }) {
+export default function Sidebar({ active = 'home', guest = false, onNavigate, user }) {
   const navItems = guest ? publicNavItems : mainNavItems
-  const user = guest ? guestUser : {
-    ...appUser,
-    name: authenticatedUser?.fullName || appUser.name,
-    email: authenticatedUser?.email || appUser.email,
-    initials: getInitials(authenticatedUser?.fullName) || appUser.initials,
-  }
+  const initials = user?.fullName
+    ? user.fullName.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+    : guest ? '?' : 'SV'
 
   return (
     <aside className="sidebar">
       <Brand />
-
       <nav className="sidebar__nav" aria-label="Điều hướng chính">
         {navItems.map((item) => (
           <button
@@ -28,19 +24,18 @@ export default function Sidebar({ active = 'home', guest = false, onLogout, onNa
           </button>
         ))}
       </nav>
-
       <div className="sidebar__footer">
         <div className="profile-mini">
           <span className={`profile-mini__avatar ${guest ? 'profile-mini__avatar--guest' : ''}`}>
-            {user.initials}
+            {initials}
           </span>
           <span className="profile-mini__text">
-            <strong>{user.name}</strong>
-            <small>{user.email}</small>
+            <strong>{user?.fullName || (guest ? 'Khách' : 'Người dùng')}</strong>
+            <small>{user?.email || (guest ? 'Chưa đăng nhập' : '')}</small>
           </span>
         </div>
         {!guest && (
-          <button className="logout-button" onClick={onLogout} type="button">
+          <button className="logout-button" onClick={() => onNavigate?.('logout')} type="button">
             <StudyHubIcon name="logout" size={20} />
             <span>Đăng xuất</span>
           </button>
@@ -48,8 +43,4 @@ export default function Sidebar({ active = 'home', guest = false, onLogout, onNa
       </div>
     </aside>
   )
-}
-
-function getInitials(name = '') {
-  return name.split(/\s+/).filter(Boolean).slice(-2).map((part) => part[0]).join('').toUpperCase()
 }

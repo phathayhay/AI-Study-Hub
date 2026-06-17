@@ -1,4 +1,3 @@
-import { appUser } from '../../data/studyHubData'
 import StudyHubIcon from '../icons/StudyHubIcons'
 
 export default function Topbar({ onNotifications, onNavigate, guest = false, user }) {
@@ -15,9 +14,9 @@ export default function Topbar({ onNotifications, onNavigate, guest = false, use
         <div className="topbar__user">
           <button className="notification-button" onClick={onNotifications} type="button" aria-label="Thông báo">
             <StudyHubIcon name="bell" size={20} />
-            <span>{appUser.notifications}</span>
+            <span>0</span>
           </button>
-          <strong>{user?.fullName || appUser.name}</strong>
+          <strong>{user?.fullName || ''}</strong>
         </div>
       )}
     </header>

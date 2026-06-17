@@ -43,7 +43,7 @@ public class AiAssistService {
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
 
         // Check if summary already exists
-        var existing = summaryRepository.findByDocumentId(documentId);
+        var existing = summaryRepository.findByDocument_Id(documentId);
         if (existing.isPresent()) {
             log.info("Summary already exists for document: {}", documentId);
             return existing.get();

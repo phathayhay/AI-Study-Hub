@@ -1,29 +1,29 @@
 import { apiGet, apiPost } from '../../services/api'
 
 export function generateSummary(documentId) {
-  return apiPost(`/api/ai/documents/${documentId}/summary`, {})
+  return apiPost(`/ai/documents/${documentId}/summary`)
 }
 
 export function generateQuiz(documentId, difficulty = 'MEDIUM') {
-  return apiPost(`/api/ai/documents/${documentId}/quiz?difficulty=${encodeURIComponent(difficulty)}`, {})
-}
-
-export function getDocumentQuizzes(documentId) {
-  return apiGet(`/api/ai/documents/${documentId}/quizzes`)
-}
-
-export function getQuizDetails(quizId) {
-  return apiGet(`/api/ai/quizzes/${quizId}`)
+  return apiPost(`/ai/documents/${documentId}/quiz?difficulty=${difficulty}`)
 }
 
 export function generateFlashcards(documentId) {
-  return apiPost(`/api/ai/documents/${documentId}/flashcards`, {})
+  return apiPost(`/ai/documents/${documentId}/flashcards`)
+}
+
+export function getDocumentQuizzes(documentId) {
+  return apiGet(`/ai/documents/${documentId}/quizzes`)
 }
 
 export function getDocumentFlashcardSets(documentId) {
-  return apiGet(`/api/ai/documents/${documentId}/flashcard-sets`)
+  return apiGet(`/ai/documents/${documentId}/flashcard-sets`)
 }
 
-export function getFlashcardSetDetails(setId) {
-  return apiGet(`/api/ai/flashcards/${setId}`)
+export function getQuiz(quizId) {
+  return apiGet(`/ai/quizzes/${quizId}`)
+}
+
+export function getFlashcardSet(setId) {
+  return apiGet(`/ai/flashcards/${setId}`)
 }

@@ -1,77 +1,33 @@
-import { apiPost } from '../../services/api'
+import { apiPost, apiGet } from '../../services/api'
 
-const USER_KEY = 'authUser'
-
-function clearAuthStorage(storage) {
-  storage.removeItem('accessToken')
-  storage.removeItem('refreshToken')
-  storage.removeItem(USER_KEY)
-}
-
-function saveSession(session, remember = true) {
-  clearAuthStorage(localStorage)
-  clearAuthStorage(sessionStorage)
-  const storage = remember ? localStorage : sessionStorage
-  storage.setItem('accessToken', session.accessToken)
-  storage.setItem('refreshToken', session.refreshToken)
-  storage.setItem(USER_KEY, JSON.stringify({
-    email: session.email,
-    fullName: session.fullName,
-    role: session.role,
-    studentCode: session.studentCode,
-  }))
-  return session
-}
-
-export async function login(credentials, remember = true) {
-  return saveSession(await apiPost('/api/auth/login', credentials), remember)
+export async function login(credentials) {
+  return apiPost('/auth/login', credentials)
 }
 
 export async function register(data) {
-  return saveSession(await apiPost('/api/auth/register', data))
+  return apiPost('/auth/register', data)
 }
 
-export async function refreshSession() {
-  const refreshToken = localStorage.getItem('refreshToken') ?? sessionStorage.getItem('refreshToken')
-  if (!refreshToken) throw new Error('Không có refresh token.')
-  const remember = Boolean(localStorage.getItem('refreshToken'))
-  return saveSession(await apiPost('/api/auth/refresh', { refreshToken }), remember)
+export async function getMe() {
+  try { return await apiGet('/auth/me') } catch { return null }
 }
 
-export async function logout() {
-  const refreshToken = localStorage.getItem('refreshToken') ?? sessionStorage.getItem('refreshToken')
-  try {
-    if (refreshToken) await apiPost('/api/auth/logout', { refreshToken })
-  } finally {
-    clearAuthStorage(localStorage)
-    clearAuthStorage(sessionStorage)
-  }
+export async function logout(refreshToken) {
+  try { await apiPost('/auth/logout', { refreshToken }) } catch { /* ignore */ }
 }
 
-export function getStoredUser() {
-  const value = localStorage.getItem(USER_KEY) ?? sessionStorage.getItem(USER_KEY)
-  if (!value) return null
-  try {
-    return JSON.parse(value)
-  } catch {
-    clearAuthStorage(localStorage)
-    clearAuthStorage(sessionStorage)
-    return null
-  }
+export async function refresh(refreshToken) {
+  return apiPost('/auth/refresh', { refreshToken })
 }
 
-export function forgotPassword(email) {
-  return apiPost('/api/auth/forgot-password', { email })
+export async function changePassword(data) {
+  return apiPost('/auth/change-password', data)
 }
 
-export function resetPassword(token, newPassword) {
-  return apiPost('/api/auth/reset-password', { token, newPassword })
+export async function forgotPassword(email) {
+  return apiPost('/auth/forgot-password', { email })
 }
 
-export function changePassword(oldPassword, newPassword) {
-  return apiPost('/api/auth/change-password', {
-    oldPassword,
-    newPassword,
-    confirmPassword: newPassword,
-  })
+export async function resetPassword(data) {
+  return apiPost('/auth/reset-password', data)
 }

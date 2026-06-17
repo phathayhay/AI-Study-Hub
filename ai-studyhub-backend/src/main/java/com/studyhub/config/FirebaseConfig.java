@@ -33,8 +33,7 @@ public class FirebaseConfig {
                 log.info("Firebase initialized successfully");
             }
         } catch (IOException e) {
-            log.error("Failed to initialize Firebase: {}", e.getMessage());
-            throw new RuntimeException("Firebase initialization failed", e);
+            log.warn("Firebase service account file not found or invalid at '{}'. Storage features will be unavailable. Error: {}", serviceAccountPath, e.getMessage());
         }
     }
 }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import FeaturedDocuments from '../../components/home/FeaturedDocuments'
 import FeaturedFolders from '../../components/home/FeaturedFolders'
 import HeroSearch from '../../components/home/HeroSearch'
@@ -8,6 +8,8 @@ import Badge from '../../components/ui/Badge'
 import { appUser, featuredDocuments, featuredFolders, recentActivities } from '../../data/studyHubData'
 import { pricingPlans } from './config'
 import { DocumentCardMini, ExploreFolderCard, InfoLine, PageTitle, SectionTitle } from './shared'
+import { getMyDocuments, getDocument, uploadDocument } from '../../features/documents/documentService'
+import { getRootFolders, getFolder } from '../../features/folders/folderService'
 
 const uploadSelectFields = [
   {
@@ -50,7 +52,41 @@ export function HomeScreen({ guest = false, onNavigate }) {
   )
 }
 
-export function ExplorePage({ onNavigate }) {
+export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder }) {
+  const [folders, setFolders] = useState(featuredFolders)
+  const [documents, setDocuments] = useState(featuredDocuments)
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+    getRootFolders().then((res) => {
+      const list = Array.isArray(res) ? res : res?.data || []
+      if (list.length) {
+        setFolders(list.map((f) => ({
+          id: f.id,
+          code: f.name?.substring(0, 8) || 'N/A',
+          title: f.name || 'Untitled',
+          description: f.description || '',
+          files: 0, downloads: '0', author: 'You',
+          date: f.createdAt ? new Date(f.createdAt).toLocaleDateString() : '',
+        })))
+      }
+    }).catch(() => {})
+    getMyDocuments().then((res) => {
+      const list = Array.isArray(res) ? res : res?.data || []
+      if (list.length) {
+        setDocuments(list.map((d) => ({
+          id: d.id,
+          code: (d.title || d.fileName || 'Doc').substring(0, 8),
+          type: d.fileType || 'Document',
+          title: d.title || d.fileName || 'Untitled',
+          description: d.description || '',
+          downloads: '0', rating: '0',
+        })))
+      }
+    }).catch(() => {})
+  }, [])
+
   return (
     <main className="page-surface page-surface--narrow">
       <PageTitle title="Khám phá tài liệu" subtitle="Tìm kiếm và khám phá hàng nghìn tài liệu học tập từ cộng đồng FPTU" />
@@ -73,28 +109,35 @@ export function ExplorePage({ onNavigate }) {
         </div>
       </div>
 
-      <p className="result-count">Tìm thấy 7 thư mục và 8 tài liệu</p>
-      <SectionTitle icon="folder" title="Thư mục" count={7} />
+      <p className="result-count">Tìm thấy {folders.length} thư mục và {documents.length} tài liệu</p>
+      <SectionTitle icon="folder" title="Thư mục" count={folders.length} />
       <div className="explore-folder-grid">
-        {featuredFolders.map((folder) => (
-          <ExploreFolderCard folder={folder} key={folder.code} onOpen={() => onNavigate('folder-detail')} />
+        {folders.map((folder) => (
+          <ExploreFolderCard folder={folder} key={folder.code} onOpen={() => onOpenFolder?.(folder.id)} />
         ))}
       </div>
-      <SectionTitle icon="file" title="Tài liệu" count={8} />
+      <SectionTitle icon="file" title="Tài liệu" count={documents.length} />
       <div className="document-grid">
-        {featuredDocuments.map((document) => (
-          <DocumentCardMini document={document} key={`${document.code}-${document.type}`} onOpen={() => onNavigate('doc-detail')} />
+        {documents.map((document) => (
+          <DocumentCardMini document={document} key={`${document.code}-${document.type}`} onOpen={() => onOpenDocument?.(document.id)} />
         ))}
       </div>
     </main>
   )
 }
 
-export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
+export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
   const [readStatus, setReadStatus] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const [uploadSuccess, setUploadSuccess] = useState(false)
   const fileInputRef = useRef(null)
+  const titleRef = useRef(null)
+  const descRef = useRef(null)
+  const visibilityRef = useRef(null)
+  const tagsRef = useRef(null)
   const isStudyUpload = mode === 'study'
 
   const handleFileSelect = async (files) => {
@@ -104,18 +147,19 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
     setSelectedUploadFile(file)
     setUploadedText('')
     setReadStatus('')
+    setUploadError('')
+    setUploadSuccess(false)
 
-    if (!canReadAsText(file)) {
-      setReadStatus('File đã được chọn. Định dạng này cần parser/backend để đọc nội dung trực tiếp.')
-      return
-    }
-
-    try {
-      const text = await file.text()
-      setUploadedText(text.trim())
-      setReadStatus(text.trim() ? 'Đã đọc nội dung file.' : 'File không có nội dung text để hiển thị.')
-    } catch {
-      setReadStatus('Chưa đọc được nội dung file. Vui lòng thử file khác.')
+    if (canReadAsText(file)) {
+      try {
+        const text = await file.text()
+        setUploadedText(text.trim())
+        setReadStatus(text.trim() ? 'Đã đọc nội dung file.' : 'File không có nội dung text để hiển thị.')
+      } catch {
+        setReadStatus('Chưa đọc được nội dung file.')
+      }
+    } else {
+      setReadStatus('File sẽ được xử lý bởi backend sau khi tải lên.')
     }
   }
 
@@ -123,20 +167,56 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
     setSelectedUploadFile(null)
     setUploadedText('')
     setReadStatus('')
+    setUploadError('')
+    setUploadSuccess(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const startStudySession = () => {
     if (!selectedUploadFile || !onStudyFileUploaded) return
-
+    const fileUrl = !uploadedText ? URL.createObjectURL(selectedUploadFile) : ''
     onStudyFileUploaded({
+      id: Date.now(),
       name: selectedUploadFile.name,
       attachmentName: selectedUploadFile.name,
       subject: selectedUploadFile.type || 'Imported file',
       sizeLabel: formatFileSize(selectedUploadFile.size),
       content: uploadedText,
+      fileUrl,
       readStatus,
     })
+  }
+
+  const handleUpload = async () => {
+    if (!selectedUploadFile) return
+    const title = titleRef.current?.value?.trim() || selectedUploadFile.name
+    const description = descRef.current?.value?.trim() || ''
+    const visibility = visibilityRef.current?.value || 'PRIVATE'
+    const tagsRaw = tagsRef.current?.value?.trim() || ''
+    const tags = tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : []
+    setUploading(true)
+    setUploadError('')
+    setUploadSuccess(false)
+    try {
+      const res = await uploadDocument(selectedUploadFile, { title, description, visibility, tags })
+      const doc = res?.data || res
+      setUploadSuccess(true)
+      setTimeout(() => {
+        clearSelectedFile()
+        if (onStudyFileUploaded) {
+          onStudyFileUploaded({
+            id: doc?.id || doc?.documentId,
+            name: title,
+            attachmentName: selectedUploadFile.name,
+            content: '',
+            fileUrl: doc?.fileUrl || '',
+          })
+        }
+        if (onNavigate) onNavigate('study')
+      }, 1000)
+    } catch (err) {
+      setUploadError(err?.message || 'Tải lên thất bại')
+    } finally { setUploading(false) }
   }
 
   return (
@@ -152,7 +232,7 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
               ref={fileInputRef}
               className="visually-hidden"
               type="file"
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.zip,.txt,.md,.csv,.json"
+              accept=".pdf,.doc,.docx,.ppt,.pptx,.zip,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.gif,.webp"
               onChange={(event) => handleFileSelect(event.target.files)}
             />
             <div
@@ -182,8 +262,10 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
               <button onClick={clearSelectedFile} type="button">×</button>
             </div>
             {readStatus && <p className="upload-read-status">{readStatus}</p>}
-            <label>Tiêu đề tài liệu *<input defaultValue={selectedUploadFile.name} placeholder="Nhập tiêu đề tài liệu" /></label>
-            <label>Mô tả<textarea placeholder="Mô tả ngắn gọn nội dung tài liệu..." /></label>
+            {uploadError && <p className="auth-error">{uploadError}</p>}
+            {uploadSuccess && <p className="upload-success">Tải lên thành công!</p>}
+            <label>Tiêu đề tài liệu *<input ref={titleRef} defaultValue={selectedUploadFile.name} placeholder="Nhập tiêu đề tài liệu" /></label>
+            <label>Mô tả<textarea ref={descRef} placeholder="Mô tả ngắn gọn nội dung tài liệu..." /></label>
             <div className="upload-form__grid">
               {uploadSelectFields.map((field) => (
                 <label key={field.label}>
@@ -194,10 +276,14 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
                   </select>
                 </label>
               ))}
+              <label>Hiển thị<select ref={visibilityRef} defaultValue="PRIVATE">
+                <option value="PUBLIC">Public</option><option value="PRIVATE">Private</option>
+              </select></label>
+              <label>Tags (phân cách bằng dấu phẩy)<input ref={tagsRef} placeholder="SWP, Study, ..." /></label>
             </div>
             <div className="upload-form__actions">
-              <button className="upload-submit" onClick={startStudySession} type="button">
-                {isStudyUpload ? 'Bắt đầu học với AI' : 'Tải lên'}
+              <button className="upload-submit" onClick={isStudyUpload ? startStudySession : handleUpload} type="button" disabled={uploading}>
+                {uploading ? 'Đang tải lên...' : isStudyUpload ? 'Bắt đầu học với AI' : 'Tải lên'}
               </button>
               <button className="cancel-button" onClick={clearSelectedFile} type="button">Hủy</button>
             </div>
@@ -209,13 +295,17 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded }) {
 }
 
 export function ProfilePage() {
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('user') || 'null') } catch { return null }
+  })
+
   return (
     <main className="page-surface profile-page">
       <section className="profile-card">
-        <div className="profile-avatar">SV</div>
+        <div className="profile-avatar">{user?.fullName?.[0] || 'SV'}</div>
         <div>
-          <h1>{appUser.name} <button type="button"><StudyHubIcon name="edit" size={16} /> Chỉnh sửa</button></h1>
-          <p><StudyHubIcon name="mail" size={16} /> {appUser.email}</p>
+          <h1>{user?.fullName || appUser.name} <button type="button"><StudyHubIcon name="edit" size={16} /> Chỉnh sửa</button></h1>
+          <p><StudyHubIcon name="mail" size={16} /> {user?.email || appUser.email}</p>
           <p><StudyHubIcon name="globe" size={16} /> {appUser.city}</p>
           <p><StudyHubIcon name="calendar" size={16} /> {appUser.joined}</p>
         </div>
@@ -252,44 +342,66 @@ function canReadAsText(file) {
   return file.type.startsWith('text/') || readableExtensions.some((extension) => lowerName.endsWith(extension))
 }
 
-export function FolderDetailPage({ onNavigate }) {
+export function FolderDetailPage({ id, onNavigate }) {
+  const [folder, setFolder] = useState(null)
+
+  useEffect(() => {
+    if (!id) return
+    getFolder(id).then((res) => {
+      setFolder(res?.data || res)
+    }).catch(() => {})
+  }, [id])
+
+  const f = folder || {
+    name: 'PRF192 - Programming Fundamentals Full Pack',
+    description: 'Bộ tài liệu hoàn chỉnh PRF192: Slides bài giảng, Source code mẫu, Đề thi + Đáp án',
+  }
+
   return (
     <main className="page-surface folder-detail-page">
       <button className="text-link" onClick={() => onNavigate('explore')} type="button">← Quay lại danh sách</button>
-      <p className="breadcrumb">Khám phá › PRF192 - Programming Fundamentals Full Pack</p>
-      <h1>PRF192 - Programming Fundamentals Full Pack</h1>
-      <p>Bộ tài liệu hoàn chỉnh PRF192: Slides bài giảng, Source code mẫu, Đề thi + Đáp án</p>
+      <p className="breadcrumb">Khám phá › {f.name}</p>
+      <h1>{f.name}</h1>
+      <p>{f.description}</p>
       <section className="folder-hero-card">
         <span><StudyHubIcon name="folder" size={36} /></span>
-        <Badge tone="blue">PRF192</Badge>
-        <small><StudyHubIcon name="file" size={14} /> 1 tài liệu</small>
-        <small><StudyHubIcon name="download" size={14} /> 5,678 lượt tải</small>
+        <Badge tone="blue">{f.id?.toString().slice(-6) || 'FOL'}</Badge>
+        <small><StudyHubIcon name="file" size={14} /> 0 tài liệu</small>
+        <small><StudyHubIcon name="download" size={14} /> 0 lượt tải</small>
         <button className="primary-action" type="button"><StudyHubIcon name="download" size={18} /> Tải về toàn bộ folder</button>
       </section>
-      <SectionTitle icon="file" title="Tài liệu trong thư mục" count={1} />
+      <SectionTitle icon="file" title="Tài liệu trong thư mục" count={0} />
       <div className="document-grid document-grid--single">
-        <DocumentCardMini document={{ ...featuredDocuments[1], code: 'DTG302', title: 'DTG302 - Motion Graphics Final Project', downloads: '432', rating: '4.7' }} onOpen={() => onNavigate('doc-detail')} />
+        <p style={{ opacity: 0.5, gridColumn: '1 / -1' }}>Chưa có tài liệu nào trong thư mục này</p>
       </div>
     </main>
   )
 }
 
-export function DocumentDetailPage({ onBack, onReport }) {
-  const doc = featuredDocuments[1]
-  const [favorite, setFavorite] = useState(Boolean(doc.favorite))
+export function DocumentDetailPage({ id, onBack, onReport }) {
+  const [doc, setDoc] = useState(null)
+
+  useEffect(() => {
+    if (!id) return
+    getDocument(id).then((res) => {
+      setDoc(res?.data || res)
+    }).catch(() => {})
+  }, [id])
+
+  const d = doc || featuredDocuments[1]
 
   return (
     <main className="page-surface document-detail-page">
       <div className="doc-layout">
         <section className="doc-main-card">
           <button className="text-link" onClick={onBack} type="button">← Quay lại</button>
-          <div className="doc-tags"><Badge tone="blue">{doc.code}</Badge><Badge>{doc.type}</Badge></div>
-          <h1>{doc.title}</h1>
-          <p>{doc.description}</p>
+          <div className="doc-tags"><Badge tone="blue">{d.code || d.id?.toString().slice(-6)}</Badge><Badge>{d.fileType || d.type}</Badge></div>
+          <h1>{d.title}</h1>
+          <p>{d.description}</p>
           <div className="doc-metrics">
-            <span><StudyHubIcon name="download" size={15} /> {doc.downloads} lượt tải</span>
-            <span><StudyHubIcon name="eye" size={15} /> {doc.views} lượt xem</span>
-            <span className="rating">★ {doc.rating} (124 đánh giá)</span>
+            <span><StudyHubIcon name="download" size={15} /> {d.downloads || 0} lượt tải</span>
+            <span><StudyHubIcon name="eye" size={15} /> {d.views || 0} lượt xem</span>
+            <span className="rating">★ {d.rating || 0} </span>
           </div>
           <h2>Xem trước</h2>
           <div className="preview-box">
@@ -300,13 +412,13 @@ export function DocumentDetailPage({ onBack, onReport }) {
         </section>
         <aside className="doc-info-card">
           <h2>Thông tin tài liệu</h2>
-          <InfoLine icon="user" label="Người tải lên" value={doc.uploader} />
-          <InfoLine icon="calendar" label="Ngày tải lên" value={doc.date} />
-          <InfoLine icon="file" label="Môn học" value={doc.subject} />
-          <button className="primary-action" type="button"><StudyHubIcon name="download" size={16} /> Tải xuống</button>
+          <InfoLine icon="user" label="Người tải lên" value={d.uploader || 'N/A'} />
+          <InfoLine icon="calendar" label="Ngày tải lên" value={d.createdAt ? new Date(d.createdAt).toLocaleDateString() : d.date || 'N/A'} />
+          <InfoLine icon="file" label="Môn học" value={d.subject || d.fileType || 'N/A'} />
+          {d.fileUrl && <button className="primary-action" type="button" onClick={() => window.open(d.fileUrl, '_blank')}><StudyHubIcon name="download" size={16} /> Tải xuống</button>}
           <button className="purple-button" type="button"><StudyHubIcon name="message" size={16} /> Chat với AI</button>
           <button className="success-button" type="button"><StudyHubIcon name="share" size={16} /> Chia sẻ</button>
-          <button className={`muted-button ${favorite ? 'is-active' : ''}`} onClick={() => setFavorite((value) => !value)} type="button"><StudyHubIcon name="heart" size={16} /> Yêu thích</button>
+          <button className="muted-button" type="button"><StudyHubIcon name="heart" size={16} /> Yêu thích</button>
           <button className="danger-outline" onClick={onReport} type="button"><StudyHubIcon name="flag" size={16} /> Báo cáo</button>
           <div className="rating-row">☆ ☆ ☆ ☆ ☆</div>
         </aside>

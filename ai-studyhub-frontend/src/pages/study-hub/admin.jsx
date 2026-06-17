@@ -4,12 +4,12 @@ import Badge from '../../components/ui/Badge'
 import { adminCourses, adminDocuments, adminNavItems, adminUsers } from './config'
 import { InfoBlock } from './shared'
 
-export function AdminApp({ route, onLogout, onNavigate }) {
+export function AdminApp({ route, onNavigate, onLogout }) {
   const [userModal, setUserModal] = useState(null)
   const [courseModal, setCourseModal] = useState(null)
 
   return (
-    <AdminLayout active={route} onLogout={onLogout} onNavigate={onNavigate}>
+    <AdminLayout active={route} onNavigate={onNavigate} onLogout={onLogout}>
       {route === 'admin-overview' && <AdminOverview />}
       {route === 'admin-users' && <AdminUsers onOpenUser={() => setUserModal(adminUsers[0])} />}
       {route === 'admin-documents' && <AdminDocuments />}
@@ -24,10 +24,10 @@ export function AdminApp({ route, onLogout, onNavigate }) {
   )
 }
 
-function AdminLayout({ active, children, onLogout, onNavigate }) {
+function AdminLayout({ active, children, onNavigate, onLogout }) {
   return (
     <div className="admin-shell">
-      <AdminSidebar active={active} onLogout={onLogout} onNavigate={onNavigate} />
+      <AdminSidebar active={active} onNavigate={onNavigate} onLogout={onLogout} />
       <div className="admin-body">
         <AdminTopbar />
         {children}
@@ -36,7 +36,7 @@ function AdminLayout({ active, children, onLogout, onNavigate }) {
   )
 }
 
-function AdminSidebar({ active, onLogout, onNavigate }) {
+function AdminSidebar({ active, onNavigate, onLogout }) {
   return (
     <aside className="admin-sidebar">
       <div className="admin-brand">

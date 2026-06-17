@@ -1,9 +1,12 @@
+server:
+  forward-headers-strategy: framework
+
 spring:
   application:
     name: ai-studyhub-backend
 
   datasource:
-    url: jdbc:mysql://localhost:3306/ai_studyhub?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ai_studyhub}?useSSL=${DB_SSL:false}&verifyServerCertificate=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -47,10 +50,16 @@ firebase:
   storage-bucket: ${FIREBASE_STORAGE_BUCKET:your-project-id.appspot.com}
   project-id: ${FIREBASE_PROJECT_ID:your-project-id}
 
+# ── Cloudinary ───────────────────────────────────────────────
+cloudinary:
+  cloud-name: ${CLOUDINARY_CLOUD_NAME}
+  api-key: ${CLOUDINARY_API_KEY}
+  api-secret: ${CLOUDINARY_API_SECRET}
+
 # ── Gemini AI ────────────────────────────────────────────────
 gemini:
   api-key: ${GEMINI_API_KEY}
-  model: gemini-1.5-flash
+  model: gemini-2.5-flash-lite
   project-id: ${GOOGLE_CLOUD_PROJECT_ID}
   location: us-central1
   max-tokens: 2048
@@ -64,6 +73,7 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: alpha
     tags-sorter: alpha
+    persist-authorization: true
 
 # ── App config ───────────────────────────────────────────────
 app:

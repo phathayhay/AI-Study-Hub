@@ -1,12 +1,25 @@
 .idea/
 **/.idea/
+.vscode/
 
 *.iml
 
 target/
 **/target/
 
+# Node
+node_modules/
+
+# env
 .env
+
+# json
+ai-studyhub-backend/src/main/resources/firebase-service-account.json
+
+# OS
+.DS_Store
+
+**/run-project.ps1
 
 # Maven
 .mvn/wrapper/maven-wrapper.jar
