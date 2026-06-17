@@ -15,4 +15,12 @@ public class SecurityUtils {
         }
         throw new IllegalStateException("No authenticated user found");
     }
+
+    public static String getCurrentUserEmailOptional() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof UserDetails ud) {
+            return ud.getUsername();
+        }
+        return null;
+    }
 }
