@@ -6,4 +6,5 @@ import java.util.Optional;
 
 public interface StudentVerificationRepository extends JpaRepository<StudentVerification, Long> {
     Optional<StudentVerification> findByUserId(Long userId);
+    java.util.List<StudentVerification> findByStatus(com.studyhub.common.enums.VerificationStatus status);
 }
