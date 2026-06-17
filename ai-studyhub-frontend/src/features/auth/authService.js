@@ -1,4 +1,4 @@
-import { apiPost } from '../../services/api'
+import { apiGet, apiPost, buildQueryString } from '../../services/api'
 
 const USER_KEY = 'authUser'
 
@@ -74,4 +74,8 @@ export function changePassword(oldPassword, newPassword) {
     newPassword,
     confirmPassword: newPassword,
   })
+}
+
+export function verifyEmail(token) {
+  return apiGet(`/api/auth/verify-email${buildQueryString({ token })}`)
 }

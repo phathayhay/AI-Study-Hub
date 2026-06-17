@@ -14,8 +14,8 @@ import {
   addDocumentFavorite,
   deleteDocument,
   getMyDocuments,
-  publishDocument,
   removeDocumentFavorite,
+  updateDocumentVisibility,
 } from '../../services/documentService'
 
 export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) {
@@ -53,6 +53,14 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
     if (activeTab === 'favorites') return documents.filter((document) => document.favorite)
     return activeTab === 'recent' ? documents : documents.slice(0, 4)
   }, [activeTab, documents])
+
+  const tabCounts = useMemo(() => ({
+    sessions: documents.length,
+    shared: documents.filter((document) => document.public).length,
+    favorites: documents.filter((document) => document.favorite).length,
+    folders: folders.length,
+    recent: documents.length,
+  }), [documents, folders])
 
   const runRequest = async (request) => {
     setError('')
@@ -134,14 +142,14 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
     setShareFile(file)
   }
 
-  const handlePublishDocument = () => runRequest(async () => {
+  const handleUpdateDocumentVisibility = (visibility) => runRequest(async () => {
     if (!shareFile || sharing) return
     setSharing(true)
     try {
-      const updated = mapDocument(await publishDocument(shareFile.id))
+      const updated = mapDocument(await updateDocumentVisibility(shareFile.id, visibility))
       updateDocumentState(updated)
       setShareFile(null)
-      onTabChange('shared')
+      if (visibility === 'PUBLIC') onTabChange('shared')
     } finally {
       setSharing(false)
     }
@@ -149,7 +157,7 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
 
   return (
     <div className="library-shell">
-      <LibraryRail activeTab={activeTab} onNavigate={onNavigate} onTabChange={onTabChange} />
+      <LibraryRail activeTab={activeTab} counts={tabCounts} onNavigate={onNavigate} onTabChange={onTabChange} />
       <main className="library-main">
         <div className="library-header">
           <div><h1>Thư viện của bạn</h1></div>
@@ -209,7 +217,7 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
             file={shareFile}
             loading={sharing}
             onClose={() => setShareFile(null)}
-            onPublish={handlePublishDocument}
+            onSave={handleUpdateDocumentVisibility}
           />
         )}
       </main>
@@ -283,7 +291,7 @@ function DocumentList({ files, onDeleteFile, onOpenFile, onShareFile, onToggleFa
             <button className="file-menu-trigger" onClick={() => onToggleFileMenu(openFileMenuId === file.id ? null : file.id)} type="button">...</button>
             {openFileMenuId === file.id && (
               <div className="file-action-menu">
-                {!file.public && <button onClick={() => onShareFile(file)} type="button">Chia sẻ</button>}
+                <button onClick={() => onShareFile(file)} type="button">Chia sẻ</button>
                 <button className="is-danger" onClick={() => onDeleteFile(file)} type="button">Xóa file</button>
               </div>
             )}
@@ -294,7 +302,7 @@ function DocumentList({ files, onDeleteFile, onOpenFile, onShareFile, onToggleFa
   )
 }
 
-function LibraryRail({ activeTab, onNavigate, onTabChange }) {
+function LibraryRail({ activeTab, counts, onNavigate, onTabChange }) {
   return (
     <aside className="library-rail">
       <button className="new-session" onClick={() => onNavigate('new-study-session')} type="button">
@@ -305,7 +313,7 @@ function LibraryRail({ activeTab, onNavigate, onTabChange }) {
           <button className={activeTab === tab.id ? 'is-active' : ''} key={tab.id} onClick={() => onTabChange(tab.id)} type="button">
             <StudyHubIcon name={tab.icon} size={20} />
             <span>{tab.label}</span>
-            {tab.count && <small>{tab.count}</small>}
+            <small>{counts[tab.id] ?? 0}</small>
           </button>
         ))}
       </nav>
@@ -350,9 +358,16 @@ function FileRow({ file, onClick, onToggleFavorite }) {
   )
 }
 
-function ShareDocumentModal({ file, loading, onClose, onPublish }) {
+function ShareDocumentModal({ file, loading, onClose, onSave }) {
   const [copied, setCopied] = useState(false)
+  const [selectedVisibility, setSelectedVisibility] = useState('PUBLIC')
   const shareUrl = `${window.location.origin}${fillRoute(ROUTES.DOCUMENT_DETAIL, { documentId: file.documentId ?? file.id })}`
+  const isPublic = selectedVisibility === 'PUBLIC'
+  const accessIcon = isPublic ? 'globe' : 'lock'
+  const accessTitle = isPublic ? 'Bất kỳ ai có đường liên kết' : 'Hạn chế'
+  const accessDescription = isPublic
+    ? 'Bất kỳ ai có kết nối Internet và có đường liên kết này đều có thể xem'
+    : 'Chỉ những người được thêm mới có thể mở'
 
   const handleCopy = async () => {
     try {
@@ -391,16 +406,29 @@ function ShareDocumentModal({ file, loading, onClose, onPublish }) {
           </div>
         </label>
 
-        <div className="share-access">
-          <span><StudyHubIcon name="lock" size={18} /></span>
+        <span className="share-access-label">Quyền truy cập chung</span>
+        <label className={`share-access ${isPublic ? 'is-public' : ''}`}>
+          <span><StudyHubIcon name={accessIcon} size={18} /></span>
           <div>
-            <strong>Hạn chế <StudyHubIcon name="chevron" size={14} /></strong>
-            <small>Chỉ những người được thêm mới có thể mở</small>
+            <strong>
+              {accessTitle}
+              <StudyHubIcon name="chevron" size={14} />
+            </strong>
+            <small>{accessDescription}</small>
           </div>
-        </div>
+          <select
+            aria-label="Quyền truy cập chung"
+            disabled={loading}
+            onChange={(event) => setSelectedVisibility(event.target.value)}
+            value={selectedVisibility}
+          >
+            <option value="PRIVATE">Hạn chế</option>
+            <option value="PUBLIC">Bất kỳ ai có đường liên kết</option>
+          </select>
+        </label>
 
-        <button className="share-publish-button" disabled={loading} onClick={onPublish} type="button">
-          {loading ? 'Đang đăng...' : 'Đăng diễn đàn'}
+        <button className="share-publish-button" disabled={loading} onClick={() => onSave(selectedVisibility)} type="button">
+          {loading ? 'Đang lưu...' : selectedVisibility === 'PUBLIC' ? 'Đăng diễn đàn' : 'Chuyển về riêng tư'}
         </button>
         <button className="share-close-button" disabled={loading} onClick={onClose} type="button">Đóng</button>
       </section>

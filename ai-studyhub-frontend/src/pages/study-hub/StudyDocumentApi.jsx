@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import { studyTabs } from '../../data/studyHubData'
+import AIChat from '../../features/ai/AIChat'
 import {
   generateFlashcards,
   generateQuiz,
   generateSummary,
   getDocumentFlashcardSets,
   getDocumentQuizzes,
+  getDocumentSummary,
   getFlashcardSetDetails,
   getQuizDetails,
 } from '../../features/ai/aiService'
@@ -14,6 +16,7 @@ import {
 export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange }) {
   const documentId = file?.documentId ?? file?.id
   const [summary, setSummary] = useState(null)
+  const [summaryChecked, setSummaryChecked] = useState(false)
   const [flashcardSets, setFlashcardSets] = useState([])
   const [flashcardSet, setFlashcardSet] = useState(null)
   const [quizzes, setQuizzes] = useState([])
@@ -22,8 +25,28 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!documentId) return undefined
+    if (!documentId) {
+      setSummary(null)
+      setSummaryChecked(true)
+      return undefined
+    }
     let active = true
+    setSummary(null)
+    setSummaryChecked(false)
+
+    getDocumentSummary(documentId)
+      .then((summaryData) => {
+        if (!active) return
+        setSummary(summaryData || null)
+      })
+      .catch((requestError) => {
+        if (!active) return
+        if (![204, 404, 405, 500].includes(requestError.status)) console.warn(requestError)
+      })
+      .finally(() => {
+        if (active) setSummaryChecked(true)
+      })
+
     Promise.all([
       getDocumentFlashcardSets(documentId),
       getDocumentQuizzes(documentId),
@@ -34,7 +57,8 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
         setQuizzes(quizList)
       })
       .catch((requestError) => {
-        if (active) setError(requestError.message)
+        if (!active) return
+        setError(requestError.message)
       })
     return () => {
       active = false
@@ -56,7 +80,10 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
 
   const handleSummary = async () => {
     const result = await runRequest(() => generateSummary(documentId))
-    if (result) setSummary(result)
+    if (result) {
+      setSummary(result)
+      setSummaryChecked(true)
+    }
   }
 
   const handleFlashcards = async () => {
@@ -105,7 +132,9 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
         {error && <p className="api-status api-status--error">{error}</p>}
         {activeTab === 'original' && <OriginalDocument file={file} />}
         {activeTab === 'summary' && (
-          summary
+          !summaryChecked
+            ? <p className="api-status">Đang kiểm tra AI Summary...</p>
+            : summary
             ? <SummaryView summary={summary} />
             : <GeneratePanel disabled={!documentId || loading} label="Summary" loading={loading} onGenerate={handleSummary} />
         )}
@@ -132,6 +161,7 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
             : <QuizPanel disabled={!documentId || loading} loading={loading} onCreate={handleQuiz} onOpen={openQuiz} quizzes={quizzes} />
         )}
       </main>
+      <AIChat documentId={documentId} documentTitle={file?.name || file?.attachmentName || 'Document'} />
     </div>
   )
 }

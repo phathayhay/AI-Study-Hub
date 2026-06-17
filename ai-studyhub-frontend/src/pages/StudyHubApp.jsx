@@ -44,6 +44,7 @@ export default function StudyHubApp({ notFound = false }) {
     id: params.documentId,
     documentId: params.documentId,
   })
+  const [detailFile, setDetailFile] = useState(() => location.state?.file ?? null)
   const [selectedFile, setSelectedFile] = useState(null)
   const [showReport, setShowReport] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -65,6 +66,28 @@ export default function StudyHubApp({ notFound = false }) {
         if (active) setStudyFile(mapStudyDocument(document))
       })
       .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [location.state, params.documentId, route])
+
+  useEffect(() => {
+    if (route !== 'doc-detail' || !params.documentId || params.documentId === 'featured') return undefined
+
+    if (location.state?.file) {
+      setDetailFile(location.state.file)
+      return undefined
+    }
+
+    let active = true
+    setDetailFile(createLoadingPublicDocument(params.documentId))
+    getDocumentDetails(params.documentId)
+      .then((document) => {
+        if (active) setDetailFile(mapPublicDocument(document))
+      })
+      .catch(() => {
+        if (active) setDetailFile(createUnavailablePublicDocument(params.documentId))
+      })
     return () => {
       active = false
     }
@@ -96,7 +119,7 @@ export default function StudyHubApp({ notFound = false }) {
     const requestedPath = location.state?.from
     const nextPath = nextRole === 'admin'
       ? ROUTES.ADMIN_OVERVIEW
-      : requestedPath && !requestedPath.startsWith('/admin') ? requestedPath : ROUTES.HOME
+      : isPostLoginRedirectPath(requestedPath) ? requestedPath : ROUTES.HOME
     routerNavigate(nextPath, { replace: true })
   }
 
@@ -122,6 +145,32 @@ export default function StudyHubApp({ notFound = false }) {
       fileUrl: file.fileUrl,
     }
     setSelectedFile(null)
+    setStudyFile(nextFile)
+    routerNavigate(
+      fillRoute(ROUTES.STUDY_DOCUMENT, { documentId: nextFile.documentId }),
+      { state: { file: nextFile, from: location.pathname } },
+    )
+  }
+
+  const openLibraryFile = (file) => {
+    if (file.public) {
+      const nextFile = mapLibraryPublicDocument(file)
+      setSelectedFile(null)
+      setDetailFile(nextFile)
+      routerNavigate(
+        fillRoute(ROUTES.DOCUMENT_DETAIL, { documentId: nextFile.documentId }),
+        { state: { file: nextFile, from: location.pathname } },
+      )
+      return
+    }
+
+    setSelectedFile(file)
+  }
+
+  const openDetailStudyFile = (document) => {
+    const nextFile = mapPublicStudyDocument(document)
+    setStudyTab('original')
+    setStudyMode('default')
     setStudyFile(nextFile)
     routerNavigate(
       fillRoute(ROUTES.STUDY_DOCUMENT, { documentId: nextFile.documentId }),
@@ -175,7 +224,7 @@ export default function StudyHubApp({ notFound = false }) {
         <LibraryPage
           activeTab={libraryTab}
           onNavigate={navigate}
-          onOpenFile={setSelectedFile}
+          onOpenFile={openLibraryFile}
           onTabChange={setLibraryTab}
         />
       )}
@@ -189,7 +238,9 @@ export default function StudyHubApp({ notFound = false }) {
       {route === 'pricing' && <PricingPage onNavigate={navigate} />}
       {route === 'doc-detail' && (
         <DocumentDetailPage
+          document={params.documentId === 'featured' ? null : detailFile}
           onBack={() => navigateBack(routerNavigate, location.state?.from, ROUTES.HOME)}
+          onChat={openDetailStudyFile}
           onReport={() => setShowReport(true)}
         />
       )}
@@ -216,6 +267,13 @@ export default function StudyHubApp({ notFound = false }) {
 function mapRole(role) {
   if (!role) return null
   return role.toUpperCase() === 'ADMIN' ? 'admin' : 'student'
+}
+
+function isPostLoginRedirectPath(path) {
+  return Boolean(path)
+    && path !== ROUTES.LOGIN
+    && path !== ROUTES.REGISTER
+    && !path.startsWith('/admin')
 }
 
 function getRouteFromPath(pathname, role) {
@@ -268,6 +326,91 @@ function mapStudyDocument(document) {
     fileUrl: document.fileUrl,
     content: '',
   }
+}
+
+function mapPublicDocument(document) {
+  return {
+    id: document.id,
+    documentId: document.id,
+    code: document.courseCode || document.tags?.[0] || document.fileType || 'Tài liệu',
+    type: document.fileType?.toLowerCase() || 'document',
+    title: document.title || document.fileName,
+    description: document.description || 'Tài liệu học tập được chia sẻ trên diễn đàn.',
+    downloads: document.totalDownloads ?? 0,
+    views: document.totalViews ?? 0,
+    rating: document.averageRating ?? '0',
+    uploader: document.uploaderName || `User #${document.userId ?? ''}`.trim(),
+    date: formatApiDate(document.createdAt),
+    subject: document.courseName || document.description || document.fileType || 'Tài liệu',
+    favorite: Boolean(document.favorite),
+    fileUrl: document.fileUrl,
+  }
+}
+
+function mapLibraryPublicDocument(file) {
+  return {
+    id: file.id,
+    documentId: file.documentId ?? file.id,
+    code: file.subject?.split(',')[0] || file.kind || 'Tài liệu',
+    type: file.kind || 'document',
+    title: file.name,
+    description: file.subject || 'Tài liệu học tập được chia sẻ trên diễn đàn.',
+    downloads: 0,
+    views: 0,
+    rating: '0',
+    uploader: 'Bạn',
+    date: file.date,
+    subject: file.subject || file.kind || 'Tài liệu',
+    favorite: Boolean(file.favorite),
+    fileUrl: file.fileUrl,
+  }
+}
+
+function mapPublicStudyDocument(document) {
+  const documentId = document?.documentId ?? document?.id ?? 'featured'
+  const name = document?.title || document?.name || 'Tài liệu'
+
+  return {
+    id: documentId,
+    documentId,
+    name,
+    attachmentName: document?.attachmentName || name,
+    subject: document?.subject || document?.description || document?.code || 'Tài liệu',
+    content: '',
+    sizeLabel: document?.sizeLabel,
+    fileUrl: document?.fileUrl,
+  }
+}
+
+function createLoadingPublicDocument(documentId) {
+  return {
+    id: documentId,
+    documentId,
+    code: 'Tài liệu',
+    type: 'document',
+    title: 'Đang tải tài liệu...',
+    description: '',
+    downloads: 0,
+    views: 0,
+    rating: '0',
+    uploader: '',
+    date: '',
+    subject: 'Tài liệu',
+    favorite: false,
+  }
+}
+
+function createUnavailablePublicDocument(documentId) {
+  return {
+    ...createLoadingPublicDocument(documentId),
+    title: 'Không thể tải tài liệu',
+    description: 'Tài liệu có thể không tồn tại hoặc bạn không có quyền truy cập.',
+  }
+}
+
+function formatApiDate(value) {
+  if (!value) return ''
+  return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short' }).format(new Date(value))
 }
 
 function formatFileSize(bytes = 0) {

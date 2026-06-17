@@ -274,8 +274,8 @@ export function FolderDetailPage({ onNavigate }) {
   )
 }
 
-export function DocumentDetailPage({ onBack, onReport }) {
-  const doc = featuredDocuments[1]
+export function DocumentDetailPage({ document, onBack, onChat, onReport }) {
+  const doc = document ?? featuredDocuments[1]
   const [favorite, setFavorite] = useState(Boolean(doc.favorite))
 
   return (
@@ -304,7 +304,7 @@ export function DocumentDetailPage({ onBack, onReport }) {
           <InfoLine icon="calendar" label="Ngày tải lên" value={doc.date} />
           <InfoLine icon="file" label="Môn học" value={doc.subject} />
           <button className="primary-action" type="button"><StudyHubIcon name="download" size={16} /> Tải xuống</button>
-          <button className="purple-button" type="button"><StudyHubIcon name="message" size={16} /> Chat với AI</button>
+          <button className="purple-button" onClick={() => onChat?.(doc)} type="button"><StudyHubIcon name="message" size={16} /> Chat với AI</button>
           <button className="success-button" type="button"><StudyHubIcon name="share" size={16} /> Chia sẻ</button>
           <button className={`muted-button ${favorite ? 'is-active' : ''}`} onClick={() => setFavorite((value) => !value)} type="button"><StudyHubIcon name="heart" size={16} /> Yêu thích</button>
           <button className="danger-outline" onClick={onReport} type="button"><StudyHubIcon name="flag" size={16} /> Báo cáo</button>
