@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
 import AppLayout from '../components/layout/AppLayout'
 import { AdminApp } from './study-hub/admin'
-import { LoginPage, RegisterPage, ForgotPasswordPage, ResetPasswordPage } from './study-hub/auth'
+import { LoginPage, RegisterPage } from './study-hub/auth'
 import { LibraryPage } from './study-hub/library'
-import { FilePreviewModal, NotificationPanel, ReportModal } from './study-hub/modals'
+import { FilePreviewModal, NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal } from './study-hub/modals'
 import {
   DocumentDetailPage, ExplorePage, FolderDetailPage, HomeScreen,
   PricingPage, ProfilePage, UploadPage,
 } from './study-hub/public-pages'
-import { StudyDocumentPage } from './study-hub/study-document'
+import StudyDocumentApi from './study-hub/StudyDocumentApi'
 import useAuth from '../hooks/useAuth'
 
 const defaultStudyFile = {
@@ -19,10 +19,22 @@ const defaultStudyFile = {
 }
 
 export default function StudyHubApp() {
-  const { user, loading, login: authLogin, register: authRegister, logout: authLogout } = useAuth()
+  const { user, loading, login: authLogin, register: authRegister, logout: authLogout, setUser } = useAuth()
   const [route, setRoute] = useState('guest-home')
   const [previousRoute, setPreviousRoute] = useState('guest-home')
-  const [role, setRole] = useState(null)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('sidebarCollapsed') === 'true'
+  })
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev
+      localStorage.setItem('sidebarCollapsed', String(next))
+      return next
+    })
+  }
+  const role = user ? (user.role?.toUpperCase() === 'ADMIN' ? 'admin' : 'student') : null
+  const guest = !user || !role
   const [libraryTab, setLibraryTab] = useState('sessions')
   const [studyTab, setStudyTab] = useState('original')
   const [studyMode, setStudyMode] = useState('default')
@@ -33,13 +45,58 @@ export default function StudyHubApp() {
   const [selectedFolderId, setSelectedFolderId] = useState(null)
   const [showReport, setShowReport] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const [showFeatureRequest, setShowFeatureRequest] = useState(false)
+  const [showSupport, setShowSupport] = useState(false)
+  const [showExtension, setShowExtension] = useState(false)
 
   useEffect(() => {
-    if (user && (route === 'login' || route === 'register')) setRoute('home')
-  }, [user])
+    const savedTheme = localStorage.getItem('theme')
+    if (savedTheme === 'dark') {
+      document.body.classList.add('dark-theme')
+    } else {
+      document.body.classList.remove('dark-theme')
+    }
+  }, [])
+
+
+  useEffect(() => {
+    if (guest) {
+      const publicRoutes = ['guest-home', 'explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
+      if (!publicRoutes.includes(route)) {
+        setRoute('login')
+      }
+    } else {
+      const guestOnlyRoutes = ['guest-home', 'login', 'register']
+      if (guestOnlyRoutes.includes(route)) {
+        setRoute(role === 'admin' ? 'admin-overview' : 'home')
+      }
+    }
+  }, [user, role, route])
 
   const navigate = (nextRoute) => {
     if (nextRoute === 'logout') { handleLogout(); return }
+    if (nextRoute === 'settings') { setShowSettings(true); return }
+    if (nextRoute === 'feature-request') { setShowFeatureRequest(true); return }
+    if (nextRoute === 'support') { setShowSupport(true); return }
+    if (nextRoute === 'chrome-extension') { setShowExtension(true); return }
+
+    // Enforce route guards
+    const hasToken = !!localStorage.getItem('accessToken')
+    const isGuest = !user && !hasToken
+    const publicRoutes = ['guest-home', 'explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
+    let targetBaseRoute = nextRoute
+    if (nextRoute === 'new-study-session') {
+      targetBaseRoute = 'upload'
+    } else if (nextRoute === 'library-shared' || nextRoute === 'library-folders') {
+      targetBaseRoute = 'library'
+    }
+
+    if (isGuest && !publicRoutes.includes(targetBaseRoute)) {
+      setRoute('login')
+      return
+    }
+
     if (nextRoute === 'new-study-session') {
       setPreviousRoute(route)
       setUploadMode('study')
@@ -47,32 +104,42 @@ export default function StudyHubApp() {
       setShowNotifications(false); setShowReport(false); setSelectedFile(null)
       return
     }
+    if (nextRoute === 'library-shared') {
+      setPreviousRoute(route)
+      setRoute('library')
+      setLibraryTab('shared')
+      setShowNotifications(false); setShowReport(false); setSelectedFile(null)
+      return
+    }
+    if (nextRoute === 'library-folders') {
+      setPreviousRoute(route)
+      setRoute('library')
+      setLibraryTab('folders')
+      setShowNotifications(false); setShowReport(false); setSelectedFile(null)
+      return
+    }
     setPreviousRoute(route)
     setRoute(nextRoute)
     setShowNotifications(false); setShowReport(false); setSelectedFile(null)
-    if (nextRoute === 'guest-home') setRole(null)
     if (nextRoute === 'upload') setUploadMode('document')
-    if (nextRoute === 'library') setLibraryTab('sessions')
+    if (nextRoute === 'library') setLibraryTab('recent')
     if (nextRoute === 'study') { setStudyTab('original'); setStudyMode('default') }
   }
 
-  const handleLogin = async (email, password) => {
-    const u = await authLogin(email, password)
-    const r = u.role === 'ADMIN' ? 'admin' : 'student'
-    setRole(r)
+  const handleLogin = async (res) => {
+    const u = await authLogin(res)
+    const r = u.role?.toUpperCase() === 'ADMIN' ? 'admin' : 'student'
     navigate(r === 'admin' ? 'admin-overview' : 'home')
   }
 
-  const handleRegister = async (data) => {
-    const u = await authRegister(data)
-    const r = u.role === 'ADMIN' ? 'admin' : 'student'
-    setRole(r)
+  const handleRegister = async (res) => {
+    const u = await authRegister(res)
+    const r = u.role?.toUpperCase() === 'ADMIN' ? 'admin' : 'student'
     navigate(r === 'admin' ? 'admin-overview' : 'home')
   }
 
   const handleLogout = async () => {
     await authLogout()
-    setRole(null)
     navigate('guest-home')
   }
 
@@ -103,27 +170,29 @@ export default function StudyHubApp() {
 
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
   if (route === 'register') return <RegisterPage onRegister={handleRegister} onNavigate={navigate} />
-  if (route === 'forgot-password') return <ForgotPasswordPage onNavigate={navigate} />
-  if (route === 'reset-password') return <ResetPasswordPage onNavigate={navigate} />
   if (route.startsWith('admin-')) return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />
 
-  const guest = !user || !role
   const activeRoute = guest
     ? ['explore', 'folder-detail', 'doc-detail'].includes(route) ? 'explore' : 'guest-home'
-    : route === 'folder-detail' ? 'explore' : route
+    : route === 'folder-detail' ? 'explore'
+    : route === 'library' ? (libraryTab === 'shared' ? 'library-shared' : libraryTab === 'folders' ? 'library-folders' : 'library')
+    : route
 
   return (
     <AppLayout
       active={activeRoute} className={route === 'study' ? 'app-shell--study' : ''}
       guest={guest} user={user}
+      title={route === 'study' ? studyFile?.name : null}
       onNavigate={navigate}
       onNotifications={() => setShowNotifications((open) => !open)}
+      sidebarCollapsed={sidebarCollapsed}
+      onToggleCollapse={toggleSidebar}
     >
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
 
       {route === 'guest-home' && <HomeScreen guest={guest} onNavigate={navigate} />}
       {route === 'home' && <HomeScreen onNavigate={navigate} />}
-      {route === 'explore' && <ExplorePage onNavigate={navigate} onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail') }} onOpenFolder={(id) => { setSelectedFolderId(id); navigate('folder-detail') }} />}
+      {route === 'explore' && <ExplorePage guest={guest} onNavigate={navigate} onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail') }} onOpenFolder={(id) => { setSelectedFolderId(id); navigate('folder-detail') }} />}
       {route === 'folder-detail' && <FolderDetailPage id={selectedFolderId} onNavigate={navigate} />}
       {route === 'library' && (
         <LibraryPage activeTab={libraryTab} onNavigate={navigate} onOpenFile={setSelectedFile} onTabChange={setLibraryTab} />
@@ -132,18 +201,29 @@ export default function StudyHubApp() {
       {route === 'profile' && <ProfilePage />}
       {route === 'pricing' && <PricingPage onNavigate={navigate} />}
       {route === 'doc-detail' && (
-        <DocumentDetailPage id={selectedDocId} onBack={() => navigate(previousRoute || (role ? 'home' : 'guest-home'))} onReport={() => setShowReport(true)} />
+        <DocumentDetailPage
+          id={selectedDocId}
+          guest={guest}
+          onNavigate={navigate}
+          onOpenStudyFile={openStudyFile}
+          onBack={() => navigate(previousRoute || (role ? 'home' : 'guest-home'))}
+          onReport={() => setShowReport(true)}
+        />
       )}
       {route === 'study' && (
-        <StudyDocumentPage
-          activeTab={studyTab} file={studyFile} mode={studyMode}
-          onBack={() => navigate(previousRoute || 'library')} onModeChange={setStudyMode}
+        <StudyDocumentApi
+          activeTab={studyTab} file={studyFile}
+          onBack={() => navigate(previousRoute || 'library')}
           onTabChange={(tab) => { setStudyTab(tab); setStudyMode('default') }}
         />
       )}
 
       {selectedFile && <FilePreviewModal file={selectedFile} onClose={() => setSelectedFile(null)} onView={() => openStudyFile(selectedFile)} />}
       {showReport && <ReportModal onClose={() => setShowReport(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} user={user} onUserUpdate={setUser} />}
+      {showFeatureRequest && <FeatureRequestModal onClose={() => setShowFeatureRequest(false)} />}
+      {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
+      {showExtension && <ChromeExtensionModal onClose={() => setShowExtension(false)} />}
     </AppLayout>
   )
 }

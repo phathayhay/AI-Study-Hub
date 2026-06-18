@@ -4,6 +4,10 @@ export function getMyDocuments() {
   return apiGet('/documents/my')
 }
 
+export function getSharedDocuments() {
+  return apiGet('/documents/shared')
+}
+
 export function getDocument(id) {
   return apiGet(`/documents/${id}`)
 }

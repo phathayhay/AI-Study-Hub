@@ -50,82 +50,22 @@ export function HomeScreen({ guest = false, onNavigate }) {
       </div>
     </main>
   )
-}
-
-export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder }) {
-  const [folders, setFolders] = useState(featuredFolders)
-  const [documents, setDocuments] = useState(featuredDocuments)
-
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken')
-    if (!token) return
-    getRootFolders().then((res) => {
-      const list = Array.isArray(res) ? res : res?.data || []
-      if (list.length) {
-        setFolders(list.map((f) => ({
-          id: f.id,
-          code: f.name?.substring(0, 8) || 'N/A',
-          title: f.name || 'Untitled',
-          description: f.description || '',
-          files: 0, downloads: '0', author: 'You',
-          date: f.createdAt ? new Date(f.createdAt).toLocaleDateString() : '',
-        })))
-      }
-    }).catch(() => {})
-    getMyDocuments().then((res) => {
-      const list = Array.isArray(res) ? res : res?.data || []
-      if (list.length) {
-        setDocuments(list.map((d) => ({
-          id: d.id,
-          code: (d.title || d.fileName || 'Doc').substring(0, 8),
-          type: d.fileType || 'Document',
-          title: d.title || d.fileName || 'Untitled',
-          description: d.description || '',
-          downloads: '0', rating: '0',
-        })))
-      }
-    }).catch(() => {})
-  }, [])
-
+}export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = false }) {
   return (
-    <main className="page-surface page-surface--narrow">
-      <PageTitle title="Khám phá tài liệu" subtitle="Tìm kiếm và khám phá hàng nghìn tài liệu học tập từ cộng đồng FPTU" />
-      <div className="filter-panel">
-        <div className="search-line">
-          <StudyHubIcon name="search" size={16} />
-          <input placeholder="Tìm kiếm theo mã môn học, nội dung tài liệu..." />
-        </div>
-        <div className="filter-grid">
-          {['Ngành học', 'Học kỳ', 'Mã môn học', 'Loại tài liệu'].map((label, index) => (
-            <label key={label}>
-              <span>{label}</span>
-              <select>
-                <option>
-                  {index === 0 ? 'Tất cả ngành' : index === 1 ? 'Tất cả học kỳ' : index === 2 ? 'Chọn học kỳ hoặc ngành trước' : 'Tất cả loại'}
-                </option>
-              </select>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <p className="result-count">Tìm thấy {folders.length} thư mục và {documents.length} tài liệu</p>
-      <SectionTitle icon="folder" title="Thư mục" count={folders.length} />
-      <div className="explore-folder-grid">
-        {folders.map((folder) => (
-          <ExploreFolderCard folder={folder} key={folder.code} onOpen={() => onOpenFolder?.(folder.id)} />
-        ))}
-      </div>
-      <SectionTitle icon="file" title="Tài liệu" count={documents.length} />
-      <div className="document-grid">
-        {documents.map((document) => (
-          <DocumentCardMini document={document} key={`${document.code}-${document.type}`} onOpen={() => onOpenDocument?.(document.id)} />
-        ))}
-      </div>
-    </main>
+    <HomeScreen
+      guest={guest}
+      onNavigate={(target) => {
+        if (target === 'doc-detail') {
+          onOpenDocument?.(1)
+        } else if (target === 'folder-detail') {
+          onOpenFolder?.(1)
+        } else {
+          onNavigate(target)
+        }
+      }}
+    />
   )
 }
-
 export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
@@ -378,7 +318,7 @@ export function FolderDetailPage({ id, onNavigate }) {
   )
 }
 
-export function DocumentDetailPage({ id, onBack, onReport }) {
+export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavigate, onOpenStudyFile }) {
   const [doc, setDoc] = useState(null)
 
   useEffect(() => {
@@ -389,6 +329,19 @@ export function DocumentDetailPage({ id, onBack, onReport }) {
   }, [id])
 
   const d = doc || featuredDocuments[1]
+
+  const handleStudyWithAI = () => {
+    if (guest) {
+      onNavigate?.('login')
+    } else if (onOpenStudyFile) {
+      onOpenStudyFile({
+        id: d.id,
+        name: d.title || 'Untitled Document',
+        subject: d.subject || d.type || 'Document',
+        fileUrl: d.fileUrl || '',
+      })
+    }
+  }
 
   return (
     <main className="page-surface document-detail-page">
@@ -415,11 +368,43 @@ export function DocumentDetailPage({ id, onBack, onReport }) {
           <InfoLine icon="user" label="Người tải lên" value={d.uploader || 'N/A'} />
           <InfoLine icon="calendar" label="Ngày tải lên" value={d.createdAt ? new Date(d.createdAt).toLocaleDateString() : d.date || 'N/A'} />
           <InfoLine icon="file" label="Môn học" value={d.subject || d.fileType || 'N/A'} />
-          {d.fileUrl && <button className="primary-action" type="button" onClick={() => window.open(d.fileUrl, '_blank')}><StudyHubIcon name="download" size={16} /> Tải xuống</button>}
-          <button className="purple-button" type="button"><StudyHubIcon name="message" size={16} /> Chat với AI</button>
-          <button className="success-button" type="button"><StudyHubIcon name="share" size={16} /> Chia sẻ</button>
-          <button className="muted-button" type="button"><StudyHubIcon name="heart" size={16} /> Yêu thích</button>
-          <button className="danger-outline" onClick={onReport} type="button"><StudyHubIcon name="flag" size={16} /> Báo cáo</button>
+          {d.fileUrl && (
+            <button
+              className="primary-action"
+              type="button"
+              onClick={() => {
+                if (guest) {
+                  onNavigate?.('login')
+                } else {
+                  window.open(d.fileUrl, '_blank')
+                }
+              }}
+            >
+              <StudyHubIcon name="download" size={16} /> Tải xuống
+            </button>
+          )}
+          <button className="purple-button" type="button" onClick={handleStudyWithAI}>
+            <StudyHubIcon name="message" size={16} /> Chat với AI
+          </button>
+          <button className="success-button" type="button" onClick={() => guest ? onNavigate?.('login') : null}>
+            <StudyHubIcon name="share" size={16} /> Chia sẻ
+          </button>
+          <button className="muted-button" type="button" onClick={() => guest ? onNavigate?.('login') : null}>
+            <StudyHubIcon name="heart" size={16} /> Yêu thích
+          </button>
+          <button
+            className="danger-outline"
+            onClick={() => {
+              if (guest) {
+                onNavigate?.('login')
+              } else {
+                onReport?.()
+              }
+            }}
+            type="button"
+          >
+            <StudyHubIcon name="flag" size={16} /> Báo cáo
+          </button>
           <div className="rating-row">☆ ☆ ☆ ☆ ☆</div>
         </aside>
       </div>
@@ -431,8 +416,23 @@ export function DocumentDetailPage({ id, onBack, onReport }) {
             <p><strong>Sinh viên {item}</strong> <small>{item} ngày trước</small><br />Tài liệu rất chi tiết và dễ hiểu. Cảm ơn bạn đã chia sẻ!</p>
           </div>
         ))}
-        <textarea placeholder="Viết bình luận của bạn..." />
-        <button className="primary-action" type="button">Gửi bình luận</button>
+        <textarea
+          placeholder={guest ? "Đăng nhập để viết bình luận..." : "Viết bình luận của bạn..."}
+          disabled={guest}
+        />
+        <button
+          className="primary-action"
+          type="button"
+          onClick={() => {
+            if (guest) {
+              onNavigate?.('login')
+            } else {
+              // normal comment submission logic if any exists, currently empty in the original code
+            }
+          }}
+        >
+          Gửi bình luận
+        </button>
       </section>
     </main>
   )
