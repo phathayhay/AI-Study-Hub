@@ -3,8 +3,20 @@ import { mainNavItems, publicNavItems } from '../../data/studyHubData'
 import StudyHubIcon from '../icons/StudyHubIcons'
 import Brand from './Brand'
 
-export default function Sidebar({ active = 'home', guest = false, onNavigate, user, collapsed = false, onToggleCollapse }) {
+export default function Sidebar({
+  active = 'home', guest = false, onNavigate, user, collapsed = false, onToggleCollapse,
+  recentItems = [], onOpenRecentItem, activeItemContext = {}
+}) {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [recentExpanded, setRecentExpanded] = useState(true)
+
+  const isItemActive = (item) => {
+    const { route, studyFileId, selectedDocId, selectedFolderId } = activeItemContext
+    if (item.target === 'study' && route === 'study' && studyFileId === item.id) return true
+    if (item.target === 'folder-detail' && route === 'folder-detail' && selectedFolderId === item.id) return true
+    if (item.target === 'doc-detail' && route === 'doc-detail' && selectedDocId === item.id) return true
+    return false
+  }
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark')
 
   useEffect(() => {
@@ -72,8 +84,8 @@ export default function Sidebar({ active = 'home', guest = false, onNavigate, us
         display: 'flex', 
         flexDirection: 'column', 
         height: '100vh', 
-        borderRight: '1px solid #e2e8f0', 
-        backgroundColor: '#f8fafc',
+        borderRight: isDark ? '1px solid #1e293b' : '1px solid #e2e8f0', 
+        backgroundColor: isDark ? '#0f172a' : '#ffffff',
         transition: 'width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
         overflow: 'visible'
       }}
@@ -86,7 +98,7 @@ export default function Sidebar({ active = 'home', guest = false, onNavigate, us
           justifyContent: 'center',
           gap: '12px',
           padding: collapsed ? '16px 8px 12px' : '16px 16px 12px', 
-          borderBottom: '1px solid #e2e8f0',
+          borderBottom: isDark ? '1px solid #1e293b' : '1px solid #e2e8f0',
           position: 'relative'
         }}
       >
@@ -96,8 +108,8 @@ export default function Sidebar({ active = 'home', guest = false, onNavigate, us
             <button 
               onClick={onToggleCollapse}
               style={{ 
-                background: '#ffffff', 
-                border: '1px solid #e2e8f0', 
+                background: isDark ? '#1e293b' : '#ffffff', 
+                border: isDark ? '1px solid #334155' : '1px solid #e2e8f0', 
                 borderRadius: '8px', 
                 color: '#6366f1', 
                 width: '36px', 
@@ -122,16 +134,16 @@ export default function Sidebar({ active = 'home', guest = false, onNavigate, us
         ) : (
           <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Brand 
-              onClick={() => onNavigate?.(guest ? 'guest-home' : 'library')} 
+              onClick={() => onNavigate?.(guest ? 'explore' : 'library')} 
               compact={false} 
             />
             <button 
               onClick={onToggleCollapse}
               style={{ 
-                background: '#ffffff', 
-                border: '1px solid #e2e8f0', 
+                background: isDark ? '#1e293b' : '#ffffff', 
+                border: isDark ? '1px solid #334155' : '1px solid #e2e8f0', 
                 borderRadius: '6px', 
-                color: '#64748b', 
+                color: isDark ? '#94a3b8' : '#64748b', 
                 width: '32px', 
                 height: '32px', 
                 cursor: 'pointer', 
@@ -183,172 +195,194 @@ export default function Sidebar({ active = 'home', guest = false, onNavigate, us
       </div>
 
       <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '0 8px' : '0 16px', display: 'flex', flexDirection: 'column', gap: collapsed ? '12px' : '20px' }}>
-        {guest ? (
-          collapsed ? (
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-              {renderNavButton('guest-home', (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
-              ), 'Trang chủ')}
-              
+        {collapsed ? (
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+            {renderNavButton('explore', (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+              </svg>
+            ), 'Explore')}
+
+            {renderNavButton('library', (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+            ), 'Study sessions')}
+
+            {renderNavButton('library-shared', (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            ), 'Shared with me')}
+
+            {renderNavButton('library-folders', (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" />
+              </svg>
+            ), 'Folders')}
+
+            {renderNavButton('library-favorites', (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            ), 'Favorites')}
+
+            {renderNavButton('library-recent', (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            ), 'Recent')}
+          </nav>
+        ) : (
+          <>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {renderNavButton('explore', (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
                 </svg>
-              ), 'Khám phá')}
-
-              {renderNavButton('pricing', (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                </svg>
-              ), 'Bảng giá')}
+              ), 'Explore')}
             </nav>
-          ) : (
-            <div>
-              <h4 style={{ fontSize: '14px', color: '#64748b', fontWeight: 500, paddingLeft: '8px', marginBottom: '8px' }}>Menu</h4>
-              <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {renderNavButton('guest-home', (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
-                  </svg>
-                ), 'Trang chủ')}
-                
-                {renderNavButton('explore', (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-                  </svg>
-                ), 'Khám phá')}
 
-                {renderNavButton('pricing', (
+            <div>
+              <h4 style={{ fontSize: '14px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 500, paddingLeft: '8px', marginBottom: '8px' }}>Library</h4>
+              <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {renderNavButton('library', (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10" />
+                    <line x1="12" y1="20" x2="12" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                  </svg>
+                ), 'Study sessions')}
+
+                {renderNavButton('library-shared', (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                ), 'Shared with me')}
+
+                {renderNavButton('library-folders', (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" />
+                  </svg>
+                ), 'Folders')}
+
+                {renderNavButton('library-favorites', (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
-                ), 'Bảng giá')}
+                ), 'Favorites')}
               </nav>
             </div>
-          )
-        ) : (
-          collapsed ? (
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-              {renderNavButton('library', (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="20" x2="18" y2="10" />
-                  <line x1="12" y1="20" x2="12" y2="4" />
-                  <line x1="6" y1="20" x2="6" y2="14" />
-                </svg>
-              ), 'Study sessions')}
 
-              {renderNavButton('library-shared', (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            <div>
+              <div 
+                onClick={() => setRecentExpanded(!recentExpanded)}
+                style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center', 
+                  padding: '12px 16px', 
+                  backgroundColor: isDark ? '#1e293b' : '#f3f4f6', 
+                  borderRadius: '8px',
+                  marginBottom: '8px', 
+                  cursor: 'pointer', 
+                  userSelect: 'none',
+                  transition: 'background-color 0.2s'
+                }}
+                className="sidebar-recent-header"
+              >
+                <h4 style={{ fontSize: '14px', color: isDark ? '#f1f5f9' : '#4b5563', fontWeight: 600, margin: 0 }}>Recent</h4>
+                <svg 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  style={{ color: isDark ? '#94a3b8' : '#4b5563', transform: recentExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}
+                >
+                  <path d="m6 9 6 6 6-6" />
                 </svg>
-              ), 'Shared with me')}
-
-              {renderNavButton('library-folders', (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" />
-                </svg>
-              ), 'Folders')}
-
-              {renderNavButton('explore', (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-                </svg>
-              ), 'Khám phá tài liệu')}
-
-              {renderNavButton('pricing', (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                </svg>
-              ), 'Nâng cấp gói')}
-
-              {renderNavButton('library', (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
-              ), 'Recent')}
-            </nav>
-          ) : (
-            <>
-              <div>
-                <h4 style={{ fontSize: '14px', color: '#64748b', fontWeight: 500, paddingLeft: '8px', marginBottom: '8px' }}>Library</h4>
+              </div>
+              {recentExpanded && (
                 <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  {renderNavButton('library', (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="20" x2="18" y2="10" />
-                      <line x1="12" y1="20" x2="12" y2="4" />
-                      <line x1="6" y1="20" x2="6" y2="14" />
-                    </svg>
-                  ), 'Study sessions')}
-
-                  {renderNavButton('library-shared', (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                  ), 'Shared with me')}
-
-                  {renderNavButton('library-folders', (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" />
-                    </svg>
-                  ), 'Folders')}
+                  {recentItems.length === 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px 24px', textAlign: 'center' }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={isDark ? '#4b5563' : '#94a3b8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '16px' }}>
+                        <circle cx="12" cy="12" r="9" />
+                        <polyline points="12 7 12 12 15 15" />
+                      </svg>
+                      <h5 style={{ fontSize: '16px', fontWeight: 600, color: isDark ? '#e2e8f0' : '#475569', margin: '0 0 8px' }}>No recent sessions</h5>
+                      <p style={{ fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8', margin: '0 auto', lineHeight: 1.5, maxWidth: '200px' }}>Start studying to see your recent sessions here</p>
+                    </div>
+                  ) : (
+                    recentItems.map((item) => {
+                      const isActive = isItemActive(item)
+                      return (
+                        <button
+                          key={`${item.type}-${item.id}`}
+                          onClick={() => onOpenRecentItem?.(item)}
+                          style={{
+                            width: '100%',
+                            padding: '8px',
+                            background: 'transparent',
+                            color: isActive ? '#6366f1' : '#475569',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            fontWeight: isActive ? 600 : 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'all 0.2s',
+                          }}
+                          className="sidebar__nav-item"
+                          title={item.name}
+                        >
+                          <span style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: isActive ? '#22c55e' : 'transparent',
+                            display: 'inline-block',
+                            flexShrink: 0,
+                          }} />
+                          <span style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            flex: 1
+                          }}>
+                            {item.name}
+                          </span>
+                        </button>
+                      )
+                    })
+                  )}
                 </nav>
-              </div>
-
-              <div>
-                <h4 style={{ fontSize: '14px', color: '#64748b', fontWeight: 500, paddingLeft: '8px', marginBottom: '8px' }}>Khám phá</h4>
-                <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  {renderNavButton('explore', (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
-                    </svg>
-                  ), 'Khám phá tài liệu')}
-
-                  {renderNavButton('pricing', (
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                  ), 'Nâng cấp gói')}
-                </nav>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingLeft: '8px', marginBottom: '8px' }}>
-                  <h4 style={{ fontSize: '14px', color: '#64748b', fontWeight: 500, margin: 0 }}>Recent</h4>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#64748b' }}>
-                    <path d="m6 9 6 6 6-6" />
-                  </svg>
-                </div>
-                <nav>
-                  <button style={{ width: '100%', padding: '8px', background: 'transparent', color: '#475569', border: 'none', borderRadius: '6px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', textAlign: 'left' }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" />
-                    </svg>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Untitled Folder</span>
-                  </button>
-                </nav>
-              </div>
-            </>
-          )
+              )}
+            </div>
+          </>
         )}
       </div>
 
       {guest ? (
-        <div style={{ padding: collapsed ? '12px 8px' : '16px', borderTop: '1px solid #e2e8f0' }}>
+        <div style={{ padding: collapsed ? '12px 8px' : '24px 16px 16px', borderTop: isDark ? '1px solid #1e293b' : '1px solid #e5e7eb' }}>
           <button 
             onClick={() => onNavigate?.('login')} 
             style={{ 
@@ -356,23 +390,26 @@ export default function Sidebar({ active = 'home', guest = false, onNavigate, us
               display: 'flex', 
               alignItems: 'center', 
               justifyContent: collapsed ? 'center' : 'flex-start', 
-              gap: '12px', 
+              gap: collapsed ? '0' : '16px', 
               background: 'transparent', 
               border: 'none', 
               cursor: 'pointer', 
-              padding: '8px' 
+              padding: '8px',
+              borderRadius: '8px',
+              transition: 'background-color 0.2s'
             }}
+            className="sidebar-guest-signup-btn"
             title={collapsed ? "Sign up" : undefined}
           >
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#6366f1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: '#6366f1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'transform 0.2s' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
                 <line x1="19" y1="8" x2="19" y2="14" />
                 <line x1="22" y1="11" x2="16" y2="11" />
               </svg>
             </div>
-            {!collapsed && <span style={{ fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>Sign up</span>}
+            {!collapsed && <span style={{ fontSize: '18px', fontWeight: 700, color: isDark ? '#f1f5f9' : '#0f172a' }}>Sign up</span>}
           </button>
         </div>
       ) : (

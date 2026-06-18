@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { featuredDocuments, notifications } from '../../data/studyHubData'
 import { InfoBlock } from './shared'
 import { changePassword } from '../../features/auth/authService'
 import { uploadAvatar, verifyStudent } from '../../services/userService'
+import { getDocument, reportDocument } from '../../features/documents/documentService'
 
 export function NotificationPanel({ onClose }) {
   return (
@@ -55,17 +56,79 @@ export function FilePreviewModal({ file, onClose, onView }) {
   )
 }
 
-export function ReportModal({ onClose }) {
-  const doc = featuredDocuments[2]
+export function ReportModal({ onClose, documentId }) {
+  const [doc, setDoc] = useState(null)
+  const [reportType, setReportType] = useState('SPAM')
+  const [reason, setReason] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!documentId) return
+    getDocument(documentId)
+      .then(res => {
+        setDoc(res?.data || res)
+      })
+      .catch(() => {
+        setDoc({ id: documentId, title: 'Đang tải...', code: 'DOC' })
+      })
+  }, [documentId])
+
+  const d = doc || { title: 'Đang tải...', code: 'DOC' }
+
+  const handleSubmit = () => {
+    if (!reason.trim()) {
+      window.showToast?.('Vui lòng nhập lý do báo cáo', 'error')
+      return
+    }
+    setLoading(true)
+    reportDocument(documentId, reportType, reason.trim())
+      .then(() => {
+        window.showToast?.('Gửi báo cáo thành công', 'success')
+        onClose()
+      })
+      .catch(err => {
+        window.showToast?.(err.message || 'Gửi báo cáo thất bại', 'error')
+      })
+      .finally(() => setLoading(false))
+  }
+
   return (
     <div className="modal-backdrop">
       <section className="report-modal">
         <header><h2><StudyHubIcon name="flag" size={18} /> Báo cáo tài liệu</h2><button onClick={onClose} type="button">×</button></header>
-        <div className="report-doc"><Badge tone="blue">{doc.code}</Badge><strong>{doc.title}</strong></div>
-        <label>Lý do báo cáo *<input /></label>
-        <label>Mô tả chi tiết (tùy chọn)<textarea placeholder="Vui lòng mô tả chi tiết vấn đề bạn gặp phải với tài liệu này..." /></label>
+        <div className="report-doc"><Badge tone="blue">{d.code || d.id?.toString().slice(-6)}</Badge><strong>{d.title}</strong></div>
+        
+        <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+          Loại vi phạm *
+          <select 
+            value={reportType} 
+            onChange={(e) => setReportType(e.target.value)}
+            style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+          >
+            <option value="SPAM">Spam / Rác</option>
+            <option value="COPYRIGHT">Bản quyền</option>
+            <option value="INAPPROPRIATE">Không phù hợp</option>
+            <option value="OTHER">Lý do khác</option>
+          </select>
+        </label>
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+          Mô tả chi tiết *
+          <textarea 
+            placeholder="Vui lòng mô tả chi tiết vấn đề bạn gặp phải với tài liệu này..." 
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            style={{ width: '100%', minHeight: '100px', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13.5px', resize: 'vertical', outline: 'none' }}
+          />
+        </label>
+        
         <div className="warning-box">Lưu ý: Báo cáo sai sự thật có thể dẫn đến việc tài khoản bị khóa.</div>
-        <footer><button onClick={onClose} type="button">Hủy</button><button className="danger-button" type="button">Gửi báo cáo</button></footer>
+        <footer>
+          <button onClick={onClose} disabled={loading} type="button">Hủy</button>
+          <button className="danger-button" disabled={loading} onClick={handleSubmit} type="button">
+            {loading ? 'Đang gửi...' : 'Gửi báo cáo'}
+          </button>
+        </footer>
       </section>
     </div>
   )
@@ -448,7 +511,7 @@ export function ChromeExtensionModal({ onClose }) {
     link.href = '#'
     link.setAttribute('download', 'ai-studyhub-extension.zip')
     document.body.appendChild(link)
-    alert('Tiện ích AI Study Hub Beta (file zip) đang được tạo và tải xuống trình duyệt của bạn.')
+    window.showToast?.('AI Study Hub Extension Beta is downloading...', 'info')
     document.body.removeChild(link)
   }
 

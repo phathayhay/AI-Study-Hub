@@ -28,7 +28,7 @@ export function LoginPage({ onLogin, onNavigate }) {
     <AuthShell
       description="Tiếp tục hành trình học tập của bạn với tài liệu, flashcard và trợ lý AI."
       leaving={transition.leaving}
-      onBack={() => transition.to('guest-home')}
+      onBack={() => transition.to('explore')}
       subtitle="Chào mừng trở lại!"
       title="Đăng nhập"
     >
@@ -136,7 +136,7 @@ export function RegisterPage({ onNavigate, onRegister }) {
       compact
       description="Tạo không gian học tập cá nhân và bắt đầu khai thác sức mạnh của AI."
       leaving={transition.leaving}
-      onBack={() => transition.to('guest-home')}
+      onBack={() => transition.to('explore')}
       subtitle="Bắt đầu hành trình học tập thông minh"
       title="Tạo tài khoản"
     >

@@ -4,7 +4,10 @@ import Topbar from './Topbar'
 export default function AppLayout({
   active = 'home', children, className = '',
   guest = false, onNavigate, onNotifications, user = null, withTopbar = true, title = null,
-  sidebarCollapsed = false, onToggleCollapse
+  sidebarCollapsed = false, onToggleCollapse,
+  recentItems = [], onOpenRecentItem, activeItemContext = {},
+  breadcrumbs = [],
+  onBreadcrumbClick
 }) {
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'app-shell--collapsed' : ''} ${className}`}>
@@ -15,10 +18,13 @@ export default function AppLayout({
         user={user} 
         collapsed={sidebarCollapsed}
         onToggleCollapse={onToggleCollapse}
+        recentItems={recentItems}
+        onOpenRecentItem={onOpenRecentItem}
+        activeItemContext={activeItemContext}
       />
       <div className="app-shell__body">
         {withTopbar && (
-          <Topbar guest={guest} onNavigate={onNavigate} onNotifications={onNotifications} user={user} title={title} active={active} />
+          <Topbar guest={guest} onNavigate={onNavigate} onNotifications={onNotifications} user={user} title={title} active={active} breadcrumbs={breadcrumbs} onBreadcrumbClick={onBreadcrumbClick} />
         )}
         {children}
       </div>

@@ -1,254 +1,512 @@
 import { useEffect, useMemo, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
-import { libraryFiles, libraryFolders } from '../../data/studyHubData'
 import { libraryTabs } from './config'
-import { getMyDocuments, getSharedDocuments } from '../../features/documents/documentService'
-import { getRootFolders, createFolder, renameFolder, deleteFolder } from '../../features/folders/folderService'
+import { 
+  getMyDocuments, 
+  getSharedDocuments, 
+  deleteDocument,
+  getFavoriteDocuments, 
+  getHistoryDocuments 
+} from '../../features/documents/documentService'
+import { 
+  getRootFolders, 
+  getFolder,
+  createFolder, 
+  renameFolder, 
+  deleteFolder 
+} from '../../features/folders/folderService'
+
+function getItemGroup(dateStr) {
+  if (!dateStr) return 'Older'
+  const date = new Date(dateStr)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  
+  const diffTime = Math.abs(today - date)
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today'
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday'
+  } else if (diffDays <= 7) {
+    return 'This Week'
+  } else {
+    return 'Older'
+  }
+}
 
 function mapDoc(doc) {
+  const dateObj = doc.createdAt ? new Date(doc.createdAt) : new Date()
+  const timeFormatted = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+  
   return {
     id: doc.id,
     name: doc.title || doc.fileName || 'Untitled',
     subject: doc.fileType || 'Document',
     kind: 'document',
-    group: 'This Week',
-    date: doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : '',
+    type: 'session',
+    group: getItemGroup(doc.createdAt),
+    date: dateObj.toLocaleDateString(),
+    time: timeFormatted,
     shared: doc.visibility === 'PUBLIC',
     public: doc.visibility === 'PUBLIC',
     favorite: false,
     fileUrl: doc.fileUrl || '',
+    folderId: doc.folderId,
+    createdAt: doc.createdAt
   }
 }
 
-const folderFileMap = {
-  1: [libraryFiles[1], libraryFiles[3], libraryFiles[4], libraryFiles[6], libraryFiles[8]],
-  2: [libraryFiles[2], libraryFiles[5], libraryFiles[8], libraryFiles[0], libraryFiles[3], libraryFiles[4], libraryFiles[6], libraryFiles[7]],
-  3: [libraryFiles[0], libraryFiles[2], libraryFiles[7]],
-}
-
-export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) {
+export function LibraryPage({
+  activeTab,
+  onNavigate,
+  onOpenFile,
+  onTabChange,
+  user,
+  onRemoveRecentItem,
+  onPurgeStaleRecent,
+  initialFolderId,
+  onClearInitialFolderId
+}) {
   const [selectedFolder, setSelectedFolder] = useState(null)
-  const [folders, setFolders] = useState(libraryFolders)
-  const [filesById, setFilesById] = useState(() => Object.fromEntries(libraryFiles.map((file) => [file.id, file])))
+  const [selectedFolderDetails, setSelectedFolderDetails] = useState(null)
+  const [folderLoading, setFolderLoading] = useState(false)
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null)
-  const [folderFiles, setFolderFiles] = useState(folderFileMap)
   const [openFileMenuId, setOpenFileMenuId] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState('lastAccessed')
   const [apiDocs, setApiDocs] = useState([])
   const [apiSharedDocs, setApiSharedDocs] = useState([])
+  const [apiFavoriteDocs, setApiFavoriteDocs] = useState([])
+  const [apiHistoryDocs, setApiHistoryDocs] = useState([])
   const [apiFolders, setApiFolders] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const loadLibraryData = () => {
+    setLoading(true)
     Promise.all([
       getMyDocuments().catch(() => ({ data: [] })),
       getSharedDocuments().catch(() => ({ data: [] })),
-      getRootFolders().catch(() => ({ data: [] }))
-    ]).then(([myRes, sharedRes, folderRes]) => {
+      getRootFolders().catch(() => ({ data: [] })),
+      getFavoriteDocuments().catch(() => ({ data: [] })),
+      getHistoryDocuments().catch(() => ({ data: [] })),
+    ]).then(([myRes, sharedRes, folderRes, favRes, histRes]) => {
       const myList = Array.isArray(myRes) ? myRes : (Array.isArray(myRes?.data) ? myRes.data : myRes?.data?.content || [])
       const sharedList = Array.isArray(sharedRes) ? sharedRes : (Array.isArray(sharedRes?.data) ? sharedRes.data : sharedRes?.data?.content || [])
       const folderList = Array.isArray(folderRes) ? folderRes : (Array.isArray(folderRes?.data) ? folderRes.data : folderRes?.data?.content || [])
+      const favList = Array.isArray(favRes) ? favRes : (Array.isArray(favRes?.data) ? favRes.data : favRes?.data?.content || [])
+      const histList = Array.isArray(histRes) ? histRes : (Array.isArray(histRes?.data) ? histRes.data : histRes?.data?.content || [])
       
-      setApiDocs(myList.map(mapDoc))
+      setApiDocs(myList.map(doc => ({ ...mapDoc(doc), favorite: favList.some(f => f.id === doc.id) })))
       setApiSharedDocs(sharedList.map(mapDoc))
+      setApiFavoriteDocs(favList.map(doc => ({ ...mapDoc(doc), favorite: true })))
+      setApiHistoryDocs(histList.map(mapDoc))
       
-      const mappedFolders = folderList.map(f => ({
-        id: f.id,
-        name: f.folderName || f.name || 'Untitled Folder',
-        count: f.documentCount || 0,
-        date: f.createdAt ? new Date(f.createdAt).toLocaleDateString() : '',
-        type: 'folder'
-      }))
+      const mappedFolders = folderList.map(f => {
+        const dateObj = f.createdAt ? new Date(f.createdAt) : new Date()
+        const timeFormatted = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+        return {
+          id: f.id,
+          name: f.folderName || f.name || 'Untitled Folder',
+          count: f.documents?.length || f.documentCount || 0,
+          date: dateObj.toLocaleDateString(),
+          time: timeFormatted,
+          group: getItemGroup(f.createdAt),
+          type: 'folder',
+          isFolder: true,
+          createdAt: f.createdAt
+        }
+      })
       setApiFolders(mappedFolders)
+
+      // Purge any stale Recent entries for documents that no longer exist
+      const allDocIds = [
+        ...myList.map(d => d.id),
+        ...sharedList.map(d => d.id),
+      ]
+      onPurgeStaleRecent?.(allDocIds)
+    }).catch(err => {
+      console.error('Failed to load library data:', err)
     }).finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadLibraryData()
   }, [])
 
-  const managedFiles = useMemo(() => {
-    const merged = [...apiDocs, ...Object.values(filesById)]
-    const seen = new Set()
-    return merged.filter((f) => { if (seen.has(f.id)) return false; seen.add(f.id); return true })
-  }, [apiDocs, filesById])
-  const files = useMemo(() => {
-    if (activeTab === 'shared') return managedFiles.filter((file) => file.shared)
-    if (activeTab === 'favorites') return managedFiles.filter((file) => file.favorite)
-    if (activeTab === 'recent') return managedFiles
-    return managedFiles.slice(0, 4)
-  }, [activeTab, managedFiles])
+  // Reset folder selection when switching tabs (unless we are opening an initial folder)
+  useEffect(() => {
+    if (!initialFolderId) {
+      setSelectedFolder(null)
+      setSelectedFolderDetails(null)
+    }
+  }, [activeTab, initialFolderId])
+
+  useEffect(() => {
+    if (initialFolderId) {
+      handleSelectFolder({ id: initialFolderId, name: 'Đang tải...' })
+      onClearInitialFolderId?.()
+    }
+  }, [initialFolderId])
+
+  const handleSelectFolder = (folder) => {
+    setSelectedFolder(folder)
+    setSelectedFolderDetails(null)
+    setFolderLoading(true)
+    getFolder(folder.id)
+      .then((res) => {
+        const data = res?.data || res
+        setSelectedFolderDetails({
+          id: data.id || folder.id,
+          name: data.folderName || data.name || folder.name,
+          documents: data.documents || [],
+          subfolders: data.subfolders || []
+        })
+      })
+      .catch((err) => {
+        console.error(err)
+      })
+      .finally(() => {
+        setFolderLoading(false)
+      })
+  }
 
   const handleAddFolder = () => {
-    const nextIndex = folders.length + 1
-    const newFolder = {
-      id: Date.now(),
-      name: `New Folder ${nextIndex}`,
-      count: 0,
-      date: 'Created Jun 9, 2026',
-    }
+    const name = window.prompt('Nhập tên thư mục mới:')?.trim()
+    if (!name) return
+    setLoading(true)
+    createFolder(name)
+      .then(() => {
+        loadLibraryData()
+        onTabChange('folders')
+        window.showToast?.('Folder created', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+        window.showToast?.('Failed to create folder', 'error')
+      })
+  }
 
-    setFolders((currentFolders) => [...currentFolders, newFolder])
-    setSelectedFolder(null)
-    onTabChange('folders')
+  const handleAddSubfolder = (parentFolder) => {
+    const name = window.prompt(`Nhập tên thư mục con trong "${parentFolder.name}":`)
+    if (!name?.trim()) return
+    setFolderLoading(true)
+    createFolder(name.trim(), parentFolder.id)
+      .then(() => {
+        // Reload the current folder to reflect new subfolder
+        handleSelectFolder(parentFolder)
+        loadLibraryData()
+        window.showToast?.('Folder created', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setFolderLoading(false)
+        window.showToast?.('Failed to create subfolder', 'error')
+      })
   }
 
   const handleRenameFolder = (folder) => {
-    const nextName = window.prompt('Nhập tên thư mục mới', folder.name)?.trim()
+    const nextName = window.prompt('Nhập tên thư mục mới:', folder.name)?.trim()
     if (!nextName) return
-    setFolders((currentFolders) => currentFolders.map((currentFolder) => (
-      currentFolder.id === folder.id ? { ...currentFolder, name: nextName } : currentFolder
-    )))
+    setLoading(true)
+    renameFolder(folder.id, nextName)
+      .then(() => {
+        loadLibraryData()
+        if (selectedFolder && selectedFolder.id === folder.id) {
+          setSelectedFolder({ ...selectedFolder, name: nextName })
+        }
+        window.showToast?.('Folder renamed', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+        window.showToast?.('Failed to rename folder', 'error')
+      })
     setOpenFolderMenuId(null)
   }
 
   const handleDeleteFolder = (folder) => {
-    setFolders((currentFolders) => currentFolders.filter((currentFolder) => currentFolder.id !== folder.id))
-    setFolderFiles((currentFiles) => {
-      const nextFiles = { ...currentFiles }
-      delete nextFiles[folder.id]
-      return nextFiles
-    })
-    if (selectedFolder?.id === folder.id) setSelectedFolder(null)
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa thư mục "${folder.name}" không?`)) return
+    setLoading(true)
+    deleteFolder(folder.id)
+      .then(() => {
+        loadLibraryData()
+        onRemoveRecentItem?.(folder.id, 'folder')
+        if (selectedFolder?.id === folder.id) {
+          setSelectedFolder(null)
+          setSelectedFolderDetails(null)
+        }
+        window.showToast?.('Folder deleted', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+        window.showToast?.('Failed to delete folder', 'error')
+      })
     setOpenFolderMenuId(null)
   }
 
-  const handleRenameFolderFile = (_folder, file) => {
-    const nextName = window.prompt('Nhập tên file mới', file.name)?.trim()
-    if (!nextName) return
-    setFilesById((currentFiles) => ({
-      ...currentFiles,
-      [file.id]: { ...currentFiles[file.id], name: nextName },
-    }))
-    setFolderFiles((currentFiles) => Object.fromEntries(
-      Object.entries(currentFiles).map(([folderId, folderFilesValue]) => [
-        folderId,
-        folderFilesValue.map((currentFile) => (
-          currentFile.id === file.id ? { ...currentFile, name: nextName } : currentFile
-        )),
-      ]),
-    ))
+  const handleDeleteLibraryFile = (file) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${file.name}" không?`)) return
+    setLoading(true)
+    deleteDocument(file.id)
+      .then(() => {
+        loadLibraryData()
+        onRemoveRecentItem?.(file.id)  // Remove all recent entries for this deleted document
+        if (selectedFolder) {
+          handleSelectFolder(selectedFolder)
+        }
+        window.showToast?.('Document deleted', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+        window.showToast?.('Failed to delete document', 'error')
+      })
     setOpenFileMenuId(null)
   }
 
-  const handleDeleteFolderFile = (_folder, file) => {
-    setFilesById((currentFiles) => {
-      const nextFiles = { ...currentFiles }
-      delete nextFiles[file.id]
-      return nextFiles
-    })
-    setFolderFiles((currentFiles) => Object.fromEntries(
-      Object.entries(currentFiles).map(([folderId, folderFilesValue]) => [
-        folderId,
-        folderFilesValue.filter((currentFile) => currentFile.id !== file.id),
-      ]),
-    ))
+  const handleDeleteFolderFile = (folder, file) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${file.name}" khỏi thư mục không?`)) return
+    setLoading(true)
+    deleteDocument(file.id)
+      .then(() => {
+        onRemoveRecentItem?.(file.id)  // Remove all recent entries for this deleted document
+        handleSelectFolder(folder)
+        loadLibraryData()
+        window.showToast?.('Document deleted', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+        window.showToast?.('Failed to remove document from folder', 'error')
+      })
     setOpenFileMenuId(null)
   }
 
   const handleRenameLibraryFile = (file) => {
-    const nextName = window.prompt('Nhập tên file mới', file.name)?.trim()
-    if (!nextName) return
-    setFilesById((currentFiles) => ({
-      ...currentFiles,
-      [file.id]: { ...currentFiles[file.id], name: nextName },
-    }))
-    setFolderFiles((currentFiles) => Object.fromEntries(
-      Object.entries(currentFiles).map(([folderId, folderFilesValue]) => [
-        folderId,
-        folderFilesValue.map((currentFile) => (
-          currentFile.id === file.id ? { ...currentFile, name: nextName } : currentFile
-        )),
-      ]),
-    ))
+    window.showToast?.('Renaming documents directly is not supported yet', 'info')
     setOpenFileMenuId(null)
   }
 
-  const handleDeleteLibraryFile = (file) => {
-    setFilesById((currentFiles) => {
-      const nextFiles = { ...currentFiles }
-      delete nextFiles[file.id]
-      return nextFiles
-    })
-    setFolderFiles((currentFiles) => Object.fromEntries(
-      Object.entries(currentFiles).map(([folderId, folderFilesValue]) => [
-        folderId,
-        folderFilesValue.filter((currentFile) => currentFile.id !== file.id),
-      ]),
-    ))
-    setOpenFileMenuId(null)
+  const handleOpenFile = (item) => {
+    if (item.isFolder || item.type === 'folder') {
+      handleSelectFolder(item)
+    } else {
+      const activeFile = {
+        id: item.id,
+        name: item.name,
+        attachmentName: item.name,
+        subject: item.subject || 'Document',
+        content: '',
+        fileUrl: item.fileUrl || '',
+      }
+      onOpenFile?.(activeFile)
+    }
   }
+
+  // Study sessions tab: Combine folders and root documents
+  const combinedItems = useMemo(() => {
+    const rootDocs = apiDocs.filter(d => !d.folderId)
+    const combined = [...apiFolders, ...rootDocs]
+    
+    return combined.sort((a, b) => {
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name)
+      } else {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return timeB - timeA
+      }
+    })
+  }, [apiDocs, apiFolders, sortBy])
+
+  const filteredCombinedItems = useMemo(() => {
+    return combinedItems.filter(item => 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }, [combinedItems, searchQuery])
+
+  const filteredSharedDocs = useMemo(() => {
+    return apiSharedDocs.filter(doc => 
+      doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ).sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })
+  }, [apiSharedDocs, searchQuery, sortBy])
+
+  const filteredFavoriteDocs = useMemo(() => {
+    return apiFavoriteDocs.filter(doc => 
+      doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ).sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })
+  }, [apiFavoriteDocs, searchQuery, sortBy])
+
+  const filteredHistoryDocs = useMemo(() => {
+    return apiHistoryDocs.filter(doc => 
+      doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ).sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })
+  }, [apiHistoryDocs, searchQuery, sortBy])
+
+  const filteredFoldersOnly = useMemo(() => {
+    return apiFolders.filter(folder => 
+      folder.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ).sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })
+  }, [apiFolders, searchQuery, sortBy])
 
   return (
-    <div style={{ flex: 1, backgroundColor: '#f8fafc', overflowY: 'auto' }}>
-      <main style={{ maxWidth: '1200px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '24px', padding: '32px' }}>
+    <div style={{ flex: 1, backgroundColor: '#fff', overflowY: 'auto' }}>
+      <main style={{ maxWidth: '1100px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px', padding: '28px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 600, color: '#0f172a', margin: 0, whiteSpace: 'nowrap' }}>
-            Hello, <span style={{ fontWeight: 700 }}>Anh!</span>
+          <h1 style={{ fontSize: '22px', fontWeight: 600, color: '#0f172a', margin: 0, whiteSpace: 'nowrap' }}>
+            Hello, <span style={{ fontWeight: 700 }}>{user?.fullName || 'Sinh viên!'}</span>
           </h1>
           
-          <div style={{ flex: 1, maxWidth: '600px', display: 'flex', alignItems: 'center', backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 16px', height: '40px' }}>
-            <input 
-              placeholder="Search by title or content type..." 
-              style={{ border: 'none', outline: 'none', width: '100%', fontSize: '14px', color: '#0f172a' }}
+          <div style={{ flex: 1, maxWidth: '520px', display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 14px', height: '38px', gap: '8px' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input
+              placeholder="Search by title or content type..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ border: 'none', outline: 'none', width: '100%', fontSize: '13.5px', color: '#0f172a', background: 'transparent' }}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', whiteSpace: 'nowrap' }}>
-            <label style={{ fontSize: '14px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              Sort: <select style={{ border: 'none', background: 'transparent', color: '#4f46e5', fontWeight: 500, fontSize: '14px', cursor: 'pointer', outline: 'none' }}><option>Last accessed</option></select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap' }}>
+            <label style={{ fontSize: '13.5px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Sort:&nbsp;
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ border: 'none', background: 'transparent', color: '#4f46e5', fontWeight: 600, fontSize: '13.5px', cursor: 'pointer', outline: 'none' }}
+              >
+                <option value="lastAccessed">Last accessed</option>
+                <option value="name">Name</option>
+              </select>
             </label>
-            <button style={{ height: '36px', padding: '0 16px', backgroundColor: '#fff', color: '#4f46e5', border: '1px solid #4f46e5', borderRadius: '8px', fontSize: '14px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }} onClick={handleAddFolder} type="button">
-              <StudyHubIcon name="plus" size={16} /> Folder
-            </button>
+            {!selectedFolder && (
+              <button style={{ height: '34px', padding: '0 14px', backgroundColor: '#fff', color: '#4f46e5', border: '1.5px solid #818cf8', borderRadius: '8px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }} onClick={handleAddFolder} type="button">
+                <StudyHubIcon name="plus" size={14} /> Folder
+              </button>
+            )}
           </div>
         </div>
 
         <div style={{ flex: 1 }}>
-        {activeTab === 'folders' ? (
+        {loading ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: '#64748b' }}>
+            Đang tải dữ liệu...
+          </div>
+        ) : activeTab === 'folders' ? (
           selectedFolder ? (
             <FolderFilesView
-              files={folderFiles[selectedFolder.id] ?? []}
-              folder={selectedFolder}
-              onBack={() => setSelectedFolder(null)}
-              onDeleteFile={handleDeleteFolderFile}
-              onRenameFile={handleRenameFolderFile}
-              onOpenFile={onOpenFile}
+              folder={selectedFolderDetails || selectedFolder}
+              subfolders={selectedFolderDetails?.subfolders || []}
+              files={selectedFolderDetails?.documents || []}
+              loading={folderLoading}
+              onBack={() => { setSelectedFolder(null); setSelectedFolderDetails(null); }}
+              onDeleteFile={(folderOrFile, file) => {
+                if (!file) {
+                  handleDeleteFolder(folderOrFile)
+                } else {
+                  handleDeleteFolderFile(folderOrFile, file)
+                }
+              }}
+              onRenameFile={(file) => {
+                if (file.isFolder) {
+                  handleRenameFolder(file)
+                } else {
+                  handleRenameLibraryFile(file)
+                }
+              }}
+              onOpenFile={handleOpenFile}
               onToggleFileMenu={setOpenFileMenuId}
               openFileMenuId={openFileMenuId}
+              onSelectSubfolder={handleSelectFolder}
+              onAddSubfolder={() => handleAddSubfolder(selectedFolderDetails || selectedFolder)}
             />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <h3 style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', margin: '0 0 4px 8px' }}>Today</h3>
-              {[...apiFolders, ...folders].map((folder) => (
-                <ActionableFileRow
-                  key={folder.id}
-                  file={folder}
-                  isFolder={true}
-                  onDeleteFile={handleDeleteFolder}
-                  onOpenFile={() => setSelectedFolder(folder)}
-                  onRenameFile={handleRenameFolder}
-                  onToggleFileMenu={setOpenFolderMenuId}
-                  openFileMenuId={openFolderMenuId}
-                />
-              ))}
-              {apiFolders.length === 0 && folders.length === 0 && (
-                <div style={{ padding: '64px', textAlign: 'center', backgroundColor: '#f5f3ff', borderRadius: '16px', color: '#64748b', fontSize: '15px' }}>
-                  No items found
-                </div>
-              )}
-            </div>
+            <GroupedFolders
+              folders={filteredFoldersOnly}
+              onDeleteFolder={handleDeleteFolder}
+              onOpenFolder={handleSelectFolder}
+              onRenameFolder={handleRenameFolder}
+              onToggleFolderMenu={setOpenFolderMenuId}
+              openFolderMenuId={openFolderMenuId}
+            />
           )
         ) : activeTab === 'shared' ? (
           <SharedLibraryFiles
-            allFiles={apiSharedDocs}
+            allFiles={filteredSharedDocs}
             onDeleteFile={handleDeleteLibraryFile}
-            onOpenFile={onOpenFile}
+            onOpenFile={handleOpenFile}
             onRenameFile={handleRenameLibraryFile}
             onToggleFileMenu={setOpenFileMenuId}
             openFileMenuId={openFileMenuId}
           />
+        ) : activeTab === 'favorites' ? (
+          <SharedLibraryFiles
+            allFiles={filteredFavoriteDocs}
+            onDeleteFile={handleDeleteLibraryFile}
+            onOpenFile={handleOpenFile}
+            onRenameFile={handleRenameLibraryFile}
+            onToggleFileMenu={setOpenFileMenuId}
+            openFileMenuId={openFileMenuId}
+          />
+        ) : activeTab === 'recent' ? (
+          <SharedLibraryFiles
+            allFiles={filteredHistoryDocs}
+            onDeleteFile={handleDeleteLibraryFile}
+            onOpenFile={handleOpenFile}
+            onRenameFile={handleRenameLibraryFile}
+            onToggleFileMenu={setOpenFileMenuId}
+            openFileMenuId={openFileMenuId}
+          />
+        ) : selectedFolder ? (
+          <FolderFilesView
+            folder={selectedFolderDetails || selectedFolder}
+            subfolders={selectedFolderDetails?.subfolders || []}
+            files={selectedFolderDetails?.documents || []}
+            loading={folderLoading}
+            onBack={() => { setSelectedFolder(null); setSelectedFolderDetails(null); }}
+            onDeleteFile={(folderOrFile, file) => {
+              if (!file) {
+                handleDeleteFolder(folderOrFile)
+              } else {
+                handleDeleteFolderFile(folderOrFile, file)
+              }
+            }}
+            onRenameFile={(file) => {
+              if (file.isFolder) {
+                handleRenameFolder(file)
+              } else {
+                handleRenameLibraryFile(file)
+              }
+            }}
+            onOpenFile={handleOpenFile}
+            onToggleFileMenu={setOpenFileMenuId}
+            openFileMenuId={openFileMenuId}
+            onSelectSubfolder={handleSelectFolder}
+            onAddSubfolder={() => handleAddSubfolder(selectedFolderDetails || selectedFolder)}
+          />
         ) : (
           <GroupedFiles
-            files={files}
+            files={filteredCombinedItems}
             onDeleteFile={handleDeleteLibraryFile}
-            onOpenFile={onOpenFile}
+            onOpenFile={handleOpenFile}
             onRenameFile={handleRenameLibraryFile}
             onToggleFileMenu={setOpenFileMenuId}
             openFileMenuId={openFileMenuId}
@@ -260,170 +518,164 @@ export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) 
   )
 }
 
-function FolderGrid({ folders, onDeleteFolder, onRenameFolder, onSelectFolder, onToggleMenu, openMenuId }) {
-  return (
-    <div className="folder-library-grid">
-      {folders.map((folder) => (
-        <article
-          className="library-folder"
-          key={folder.id}
-          onClick={() => onSelectFolder(folder)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') onSelectFolder(folder)
-          }}
-          role="button"
-          tabIndex={0}
-        >
-          <button
-            className="folder-menu-trigger"
-            onClick={(event) => {
-              event.stopPropagation()
-              onToggleMenu(openMenuId === folder.id ? null : folder.id)
-            }}
-            type="button"
-          >
-            ⋯
-          </button>
-          {openMenuId === folder.id && (
-            <div className="folder-action-menu" onClick={(event) => event.stopPropagation()}>
-              <button onClick={() => onRenameFolder(folder)} type="button">Chỉnh sửa</button>
-              <button className="is-danger" onClick={() => onDeleteFolder(folder)} type="button">Xóa folder</button>
-            </div>
-          )}
-          <span><StudyHubIcon name="folder" size={26} /></span>
-          <h3>{folder.name}</h3>
-          <p>{folder.count} documents</p>
-          <small>{folder.date}</small>
-        </article>
-      ))}
-    </div>
-  )
-}
-
 function FolderFilesView({
-  files,
   folder,
+  subfolders = [],
+  files = [],
+  loading = false,
   onBack,
   onDeleteFile,
   onOpenFile,
   onRenameFile,
   onToggleFileMenu,
   openFileMenuId,
+  onSelectSubfolder,
+  onAddSubfolder
 }) {
+  if (loading) {
+    return (
+      <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+        Đang tải dữ liệu...
+      </div>
+    )
+  }
+
+  const combined = [
+    ...subfolders.map(sf => ({
+      id: sf.id,
+      name: sf.folderName || sf.name || 'Untitled Folder',
+      type: 'folder',
+      isFolder: true,
+      createdAt: sf.createdAt
+    })),
+    ...files.map(f => mapDoc(f))
+  ]
+
+  // Group items by date
+  const groups = ['Today', 'Yesterday', 'This Week', 'Older']
+  const grouped = groups.map(g => ({
+    label: g,
+    items: combined.filter(item => {
+      const grp = getItemGroup(item.createdAt)
+      return grp === g
+    })
+  })).filter(g => g.items.length > 0)
+  if (grouped.length === 0 && combined.length > 0) grouped.push({ label: 'Older', items: combined })
+
   return (
-    <section>
-      <header style={{ display: 'flex', alignItems: 'center', gap: '16px', backgroundColor: '#fff', padding: '16px 24px', borderRadius: '12px', marginBottom: '24px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', display: 'flex' }}><StudyHubIcon name="arrow-left" size={20} /></button>
-        <StudyHubIcon name="folder" size={20} style={{ color: '#818cf8' }} />
-        <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#818cf8', margin: 0 }}>{folder.name}</h2>
-      </header>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <h3 style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', margin: '0 0 4px 8px' }}>Today</h3>
-        {/* Mock folder self-reference to match screenshot */}
-        <ActionableFileRow
-          file={{ id: folder.id + '_self', name: folder.name, type: 'folder', time: '02:16' }}
-          isFolder={true}
-          onDeleteFile={() => {}}
-          onOpenFile={() => {}}
-          onRenameFile={() => {}}
-          onToggleFileMenu={() => {}}
-          openFileMenuId={null}
-        />
-        {files.map((file) => (
-          <FolderFileRow
-            file={file}
-            folder={folder}
-            key={file.id}
-            onDeleteFile={onDeleteFile}
-            onOpenFile={onOpenFile}
-            onRenameFile={onRenameFile}
-            onToggleFileMenu={onToggleFileMenu}
-            openFileMenuId={openFileMenuId}
-          />
-        ))}
+    <section style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+      {/* Breadcrumb header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+        <button
+          onClick={onBack}
+          style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '13.5px', fontWeight: 500, padding: '4px 0', display: 'flex', alignItems: 'center' }}
+        >
+          Home
+        </button>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        <span style={{ fontSize: '13.5px', fontWeight: 500, color: '#0f172a' }}>{folder.name}</span>
+        {onAddSubfolder && (
+          <button
+            onClick={onAddSubfolder}
+            type="button"
+            title="Tạo thư mục con"
+            style={{ marginLeft: 'auto', height: '32px', padding: '0 12px', backgroundColor: '#fff', color: '#4f46e5', border: '1.5px solid #818cf8', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
+          >
+            <StudyHubIcon name="plus" size={13} />
+            Folder
+          </button>
+        )}
+      </div>
+
+      {/* Content card */}
+      <div style={{ border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff' }}>
+        {combined.length === 0 ? (
+          <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
+            Thư mục này trống
+          </div>
+        ) : (
+          grouped.map(({ label, items }) => (
+            <div key={label}>
+              {/* Group header row - lavender like Mindgrasp */}
+              <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+                {label}
+              </div>
+              {items.map((item) => (
+                <ActionableFileRow
+                  key={item.id}
+                  file={item}
+                  isFolder={item.isFolder}
+                  onDeleteFile={(f) => {
+                    if (f.isFolder) {
+                      onDeleteFile(f)
+                    } else {
+                      onDeleteFile(folder, f)
+                    }
+                  }}
+                  onOpenFile={(f) => {
+                    if (f.isFolder) {
+                      onSelectSubfolder(f)
+                    } else {
+                      onOpenFile(f)
+                    }
+                  }}
+                  onRenameFile={onRenameFile}
+                  onToggleFileMenu={onToggleFileMenu}
+                  openFileMenuId={openFileMenuId}
+                />
+              ))}
+            </div>
+          ))
+        )}
       </div>
     </section>
   )
 }
-
-function FolderFileRow({ file, folder, onDeleteFile, onOpenFile, onRenameFile, onToggleFileMenu, openFileMenuId }) {
-  return (
-    <ActionableFileRow 
-      file={file} 
-      onDeleteFile={(f) => onDeleteFile(folder, f)} 
-      onOpenFile={onOpenFile} 
-      onRenameFile={(f) => onRenameFile(folder, f)} 
-      onToggleFileMenu={onToggleFileMenu} 
-      openFileMenuId={openFileMenuId} 
-    />
-  )
-}
-
 function ActionableFileRow({ file, isFolder, onDeleteFile, onOpenFile, onRenameFile, onToggleFileMenu, openFileMenuId }) {
+  const isActualFolder = isFolder || file.type === 'folder' || file.kind === 'folder';
+  const [hovered, setHovered] = useState(false)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-      <FileRow file={file} isFolder={isFolder} onClick={() => onOpenFile(file)} />
+    <div
+      style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '100%', backgroundColor: hovered ? '#f8f8ff' : '#fff', transition: 'background 0.15s', borderBottom: '1px solid #f0f0f8' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <FileRow file={file} isFolder={isActualFolder} onClick={() => onOpenFile(file)} hovered={hovered} />
       <button
         onClick={(e) => { e.stopPropagation(); onToggleFileMenu(openFileMenuId === file.id ? null : file.id) }}
         type="button"
-        style={{ position: 'absolute', right: '16px', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }}
+        style={{ position: 'absolute', right: '12px', background: 'transparent', border: 'none', color: hovered ? '#6366f1' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px', borderRadius: '6px', transition: 'color 0.15s' }}
       >
-        <StudyHubIcon name="more-vertical" size={20} />
+        <StudyHubIcon name="more-vertical" size={18} />
       </button>
       {openFileMenuId === file.id && (
-        <div className="file-action-menu" style={{ position: 'absolute', right: '16px', top: '100%', zIndex: 10, backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', padding: '4px', display: 'flex', flexDirection: 'column', minWidth: '120px' }}>
-          <button onClick={() => onRenameFile(file)} type="button" style={{ padding: '8px 12px', textAlign: 'left', border: 'none', background: 'transparent', fontSize: '13px', cursor: 'pointer', borderRadius: '4px' }}>Chỉnh sửa</button>
-          <button onClick={() => onDeleteFile(file)} type="button" style={{ padding: '8px 12px', textAlign: 'left', border: 'none', background: 'transparent', fontSize: '13px', cursor: 'pointer', borderRadius: '4px', color: '#ef4444' }}>Xóa file</button>
+        <div className="file-action-menu" style={{ position: 'absolute', right: '12px', top: '100%', zIndex: 20, backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 8px 24px rgba(99,102,241,0.12)', padding: '6px', display: 'flex', flexDirection: 'column', minWidth: '150px' }}>
+          <button onClick={() => onRenameFile(file)} type="button" style={{ padding: '8px 14px', textAlign: 'left', border: 'none', background: 'transparent', fontSize: '13px', cursor: 'pointer', borderRadius: '6px', color: '#374151' }}>
+            {isActualFolder ? 'Đổi tên thư mục' : 'Đổi tên tài liệu'}
+          </button>
+          <button onClick={() => onDeleteFile(file)} type="button" style={{ padding: '8px 14px', textAlign: 'left', border: 'none', background: 'transparent', fontSize: '13px', cursor: 'pointer', borderRadius: '6px', color: '#ef4444' }}>
+            {isActualFolder ? 'Xóa thư mục' : 'Xóa tài liệu'}
+          </button>
         </div>
       )}
     </div>
   )
 }
 
-function LibraryRail({ activeTab, onNavigate, onTabChange }) {
-  return (
-    <aside className="library-rail">
-      <button className="new-session" onClick={() => onNavigate('new-study-session')} type="button">
-        <StudyHubIcon name="plus" size={18} />
-        New Study Session
-      </button>
-      <nav className="library-tabs">
-        {libraryTabs.map((tab) => (
-          <button
-            className={activeTab === tab.id ? 'is-active' : ''}
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
-            type="button"
-          >
-            <StudyHubIcon name={tab.icon} size={20} />
-            <span>{tab.label}</span>
-            {tab.count && <small>{tab.count}</small>}
-          </button>
-        ))}
-      </nav>
-      <div className="upgrade-card">
-        <span><StudyHubIcon name="book" size={24} /></span>
-        <p>Upgrade for more features</p>
-        <button onClick={() => onNavigate('pricing')} type="button">Upgrade</button>
-      </div>
-      <button className="collapse-button" type="button">&lt;&lt;</button>
-    </aside>
-  )
-}
-
 function GroupedFiles({ files, onDeleteFile, onOpenFile, onRenameFile, onToggleFileMenu, openFileMenuId }) {
-  const groups = ['Today', 'Yesterday', 'This Week']
+  const groups = ['Today', 'Yesterday', 'This Week', 'Older']
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden' }}>
       {groups.map((group) => {
         const groupFiles = files.filter((file) => file.group === group)
-        if (!groupFiles.length && group !== 'Today') return null
-        const displayFiles = group === 'Today' && !groupFiles.length ? files : groupFiles
-        
+        if (groupFiles.length === 0) return null;
         return (
-          <section key={group} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#475569', margin: 0 }}>{group}</h2>
-            {displayFiles.map((file) => (
+          <div key={group}>
+            {/* Lavender group header — Mindgrasp style */}
+            <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+              {group}
+            </div>
+            {groupFiles.map((file) => (
               <ActionableFileRow
                 file={file}
                 key={file.id}
@@ -434,58 +686,110 @@ function GroupedFiles({ files, onDeleteFile, onOpenFile, onRenameFile, onToggleF
                 openFileMenuId={openFileMenuId}
               />
             ))}
-          </section>
+          </div>
         )
       })}
-    </div>
-  )
-}
-
-function SharedLibraryFiles({ allFiles, onDeleteFile, onOpenFile, onRenameFile, onToggleFileMenu, openFileMenuId }) {
-  // In the new API structure we pass all shared documents down, or we just render 'No items found' if none.
-  const files = allFiles.length > 0 ? allFiles : [];
-
-  return (
-    <div className="file-list">
-      {files.length === 0 ? (
-        <div style={{ padding: '64px', textAlign: 'center', backgroundColor: '#f5f3ff', borderRadius: '16px', color: '#64748b', fontSize: '15px' }}>
-          No items found
+      {files.length === 0 && (
+        <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+          No study sessions found
         </div>
-      ) : (
-        <section>
-          <h2>This Week</h2>
-          {files.map((file) => (
-            <ActionableFileRow
-              file={file}
-              key={file.id}
-              onDeleteFile={onDeleteFile}
-              onOpenFile={onOpenFile}
-              onRenameFile={onRenameFile}
-              onToggleFileMenu={onToggleFileMenu}
-              openFileMenuId={openFileMenuId}
-            />
-          ))}
-        </section>
       )}
     </div>
   )
 }
 
-function FileRow({ file, isFolder, onClick }) {
+function GroupedFolders({ folders, onDeleteFolder, onOpenFolder, onRenameFolder, onToggleFolderMenu, openFolderMenuId }) {
+  const groups = ['Today', 'Yesterday', 'This Week', 'Older']
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff' }}>
+      {groups.map((group) => {
+        const groupFolders = folders.filter((folder) => folder.group === group)
+        if (groupFolders.length === 0) return null;
+        return (
+          <div key={group}>
+            {/* Lavender group header — Mindgrasp style */}
+            <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+              {group}
+            </div>
+            {groupFolders.map((folder) => (
+              <ActionableFileRow
+                file={folder}
+                key={folder.id}
+                onDeleteFile={onDeleteFolder}
+                onOpenFile={onOpenFolder}
+                onRenameFile={onRenameFolder}
+                onToggleFileMenu={onToggleFolderMenu}
+                openFileMenuId={openFolderMenuId}
+              />
+            ))}
+          </div>
+        )
+      })}
+      {folders.length === 0 && (
+        <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+          No folders found
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SharedLibraryFiles({ allFiles, onDeleteFile, onOpenFile, onRenameFile, onToggleFileMenu, openFileMenuId }) {
+  const groups = ['Today', 'Yesterday', 'This Week', 'Older']
+  const files = allFiles || []
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff' }}>
+      {groups.map((group) => {
+        const groupFiles = files.filter((file) => file.group === group)
+        if (groupFiles.length === 0) return null;
+        return (
+          <div key={group}>
+            {/* Lavender group header — Mindgrasp style */}
+            <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+              {group}
+            </div>
+            {groupFiles.map((file) => (
+              <ActionableFileRow
+                file={file}
+                key={file.id}
+                onDeleteFile={onDeleteFile}
+                onOpenFile={onOpenFile}
+                onRenameFile={onRenameFile}
+                onToggleFileMenu={onToggleFileMenu}
+                openFileMenuId={openFileMenuId}
+              />
+            ))}
+          </div>
+        )
+      })}
+      {files.length === 0 && (
+        <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+          No items found
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FileRow({ file, isFolder, onClick, hovered }) {
   const isActualFolder = isFolder || file.type === 'folder' || file.kind === 'folder';
   return (
-    <button onClick={onClick} type="button" style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '16px 24px', backgroundColor: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-      <div style={{ color: '#818cf8', marginRight: '16px' }}>
-        <StudyHubIcon name={isActualFolder ? 'folder' : 'file'} size={24} />
+    <button
+      onClick={onClick}
+      type="button"
+      style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '13px 20px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+    >
+      <div style={{ color: '#818cf8', marginRight: '14px', flexShrink: 0 }}>
+        <StudyHubIcon name={isActualFolder ? 'folder' : 'file'} size={20} />
       </div>
-      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
+      <span style={{ flex: 1, fontSize: '13.5px', fontWeight: 500, color: '#4f46e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: hovered ? 'underline' : 'none' }}>
         {file.name}
       </span>
-      <span style={{ width: '120px', fontSize: '13px', color: '#64748b' }}>
+      <span style={{ width: '110px', fontSize: '12.5px', color: '#94a3b8', flexShrink: 0 }}>
         {isActualFolder ? 'folder' : 'session'}
       </span>
-      <span style={{ width: '80px', fontSize: '13px', color: '#64748b', textAlign: 'right', paddingRight: '32px' }}>
-        {file.time || '02:00'}
+      <span style={{ width: '70px', fontSize: '12.5px', color: '#94a3b8', textAlign: 'right', paddingRight: '36px', flexShrink: 0 }}>
+        {file.time || ''}
       </span>
     </button>
   )

@@ -3,13 +3,15 @@ import AppLayout from '../components/layout/AppLayout'
 import { AdminApp } from './study-hub/admin'
 import { LoginPage, RegisterPage } from './study-hub/auth'
 import { LibraryPage } from './study-hub/library'
-import { FilePreviewModal, NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal } from './study-hub/modals'
+import { NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal } from './study-hub/modals'
 import {
   DocumentDetailPage, ExplorePage, FolderDetailPage, HomeScreen,
   PricingPage, ProfilePage, UploadPage,
 } from './study-hub/public-pages'
 import StudyDocumentApi from './study-hub/StudyDocumentApi'
 import useAuth from '../hooks/useAuth'
+import { getFolder } from '../features/folders/folderService'
+import { getDocument } from '../features/documents/documentService'
 
 const defaultStudyFile = {
   name: '漢字--JPD316 Lesson 5-NEW.pptx',
@@ -20,8 +22,8 @@ const defaultStudyFile = {
 
 export default function StudyHubApp() {
   const { user, loading, login: authLogin, register: authRegister, logout: authLogout, setUser } = useAuth()
-  const [route, setRoute] = useState('guest-home')
-  const [previousRoute, setPreviousRoute] = useState('guest-home')
+  const [route, setRoute] = useState('explore')
+  const [previousRoute, setPreviousRoute] = useState('explore')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     return localStorage.getItem('sidebarCollapsed') === 'true'
   })
@@ -40,7 +42,6 @@ export default function StudyHubApp() {
   const [studyMode, setStudyMode] = useState('default')
   const [uploadMode, setUploadMode] = useState('document')
   const [studyFile, setStudyFile] = useState(defaultStudyFile)
-  const [selectedFile, setSelectedFile] = useState(null)
   const [selectedDocId, setSelectedDocId] = useState(null)
   const [selectedFolderId, setSelectedFolderId] = useState(null)
   const [showReport, setShowReport] = useState(false)
@@ -49,6 +50,169 @@ export default function StudyHubApp() {
   const [showFeatureRequest, setShowFeatureRequest] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
   const [showExtension, setShowExtension] = useState(false)
+  const [studyBreadcrumbs, setStudyBreadcrumbs] = useState([])
+  const [initialFolderId, setInitialFolderId] = useState(null)
+  const [toast, setToast] = useState(null)
+
+  useEffect(() => {
+    window.showToast = (message, type = 'success') => {
+      setToast({ message, type })
+    }
+    return () => {
+      delete window.showToast
+    }
+  }, [])
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    const body = document.querySelector('.app-shell__body')
+    if (body) body.scrollTop = 0
+    const main = document.querySelector('main')
+    if (main) main.scrollTop = 0
+  }, [route, selectedDocId, selectedFolderId])
+
+  useEffect(() => {
+    if (!toast) return undefined
+    const timer = setTimeout(() => {
+      setToast(null)
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [toast])
+
+  useEffect(() => {
+    if (route !== 'study' || !studyFile?.id) {
+      setStudyBreadcrumbs([])
+      return undefined
+    }
+
+    let isMounted = true
+
+    const fetchBreadcrumbs = async () => {
+      try {
+        let folderId = studyFile.folderId
+        
+        // If folderId is not present, fetch document details first
+        if (folderId === undefined || folderId === null) {
+          const docRes = await getDocument(studyFile.id)
+          const docData = docRes?.data || docRes
+          folderId = docData?.folderId
+        }
+
+        if (!folderId) {
+          if (isMounted) setStudyBreadcrumbs([])
+          return
+        }
+
+        // Fetch parent folders recursively
+        const path = []
+        let currentFolderId = folderId
+        while (currentFolderId) {
+          const folderRes = await getFolder(currentFolderId)
+          const folder = folderRes?.data || folderRes
+          if (folder) {
+            path.unshift({
+              id: folder.id,
+              name: folder.folderName || folder.name || 'Untitled Folder'
+            })
+            currentFolderId = folder.parentFolderId
+          } else {
+            break
+          }
+        }
+
+        if (isMounted) {
+          setStudyBreadcrumbs(path)
+        }
+      } catch (e) {
+        console.error('Error fetching study breadcrumbs:', e)
+        if (isMounted) setStudyBreadcrumbs([])
+      }
+    }
+
+    fetchBreadcrumbs()
+
+    return () => {
+      isMounted = false
+    }
+  }, [studyFile?.id, route])
+
+  const handleBreadcrumbClick = (folderId) => {
+    if (folderId === null) {
+      setInitialFolderId(null)
+      setLibraryTab('folders')
+      navigate('library')
+    } else {
+      setInitialFolderId(folderId)
+      setLibraryTab('folders')
+      navigate('library')
+    }
+  }
+
+  const [recentItems, setRecentItems] = useState([])
+
+  useEffect(() => {
+    const key = user ? `recentItems_${user.id || user.email || 'user'}` : 'recentItems_guest'
+    try {
+      const saved = localStorage.getItem(key)
+      setRecentItems(saved ? JSON.parse(saved) : [])
+    } catch (e) {
+      setRecentItems([])
+    }
+  }, [user])
+
+  const addRecentItem = (item) => {
+    if (!item || !item.id || !item.name) return
+    setRecentItems(prev => {
+      const filtered = prev.filter(x => !(String(x.id) === String(item.id) && x.type === item.type))
+      const updated = [
+        { id: item.id, type: item.type, name: item.name, target: item.target, params: item.params, timestamp: Date.now() },
+        ...filtered
+      ].slice(0, 10)
+      const key = user ? `recentItems_${user.id || user.email || 'user'}` : 'recentItems_guest'
+      localStorage.setItem(key, JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  // Remove recent item by id (string-safe comparison). If type is omitted, removes all entries with that id.
+  const removeRecentItem = (id, type) => {
+    setRecentItems(prev => {
+      const filtered = type
+        ? prev.filter(x => !(String(x.id) === String(id) && x.type === type))
+        : prev.filter(x => String(x.id) !== String(id))
+      const key = user ? `recentItems_${user.id || user.email || 'user'}` : 'recentItems_guest'
+      localStorage.setItem(key, JSON.stringify(filtered))
+      return filtered
+    })
+  }
+
+  // Remove all recent items whose IDs are NOT in existingIds (to purge stale/deleted items)
+  const purgeStaleRecentItems = (existingIds) => {
+    if (!existingIds || !existingIds.length) return
+    const idSet = new Set(existingIds.map(String))
+    setRecentItems(prev => {
+      // Only purge 'file' type items; keep folders, etc. as-is (they have their own cleanup)
+      const filtered = prev.filter(x => x.type !== 'file' || idSet.has(String(x.id)))
+      if (filtered.length !== prev.length) {
+        const key = user ? `recentItems_${user.id || user.email || 'user'}` : 'recentItems_guest'
+        localStorage.setItem(key, JSON.stringify(filtered))
+        return filtered
+      }
+      return prev
+    })
+  }
+
+  const handleOpenRecentItem = (item) => {
+    if (item.target === 'folder-detail') {
+      setSelectedFolderId(item.id)
+      navigate('folder-detail')
+    } else if (item.target === 'doc-detail') {
+      setSelectedDocId(item.id)
+      navigate('doc-detail')
+    } else if (item.target === 'study') {
+      openStudyFile(item.params.file)
+    }
+  }
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme')
@@ -62,14 +226,14 @@ export default function StudyHubApp() {
 
   useEffect(() => {
     if (guest) {
-      const publicRoutes = ['guest-home', 'explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
+      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
       if (!publicRoutes.includes(route)) {
         setRoute('login')
       }
     } else {
-      const guestOnlyRoutes = ['guest-home', 'login', 'register']
+      const guestOnlyRoutes = ['login', 'register']
       if (guestOnlyRoutes.includes(route)) {
-        setRoute(role === 'admin' ? 'admin-overview' : 'home')
+        setRoute(role === 'admin' ? 'admin-overview' : 'explore')
       }
     }
   }, [user, role, route])
@@ -84,11 +248,11 @@ export default function StudyHubApp() {
     // Enforce route guards
     const hasToken = !!localStorage.getItem('accessToken')
     const isGuest = !user && !hasToken
-    const publicRoutes = ['guest-home', 'explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
+    const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
     let targetBaseRoute = nextRoute
     if (nextRoute === 'new-study-session') {
       targetBaseRoute = 'upload'
-    } else if (nextRoute === 'library-shared' || nextRoute === 'library-folders') {
+    } else if (nextRoute === 'library-shared' || nextRoute === 'library-folders' || nextRoute === 'library-recent' || nextRoute === 'library-favorites') {
       targetBaseRoute = 'library'
     }
 
@@ -101,66 +265,136 @@ export default function StudyHubApp() {
       setPreviousRoute(route)
       setUploadMode('study')
       setRoute('upload')
-      setShowNotifications(false); setShowReport(false); setSelectedFile(null)
+      setShowNotifications(false); setShowReport(false)
       return
     }
     if (nextRoute === 'library-shared') {
       setPreviousRoute(route)
       setRoute('library')
       setLibraryTab('shared')
-      setShowNotifications(false); setShowReport(false); setSelectedFile(null)
+      setShowNotifications(false); setShowReport(false)
       return
     }
     if (nextRoute === 'library-folders') {
       setPreviousRoute(route)
       setRoute('library')
       setLibraryTab('folders')
-      setShowNotifications(false); setShowReport(false); setSelectedFile(null)
+      setShowNotifications(false); setShowReport(false)
+      return
+    }
+    if (nextRoute === 'library-recent') {
+      setPreviousRoute(route)
+      setRoute('library')
+      setLibraryTab('recent')
+      setShowNotifications(false); setShowReport(false)
+      return
+    }
+    if (nextRoute === 'library-favorites') {
+      setPreviousRoute(route)
+      setRoute('library')
+      setLibraryTab('favorites')
+      setShowNotifications(false); setShowReport(false)
       return
     }
     setPreviousRoute(route)
     setRoute(nextRoute)
-    setShowNotifications(false); setShowReport(false); setSelectedFile(null)
+    setShowNotifications(false); setShowReport(false)
     if (nextRoute === 'upload') setUploadMode('document')
-    if (nextRoute === 'library') setLibraryTab('recent')
+    if (nextRoute === 'library') setLibraryTab('sessions')
     if (nextRoute === 'study') { setStudyTab('original'); setStudyMode('default') }
+  }
+
+  const migrateGuestHistoryToUser = (userId) => {
+    try {
+      const guestKey = 'recentItems_guest'
+      const userKey = `recentItems_${userId}`
+      const guestSaved = localStorage.getItem(guestKey)
+      if (guestSaved) {
+        const guestItems = JSON.parse(guestSaved)
+        if (Array.isArray(guestItems) && guestItems.length > 0) {
+          const userSaved = localStorage.getItem(userKey)
+          const userItems = userSaved ? JSON.parse(userSaved) : []
+          
+          // Merge guest items into user items, avoiding duplicates
+          const merged = [...userItems]
+          guestItems.forEach(gItem => {
+            const exists = merged.some(uItem => uItem.id === gItem.id && uItem.type === gItem.type)
+            if (!exists) {
+              merged.push(gItem)
+            }
+          })
+          
+          const updated = merged
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+            .slice(0, 10)
+            
+          localStorage.setItem(userKey, JSON.stringify(updated))
+        }
+      }
+      localStorage.removeItem(guestKey)
+    } catch (e) {
+      console.error('Error migrating guest history:', e)
+    }
   }
 
   const handleLogin = async (res) => {
     const u = await authLogin(res)
+    if (u) {
+      migrateGuestHistoryToUser(u.id || u.email || 'user')
+    }
     const r = u.role?.toUpperCase() === 'ADMIN' ? 'admin' : 'student'
-    navigate(r === 'admin' ? 'admin-overview' : 'home')
+    navigate(r === 'admin' ? 'admin-overview' : 'explore')
   }
 
   const handleRegister = async (res) => {
     const u = await authRegister(res)
+    if (u) {
+      migrateGuestHistoryToUser(u.id || u.email || 'user')
+    }
     const r = u.role?.toUpperCase() === 'ADMIN' ? 'admin' : 'student'
-    navigate(r === 'admin' ? 'admin-overview' : 'home')
+    navigate(r === 'admin' ? 'admin-overview' : 'explore')
   }
 
   const handleLogout = async () => {
     await authLogout()
-    navigate('guest-home')
+    try { localStorage.removeItem('recentItems_guest') } catch (e) {}
+    navigate('explore')
   }
 
   const openStudyFile = (file) => {
-    setStudyFile({
+    const activeFile = {
       id: file.id,
       name: file.name, attachmentName: file.name, subject: file.subject,
       content: '', sizeLabel: file.sizeLabel,
       fileUrl: file.fileUrl || '',
+    }
+    setStudyFile(activeFile)
+    addRecentItem({
+      id: file.id,
+      type: 'file',
+      name: file.name,
+      target: 'study',
+      params: { file: activeFile }
     })
     navigate('study')
   }
 
   const handleStudyUpload = (file) => {
-    setStudyFile({
+    const activeFile = {
       id: file.id,
       name: file.name, attachmentName: file.attachmentName || file.name,
       subject: file.subject || '',
       content: file.content || '',
       sizeLabel: file.sizeLabel || '',
       fileUrl: file.fileUrl || '',
+    }
+    setStudyFile(activeFile)
+    addRecentItem({
+      id: file.id,
+      type: 'file',
+      name: file.name,
+      target: 'study',
+      params: { file: activeFile }
     })
     setUploadMode('document')
     navigate('study')
@@ -172,10 +406,8 @@ export default function StudyHubApp() {
   if (route === 'register') return <RegisterPage onRegister={handleRegister} onNavigate={navigate} />
   if (route.startsWith('admin-')) return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />
 
-  const activeRoute = guest
-    ? ['explore', 'folder-detail', 'doc-detail'].includes(route) ? 'explore' : 'guest-home'
-    : route === 'folder-detail' ? 'explore'
-    : route === 'library' ? (libraryTab === 'shared' ? 'library-shared' : libraryTab === 'folders' ? 'library-folders' : 'library')
+  const activeRoute = ['explore', 'folder-detail', 'doc-detail'].includes(route) ? 'explore'
+    : route === 'library' ? (libraryTab === 'shared' ? 'library-shared' : libraryTab === 'folders' ? 'library-folders' : libraryTab === 'favorites' ? 'library-favorites' : 'library')
     : route
 
   return (
@@ -187,15 +419,43 @@ export default function StudyHubApp() {
       onNotifications={() => setShowNotifications((open) => !open)}
       sidebarCollapsed={sidebarCollapsed}
       onToggleCollapse={toggleSidebar}
+      recentItems={recentItems}
+      onOpenRecentItem={handleOpenRecentItem}
+      activeItemContext={{ route, studyFileId: studyFile?.id, selectedDocId, selectedFolderId }}
+      breadcrumbs={studyBreadcrumbs}
+      onBreadcrumbClick={handleBreadcrumbClick}
     >
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
 
-      {route === 'guest-home' && <HomeScreen guest={guest} onNavigate={navigate} />}
-      {route === 'home' && <HomeScreen onNavigate={navigate} />}
       {route === 'explore' && <ExplorePage guest={guest} onNavigate={navigate} onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail') }} onOpenFolder={(id) => { setSelectedFolderId(id); navigate('folder-detail') }} />}
-      {route === 'folder-detail' && <FolderDetailPage id={selectedFolderId} onNavigate={navigate} />}
+      {route === 'folder-detail' && (
+        <FolderDetailPage 
+          id={selectedFolderId} 
+          onNavigate={navigate} 
+          onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail') }}
+          onLoad={(folder) => {
+            addRecentItem({
+              id: folder.id || selectedFolderId,
+              type: 'folder',
+              name: folder.name || 'Untitled Folder',
+              target: 'folder-detail',
+              params: { id: folder.id || selectedFolderId }
+            })
+          }}
+        />
+      )}
       {route === 'library' && (
-        <LibraryPage activeTab={libraryTab} onNavigate={navigate} onOpenFile={setSelectedFile} onTabChange={setLibraryTab} />
+      <LibraryPage
+        activeTab={libraryTab}
+        onNavigate={navigate}
+        onOpenFile={openStudyFile}
+        onTabChange={setLibraryTab}
+        user={user}
+        onRemoveRecentItem={removeRecentItem}
+        onPurgeStaleRecent={purgeStaleRecentItems}
+        initialFolderId={initialFolderId}
+        onClearInitialFolderId={() => setInitialFolderId(null)}
+      />
       )}
       {route === 'upload' && <UploadPage mode={uploadMode} onStudyFileUploaded={handleStudyUpload} onNavigate={navigate} />}
       {route === 'profile' && <ProfilePage />}
@@ -206,8 +466,17 @@ export default function StudyHubApp() {
           guest={guest}
           onNavigate={navigate}
           onOpenStudyFile={openStudyFile}
-          onBack={() => navigate(previousRoute || (role ? 'home' : 'guest-home'))}
+          onBack={() => navigate(previousRoute || 'explore')}
           onReport={() => setShowReport(true)}
+          onLoad={(doc) => {
+            addRecentItem({
+              id: doc.id || selectedDocId,
+              type: 'file',
+              name: doc.title || 'Untitled Document',
+              target: 'doc-detail',
+              params: { id: doc.id || selectedDocId }
+            })
+          }}
         />
       )}
       {route === 'study' && (
@@ -218,12 +487,79 @@ export default function StudyHubApp() {
         />
       )}
 
-      {selectedFile && <FilePreviewModal file={selectedFile} onClose={() => setSelectedFile(null)} onView={() => openStudyFile(selectedFile)} />}
-      {showReport && <ReportModal onClose={() => setShowReport(false)} />}
+
+      {showReport && <ReportModal onClose={() => setShowReport(false)} documentId={selectedDocId} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} user={user} onUserUpdate={setUser} />}
       {showFeatureRequest && <FeatureRequestModal onClose={() => setShowFeatureRequest(false)} />}
       {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
       {showExtension && <ChromeExtensionModal onClose={() => setShowExtension(false)} />}
+
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          top: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: toast.type === 'error' ? '#ef4444' : toast.type === 'info' ? '#3b82f6' : '#00b830',
+          color: '#fff',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          zIndex: 10000,
+          fontSize: '14px',
+          fontWeight: 600,
+          animation: 'toastSlideIn 0.2s ease forwards',
+        }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '18px',
+            height: '18px',
+            borderRadius: '50%',
+            backgroundColor: '#fff',
+            color: toast.type === 'error' ? '#ef4444' : toast.type === 'info' ? '#3b82f6' : '#00b830',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            flexShrink: 0
+          }}>
+            {toast.type === 'error' ? '×' : '✓'}
+          </span>
+          <span style={{ whiteSpace: 'nowrap' }}>{toast.message}</span>
+          <button 
+            onClick={() => setToast(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'rgba(255, 255, 255, 0.8)',
+              cursor: 'pointer',
+              fontSize: '14px',
+              padding: '0 0 0 8px',
+              display: 'flex',
+              alignItems: 'center',
+              fontWeight: 'bold',
+              lineHeight: 1
+            }}
+          >
+            ×
+          </button>
+          <style>{`
+            @keyframes toastSlideIn {
+              from {
+                transform: translate(-50%, -20px);
+                opacity: 0;
+              }
+              to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+              }
+            }
+          `}</style>
+        </div>
+      )}
     </AppLayout>
   )
 }

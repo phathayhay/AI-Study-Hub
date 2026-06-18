@@ -5246,4 +5246,51 @@ body.dark-theme .profile-mini-clickable:hover {
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Summary font-size slider thumb */
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.4);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.5);
+}
+input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6366f1;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.4);
+}
+
+/* Sidebar Guest Sign Up Button Interactions */
+.sidebar-guest-signup-btn:hover {
+  background-color: var(--color-blue-soft, #f1f5f9) !important;
+}
+
+.sidebar-guest-signup-btn:hover div {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
+}
+
+body.dark-theme .sidebar-guest-signup-btn:hover {
+  background-color: #1e293b !important;
+}
+
+body.dark-theme .sidebar-guest-signup-btn span {
+  color: #f1f5f9 !important;
+}
 

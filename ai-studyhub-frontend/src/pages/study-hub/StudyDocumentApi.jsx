@@ -14,7 +14,6 @@ import {
 export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange }) {
   const documentId = file?.documentId ?? file?.id
   const [summary, setSummary] = useState(null)
-  const [flashcardSets, setFlashcardSets] = useState([])
   const [flashcardSet, setFlashcardSet] = useState(null)
   const [quizzes, setQuizzes] = useState([])
   const [quiz, setQuiz] = useState(null)
@@ -51,21 +50,28 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
   useEffect(() => {
     if (!documentId) return undefined
     let active = true
-    Promise.all([
-      getDocumentFlashcardSets(documentId),
-      getDocumentQuizzes(documentId),
-    ])
-      .then(([sets, quizList]) => {
+    setLoading(true)
+    // Load quizzes separately (still used by quiz tab)
+    getDocumentQuizzes(documentId)
+      .then((quizList) => { if (active) setQuizzes(quizList) })
+      .catch(() => {})
+    // Auto-load flashcard: use existing set or generate new one
+    getDocumentFlashcardSets(documentId)
+      .then(async (sets) => {
         if (!active) return
-        setFlashcardSets(sets)
-        setQuizzes(quizList)
+        if (sets && sets.length > 0) {
+          const set = await getFlashcardSet(sets[0].id)
+          if (active) setFlashcardSet(set)
+        } else {
+          const generated = await generateFlashcards(documentId)
+          if (active && generated) setFlashcardSet(generated)
+        }
       })
       .catch((requestError) => {
         if (active) setError(requestError.message)
       })
-    return () => {
-      active = false
-    }
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [documentId])
 
   const runRequest = async (request) => {
@@ -83,19 +89,18 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
 
   const handleSummary = async () => {
     const result = await runRequest(() => generateSummary(documentId))
-    if (result) setSummary(result)
+    if (result) {
+      setSummary(result)
+      window.showToast?.('AI Summary generated successfully', 'success')
+    }
   }
 
-  const handleFlashcards = async () => {
+  const regenerateFlashcards = async () => {
     const result = await runRequest(() => generateFlashcards(documentId))
-    if (!result) return
-    setFlashcardSet(result)
-    setFlashcardSets((current) => [result, ...current.filter((item) => item.id !== result.id)])
-  }
-
-  const openFlashcards = async (setId) => {
-    const result = await runRequest(() => getFlashcardSet(setId))
-    if (result) setFlashcardSet(result)
+    if (result) {
+      setFlashcardSet(result)
+      window.showToast?.('AI Flashcards generated successfully', 'success')
+    }
   }
 
   const handleQuiz = async (difficulty) => {
@@ -103,6 +108,7 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
     if (!result) return
     setQuiz(result)
     setQuizzes((current) => [result, ...current.filter((item) => item.id !== result.id)])
+    window.showToast?.('AI Quiz generated successfully', 'success')
   }
 
   const openQuiz = async (quizId) => {
@@ -145,20 +151,9 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
                   </button>
                 )})}
               </nav>
-              <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a', fontWeight: 600, fontSize: '12px', marginBottom: '8px', backgroundColor: '#fff' }}>0</div>
             </div>
 
             <div style={{ flex: 1, backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', overflowY: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
-              {/* SUB-HEADER */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
-                <button style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', color: '#64748b', cursor: 'pointer' }}>
-                  <StudyHubIcon name="plus" size={16} />
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#6366f1', color: '#fff', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
-                  <StudyHubIcon name="file" size={14} />
-                  {file?.name || 'Template2_SRD Document.docx'}
-                </div>
-              </div>
 
               {/* CONTENT AREA */}
               <div style={{ flex: 1, padding: activeTab === 'original' ? '0' : '24px', overflowY: activeTab === 'original' ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -166,6 +161,16 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
                 {error && <p className="api-status api-status--error">{error}</p>}
                 
                 <div style={{ display: activeTab === 'original' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
+                  {/* SINGLE FILE HEADER */}
+                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '8px', alignItems: 'center', backgroundColor: '#fdfdff', flexShrink: 0 }}>
+                    <button style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', color: '#6366f1', cursor: 'pointer' }}>
+                      <StudyHubIcon name="plus" size={16} />
+                    </button>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 12px', backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
+                      <StudyHubIcon name="file" size={14} />
+                      {file?.name || 'Untitled document'}
+                    </div>
+                  </div>
                   <OriginalDocument file={file} />
                 </div>
               
@@ -191,7 +196,14 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
                 )
               )}
               
-              {activeTab === 'flashcards' && (flashcardSet ? <FlashcardViewer onBack={() => setFlashcardSet(null)} set={flashcardSet} /> : <CollectionPanel buttonLabel="Generate Flashcards" disabled={!documentId || loading} emptyLabel="No flashcard sets found" items={flashcardSets} loading={loading} onCreate={handleFlashcards} onOpen={openFlashcards} title="Your Flashcards" type="flashcard" />)}
+              {activeTab === 'flashcards' && (
+                flashcardSet
+                  ? <FlashcardViewer set={flashcardSet} onRegenerate={regenerateFlashcards} loading={loading} />
+                  : <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', color: '#6366f1', padding: '48px' }}>
+                      <div style={{ width: '48px', height: '48px', border: '4px solid #e0e7ff', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <p style={{ fontSize: '15px', fontWeight: 500, color: '#475569', margin: 0 }}>{loading ? 'Generating flashcards...' : 'Loading flashcards...'}</p>
+                    </div>
+              )}
               {activeTab === 'quizzes' && (quiz ? <QuizViewer onBack={() => setQuiz(null)} quiz={quiz} /> : <QuizPanel disabled={!documentId || loading} loading={loading} onCreate={handleQuiz} onOpen={openQuiz} quizzes={quizzes} />)}
               </div>
             </div>
@@ -230,31 +242,7 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
                 
                 {/* Scrollable Content */}
                 <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingRight: '8px', marginRight: '-8px' }}>
-                  <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', flexShrink: 0, flexWrap: 'wrap' }}>
-                    <div style={{ flex: 1, minWidth: '130px', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#fff', cursor: 'pointer' }}>
-                      <div style={{ padding: '8px', backgroundColor: '#e0e7ff', color: '#4f46e5', borderRadius: '8px', flexShrink: 0 }}><StudyHubIcon name="copy" size={16} /></div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <strong style={{ fontSize: '13px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Flash...</strong>
-                          <span style={{ fontSize: '10px', color: '#4f46e5', backgroundColor: '#e0e7ff', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>Popular</span>
-                        </div>
-                        <span style={{ fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>Study with active...</span>
-                      </div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: '130px', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '12px', display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: '#fff', cursor: 'pointer' }}>
-                      <div style={{ padding: '8px', backgroundColor: '#fae8ff', color: '#d946ef', borderRadius: '8px', flexShrink: 0 }}><StudyHubIcon name="help" size={16} /></div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                          <strong style={{ fontSize: '13px', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Quizz...</strong>
-                          <span style={{ fontSize: '10px', color: '#4f46e5', backgroundColor: '#e0e7ff', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>Popular</span>
-                        </div>
-                        <span style={{ fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>Test your knowle...</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginBottom: '16px' }}>
-                    <div style={{ width: '120px', height: '120px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #d946ef, #3b82f6)', margin: '0 auto 32px', boxShadow: '0 10px 40px rgba(99, 102, 241, 0.4)', animation: 'pulse 3s infinite alternate', flexShrink: 0 }} />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginBottom: '16px', marginTop: '32px' }}>
                     <h4 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '12px', color: '#0f172a' }}>Have a Question about your import?</h4>
                     <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '32px', lineHeight: 1.6, maxWidth: '280px' }}>You can ask questions about your imported content, and your answers will appear here</p>
                     
@@ -294,36 +282,92 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
 
 function OriginalDocument({ file }) {
   const documentName = file?.name || file?.attachmentName || 'Untitled document'
+  const fileUrl = file?.fileUrl || ''
 
-  return (
-    <section style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
-      <div style={{ padding: '16px', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '12px', alignItems: 'center', backgroundColor: '#fdfdff', borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}>
-        <button style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', color: '#6366f1', cursor: 'pointer' }}>
-          <StudyHubIcon name="plus" size={16} />
-        </button>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 12px', backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
-          <StudyHubIcon name="file" size={14} />
-          {documentName}
-        </div>
+  const isPdf = fileUrl.toLowerCase().endsWith('.pdf')
+  const isLocal = fileUrl.includes('localhost') || fileUrl.includes('127.0.0.1')
+
+  if (!fileUrl) {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', color: '#64748b' }}>
+        Không có URL file từ backend để xem trước.
       </div>
+    )
+  }
 
-      {file?.fileUrl ? (
-        <div className="document-preview-container" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
-          <iframe
-            src={`https://docs.google.com/gview?url=${encodeURIComponent(file.fileUrl)}&embedded=true`}
-            width="100%"
-            height="100%"
-            frameBorder="0"
-            title="Document Preview"
-            style={{ flex: 1, backgroundColor: '#f1f5f9', border: 'none' }}
-          />
+  // Render PDF directly using browser's built-in PDF viewer
+  if (isPdf) {
+    return (
+      <div className="document-preview-container" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
+        <iframe
+          src={fileUrl}
+          width="100%"
+          height="100%"
+          title="Document Preview"
+          style={{ flex: 1, backgroundColor: '#f1f5f9', border: 'none' }}
+        />
+      </div>
+    )
+  }
+
+  // Prevent Google Docs Viewer from downloading 'qview' when trying to access localhost
+  if (isLocal) {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px', textAlign: 'center', backgroundColor: '#f8fafc', color: '#475569', gap: '16px' }}>
+        <div style={{ padding: '16px', backgroundColor: '#fee2e2', color: '#ef4444', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <path d="m21 16-4-4-4 4" />
+            <path d="m14 14-3-3-4 3" />
+            <circle cx="9" cy="9" r="2" />
+          </svg>
         </div>
-      ) : (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px', color: '#64748b' }}>
-          Không có URL file từ backend để xem trước.
+        <div>
+          <h4 style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', marginBottom: '8px' }}>Không thể xem trước tệp Word/PowerPoint trên localhost</h4>
+          <p style={{ fontSize: '14px', color: '#64748b', maxWidth: '420px', lineHeight: 1.5, margin: 0 }}>
+            Google Docs Viewer không thể kết nối tới máy chủ <strong>localhost</strong> trong môi trường phát triển local của bạn để lấy nội dung file.
+          </p>
         </div>
-      )}
-    </section>
+        <a
+          href={fileUrl}
+          download={documentName}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '10px 24px',
+            backgroundColor: '#6366f1',
+            color: '#fff',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: 600,
+            textDecoration: 'none',
+            transition: 'background-color 0.2s',
+            boxShadow: '0 2px 4px rgba(99, 102, 241, 0.15)'
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Tải tài liệu về máy
+        </a>
+      </div>
+    )
+  }
+
+  // Default cloud URL viewer via Google Docs Viewer
+  return (
+    <div className="document-preview-container" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px' }}>
+      <iframe
+        src={`https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`}
+        width="100%"
+        height="100%"
+        title="Document Preview"
+        style={{ flex: 1, backgroundColor: '#f1f5f9', border: 'none' }}
+      />
+    </div>
   )
 }
 
@@ -339,35 +383,102 @@ function GeneratePanel({ disabled, label, loading, onGenerate }) {
   )
 }
 
+const FONT_STEPS = [12, 13, 14, 15, 16, 18, 20, 22, 24]
+
 function SummaryView({ summary }) {
+  const [fontStep, setFontStep] = useState(4) // default index → 16px
+  const fontSize = FONT_STEPS[fontStep]
+
+  const handleDownload = () => {
+    const lines = [
+      'AI SUMMARY',
+      '==========',
+      '',
+      'Short Summary',
+      summary.shortSummary || '',
+      '',
+      'Detailed Summary',
+      summary.longSummary || '',
+    ]
+    if (summary.keyTakeaways?.length) {
+      lines.push('', 'Key Takeaways')
+      summary.keyTakeaways.forEach((t, i) => lines.push(`${i + 1}. ${t}`))
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'ai-summary.txt'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <section>
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 16px', backgroundColor: '#818cf8', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '32px' }}>
-        <StudyHubIcon name="file" size={14} />
-        Template2_SRD Document.docx
-      </div>
-      
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 500, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ color: '#6366f1', fontWeight: 600 }}>AI</span> Summary
         </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#6366f1' }}>
-           <span style={{ fontSize: '12px', fontWeight: 600 }}>A</span>
-           <div style={{ width: '48px', height: '4px', backgroundColor: '#e0e7ff', borderRadius: '2px', position: 'relative' }}><div style={{ width: '20px', height: '12px', backgroundColor: '#6366f1', borderRadius: '6px', position: 'absolute', top: '-4px', left: '14px' }}></div></div>
-           <span style={{ fontSize: '18px', fontWeight: 600 }}>A</span>
-           <span style={{ cursor: 'pointer' }}><StudyHubIcon name="volume" size={20} /></span>
-           <span style={{ cursor: 'pointer' }}><StudyHubIcon name="download" size={20} /></span>
+
+        {/* Controls: A — slider — A  +  download */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Small A */}
+          <span
+            onClick={() => setFontStep((s) => Math.max(0, s - 1))}
+            style={{ fontSize: '12px', fontWeight: 700, color: fontStep === 0 ? '#cbd5e1' : '#6366f1', cursor: fontStep === 0 ? 'default' : 'pointer', userSelect: 'none', lineHeight: 1 }}
+          >A</span>
+
+          {/* Step slider */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input
+              type="range"
+              min={0}
+              max={FONT_STEPS.length - 1}
+              step={1}
+              value={fontStep}
+              onChange={(e) => setFontStep(Number(e.target.value))}
+              style={{
+                WebkitAppearance: 'none',
+                appearance: 'none',
+                width: '80px',
+                height: '4px',
+                borderRadius: '2px',
+                background: `linear-gradient(to right, #6366f1 ${(fontStep / (FONT_STEPS.length - 1)) * 100}%, #e0e7ff ${(fontStep / (FONT_STEPS.length - 1)) * 100}%)`,
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            />
+          </div>
+
+          {/* Large A */}
+          <span
+            onClick={() => setFontStep((s) => Math.min(FONT_STEPS.length - 1, s + 1))}
+            style={{ fontSize: '18px', fontWeight: 700, color: fontStep === FONT_STEPS.length - 1 ? '#cbd5e1' : '#6366f1', cursor: fontStep === FONT_STEPS.length - 1 ? 'default' : 'pointer', userSelect: 'none', lineHeight: 1 }}
+          >A</span>
+
+          {/* Divider */}
+          <div style={{ width: '1px', height: '20px', backgroundColor: '#e2e8f0', margin: '0 4px' }} />
+
+          {/* Download */}
+          <button
+            onClick={handleDownload}
+            type="button"
+            title="Download summary"
+            style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '6px', transition: 'background 0.15s' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#e0e7ff' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
+          >
+            <StudyHubIcon name="download" size={20} />
+          </button>
         </div>
       </div>
-      
+
       <article style={{ border: '1px solid #e2e8f0', borderRadius: '16px', backgroundColor: '#fff', padding: '32px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-        <h3 style={{ fontSize: '20px', fontWeight: 500, color: '#475569', marginBottom: '24px' }}>Software Requirement Document Summary</h3>
-        <h4 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', marginBottom: '16px' }}>I. Overview</h4>
-        <div style={{ fontSize: '15px', color: '#334155', lineHeight: 1.6 }}>
+        <div style={{ fontSize: `${fontSize}px`, color: '#334155', lineHeight: 1.7, transition: 'font-size 0.15s ease' }}>
           <p style={{ fontWeight: 600, marginBottom: '8px' }}>Short Summary</p>
-          <p style={{ marginBottom: '16px' }}>{summary.shortSummary}</p>
+          <p style={{ marginBottom: '20px' }}>{summary.shortSummary}</p>
           <p style={{ fontWeight: 600, marginBottom: '8px' }}>Detailed Summary</p>
-          <p style={{ marginBottom: '16px' }}>{summary.longSummary}</p>
+          <p style={{ marginBottom: '20px' }}>{summary.longSummary}</p>
           {!!summary.keyTakeaways?.length && (
             <>
               <p style={{ fontWeight: 600, marginBottom: '8px' }}>Key Takeaways</p>
@@ -381,6 +492,7 @@ function SummaryView({ summary }) {
     </section>
   )
 }
+
 
 function CollectionPanel({ buttonLabel, disabled, emptyLabel, items, loading, onCreate, onOpen, title, type }) {
   return (
@@ -414,23 +526,32 @@ function CollectionPanel({ buttonLabel, disabled, emptyLabel, items, loading, on
   )
 }
 
-function FlashcardViewer({ onBack, set }) {
+function FlashcardViewer({ set, onRegenerate, loading }) {
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const cards = set.cards ?? []
   const card = cards[index]
+
+  // Reset to first card when set changes
+  const prevSetId = useState(set.id)
+  if (prevSetId[0] !== set.id) { prevSetId[1](set.id); setIndex(0); setFlipped(false) }
+
   return (
     <section>
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 16px', backgroundColor: '#818cf8', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600, marginBottom: '32px' }}>
-        <StudyHubIcon name="file" size={14} />
-        Template2_SRD Document.docx
-      </div>
-      
-      <div style={{ position: 'relative', marginBottom: '32px', textAlign: 'center' }}>
-        <button onClick={onBack} type="button" style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', fontWeight: 500 }}>
-          <StudyHubIcon name="arrow-left" size={16} /> Back
+      {/* Header row: title + regenerate */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+          {set.setName || 'Flashcards'}
+        </h2>
+        <button
+          onClick={onRegenerate}
+          disabled={loading}
+          type="button"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', backgroundColor: loading ? '#e0e7ff' : '#6366f1', color: loading ? '#6366f1' : '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: loading ? 'default' : 'pointer', transition: 'all 0.2s' }}
+        >
+          <StudyHubIcon name="refresh" size={14} />
+          {loading ? 'Generating...' : 'Regenerate'}
         </button>
-        <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Overview</h2>
       </div>
 
       <article onClick={() => setFlipped((value) => !value)} style={{ border: '1px solid #6366f1', borderRadius: '12px', padding: '32px', minHeight: '340px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', cursor: 'pointer', backgroundColor: '#fff', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)' }}>
@@ -459,7 +580,7 @@ function QuizPanel({ disabled, loading, onCreate, onOpen, quizzes }) {
         <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Your Quizzes</h2>
         <button 
           disabled={disabled} 
-          onClick={onCreate} 
+          onClick={() => onCreate('MEDIUM')} 
           type="button"
           style={{ backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
         >
@@ -499,53 +620,253 @@ function QuizPanel({ disabled, loading, onCreate, onOpen, quizzes }) {
 
 function QuizViewer({ onBack, quiz }) {
   const [index, setIndex] = useState(0)
-  const [selected, setSelected] = useState('')
-  const [revealed, setRevealed] = useState(false)
+  const [answers, setAnswers] = useState({}) // index -> 'correct' | 'incorrect' | 'skipped'
+  const [selectedAnswers, setSelectedAnswers] = useState({}) // index -> key ('A', 'B', etc.)
+
   const questions = quiz.questions ?? []
   const question = questions[index]
   const options = question
     ? [['A', question.optionA], ['B', question.optionB], ['C', question.optionC], ['D', question.optionD]]
     : []
+  const total = questions.length
+  // Pagination: show 7 at a time
+  const PAGE_SIZE = 7
+  const pageStart = Math.floor(index / PAGE_SIZE) * PAGE_SIZE
+  const pageEnd = Math.min(pageStart + PAGE_SIZE, total)
+  const pageNums = Array.from({ length: pageEnd - pageStart }, (_, i) => pageStart + i)
+
+  const currentSelected = selectedAnswers[index] ?? ''
+  const currentRevealed = !!currentSelected
 
   const move = (nextIndex) => {
     setIndex(nextIndex)
-    setSelected('')
-    setRevealed(false)
+  }
+
+  const handleSelectOption = (key) => {
+    if (currentRevealed) return
+    const isCorrect = key === question.correctOption
+    setSelectedAnswers(prev => ({ ...prev, [index]: key }))
+    setAnswers(prev => ({ ...prev, [index]: isCorrect ? 'correct' : 'incorrect' }))
+  }
+
+  const handleSkip = () => {
+    if (!answers[index]) {
+      setAnswers(prev => ({ ...prev, [index]: 'skipped' }))
+    }
+    move(Math.min(index + 1, total - 1))
+  }
+
+  const getOptionStyle = (key) => {
+    const base = {
+      display: 'flex', alignItems: 'center', gap: '12px',
+      padding: '16px 20px', borderRadius: '10px', border: '1.5px solid',
+      cursor: currentRevealed ? 'default' : 'pointer', fontSize: '14px', fontWeight: 500,
+      textAlign: 'left', transition: 'all 0.15s', background: '#fff',
+      width: '100%',
+    }
+    if (!currentRevealed) {
+      return {
+        ...base,
+        borderColor: '#e2e8f0',
+        backgroundColor: '#fff',
+        color: '#334155',
+      }
+    }
+    if (key === question.correctOption) {
+      return { ...base, borderColor: '#22c55e', backgroundColor: '#f0fdf4', color: '#15803d', boxShadow: '0 0 0 3px rgba(34,197,94,0.12)' }
+    }
+    if (currentSelected === key && key !== question.correctOption) {
+      return { ...base, borderColor: '#ef4444', backgroundColor: '#fef2f2', color: '#b91c1c', boxShadow: '0 0 0 3px rgba(239,68,68,0.12)' }
+    }
+    return { ...base, borderColor: '#e2e8f0', color: '#94a3b8' }
   }
 
   return (
-    <section className="quiz-taking">
-      <div className="quiz-nav">
-        <button className="text-link" onClick={onBack} type="button">Quit</button>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: '0', height: '100%' }}>
+
+      {/* TOP BAR: Quit + pagination (centered) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 120px', alignItems: 'center', marginBottom: '24px' }}>
+        {/* Quit */}
         <div>
-          <strong>{quiz.quizTitle}</strong>
-          <span>{questions.length} questions</span>
+          <button
+            onClick={onBack}
+            type="button"
+            style={{ padding: '8px 20px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#475569', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}
+          >
+            Quit
+          </button>
         </div>
+
+        {/* Centered Pagination controls */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Prev page arrow */}
+            <button
+              disabled={pageStart === 0}
+              onClick={() => move(pageStart - 1)}
+              type="button"
+              style={{ background: 'none', border: 'none', color: pageStart === 0 ? '#cbd5e1' : '#6366f1', cursor: pageStart === 0 ? 'default' : 'pointer', padding: '4px', fontSize: '16px', fontWeight: 700 }}
+            >‹</button>
+
+            {/* Page numbers */}
+            {pageNums.map((n) => {
+              const isCurrent = index === n
+              const status = answers[n] // 'correct' | 'incorrect' | 'skipped'
+
+              // Default styles
+              let bg = '#f8fafc'
+              let border = '1.5px solid #e2e8f0'
+              let color = '#475569'
+              let boxShadow = 'none'
+
+              if (status === 'correct') {
+                bg = '#22c55e'
+                border = '1.5px solid #22c55e'
+                color = '#fff'
+              } else if (status === 'incorrect') {
+                bg = '#ef4444'
+                border = '1.5px solid #ef4444'
+                color = '#fff'
+              } else if (status === 'skipped') {
+                bg = '#94a3b8'
+                border = '1.5px solid #94a3b8'
+                color = '#fff'
+              }
+
+              if (isCurrent) {
+                border = '2px solid #6366f1'
+                boxShadow = '0 0 0 3px rgba(99,102,241,0.15)'
+                if (!status) {
+                  bg = '#fff'
+                  color = '#6366f1'
+                }
+              }
+
+              return (
+                <button
+                  key={n}
+                  onClick={() => move(n)}
+                  type="button"
+                  style={{
+                    width: '36px', height: '36px', borderRadius: '50%',
+                    border,
+                    background: bg,
+                    color,
+                    fontWeight: isCurrent || status ? 700 : 500,
+                    fontSize: '14px', cursor: 'pointer',
+                    boxShadow,
+                    transition: 'all 0.15s',
+                    flexShrink: 0,
+                  }}
+                >{n + 1}</button>
+              )
+            })}
+
+            {/* Next page arrow */}
+            <button
+              disabled={pageEnd >= total}
+              onClick={() => move(pageEnd)}
+              type="button"
+              style={{ background: 'none', border: 'none', color: pageEnd >= total ? '#cbd5e1' : '#6366f1', cursor: pageEnd >= total ? 'default' : 'pointer', padding: '4px', fontSize: '16px', fontWeight: 700 }}
+            >›</button>
+          </div>
+
+          <span style={{ fontSize: '12px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+            Showing {pageStart + 1}–{pageEnd} of {total} questions
+          </span>
+        </div>
+
+        {/* Balance Spacer */}
+        <div />
       </div>
+
+      {/* QUESTION CARD */}
       {question ? (
-        <article className="question-card">
-          <p className="question-progress">Question {index + 1} of {questions.length}</p>
-          <h2>{question.questionText}</h2>
-          <div className="quiz-types">
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '32px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', overflow: 'auto' }}>
+          {/* Progress label */}
+          <p style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, marginBottom: '16px', margin: '0 0 16px', textAlign: 'center' }}>
+            Question: {index + 1}/{total}
+          </p>
+
+          {/* Question text */}
+          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', marginBottom: '32px', lineHeight: 1.5, margin: '0 0 32px', textAlign: 'center' }}>
+            {question.questionText}
+          </h2>
+
+          {/* 2×2 option grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '32px' }}>
             {options.map(([key, value]) => (
-              <button className={selected === key ? 'is-active' : ''} key={key} onClick={() => { setSelected(key); setRevealed(false) }} type="button">
-                <span>{key}</span>
+              <button
+                key={key}
+                onClick={() => handleSelectOption(key)}
+                type="button"
+                style={getOptionStyle(key)}
+              >
+                {/* Option letter badge */}
+                <span style={{
+                  width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '12px', fontWeight: 700,
+                  backgroundColor: currentRevealed && key === question.correctOption ? '#22c55e'
+                    : currentRevealed && currentSelected === key && key !== question.correctOption ? '#ef4444'
+                    : '#f1f5f9',
+                  color: (currentRevealed && key === question.correctOption) || (currentRevealed && currentSelected === key && key !== question.correctOption)
+                    ? '#fff' : '#64748b',
+                  transition: 'all 0.15s',
+                }}>
+                  {key}
+                </span>
                 {value}
               </button>
             ))}
           </div>
-          {revealed && (
-            <p className={selected === question.correctOption ? 'quiz-result is-correct' : 'quiz-result'}>
-              {selected === question.correctOption ? 'Correct' : `Correct answer: ${question.correctOption}`} - {question.explanation}
-            </p>
+
+          {/* Feedback */}
+          {currentRevealed && (
+            <div style={{
+              padding: '14px 20px', borderRadius: '10px', marginBottom: '24px',
+              backgroundColor: currentSelected === question.correctOption ? '#f0fdf4' : '#fef2f2',
+              border: `1.5px solid ${currentSelected === question.correctOption ? '#86efac' : '#fca5a5'}`,
+              color: currentSelected === question.correctOption ? '#15803d' : '#b91c1c',
+              fontSize: '14px', fontWeight: 500, lineHeight: 1.6,
+            }}>
+              {currentSelected === question.correctOption
+                ? '✓ Correct!'
+                : `✗ Correct answer: ${question.correctOption}`}
+              {question.explanation ? ` — ${question.explanation}` : ''}
+            </div>
           )}
-          <div className="quiz-answer-actions">
-            <button disabled={index === 0} onClick={() => move(index - 1)} type="button">Previous</button>
-            <button disabled={!selected} onClick={() => setRevealed(true)} type="button">Check</button>
-            <button disabled={index >= questions.length - 1} onClick={() => move(index + 1)} type="button">Next</button>
+
+          {/* Actions: Previous | Skip | Next */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: 'auto' }}>
+            <button
+              disabled={index === 0}
+              onClick={() => move(index - 1)}
+              type="button"
+              style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', color: index === 0 ? '#cbd5e1' : '#475569', fontWeight: 600, fontSize: '14px', cursor: index === 0 ? 'default' : 'pointer' }}
+            >Previous</button>
+
+            <button
+              onClick={handleSkip}
+              type="button"
+              disabled={currentRevealed || index >= total - 1}
+              style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', color: (currentRevealed || index >= total - 1) ? '#cbd5e1' : '#475569', fontWeight: 600, fontSize: '14px', cursor: (currentRevealed || index >= total - 1) ? 'default' : 'pointer' }}
+            >Skip</button>
+
+            <button
+              disabled={index >= total - 1}
+              onClick={() => move(index + 1)}
+              type="button"
+              style={{ padding: '10px 28px', borderRadius: '8px', border: 'none', background: index >= total - 1 ? '#e0e7ff' : '#6366f1', color: index >= total - 1 ? '#a5b4fc' : '#fff', fontWeight: 600, fontSize: '14px', cursor: index >= total - 1 ? 'default' : 'pointer', transition: 'all 0.15s' }}
+            >Next</button>
           </div>
-        </article>
-      ) : <div className="quiz-empty-card">Quiz has no questions</div>}
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '15px' }}>
+          Quiz has no questions
+        </div>
+      )}
     </section>
   )
 }
+
