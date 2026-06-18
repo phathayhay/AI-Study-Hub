@@ -1,25 +1,36 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
-import { adminCourses, adminDocuments, adminNavItems, adminUsers } from './config'
+import {
+  banAdminUser,
+  createAdminCourse,
+  deleteAdminCourse,
+  getAdminCourses,
+  getAdminDocuments,
+  getAdminReports,
+  getAdminUsers,
+  moderateAdminDocument,
+  resolveAdminReport,
+  unbanAdminUser,
+  updateAdminCourse,
+} from '../../services/adminService'
+import { adminNavItems } from './config'
 import { InfoBlock } from './shared'
 
 export function AdminApp({ route, onLogout, onNavigate }) {
   const [userModal, setUserModal] = useState(null)
-  const [courseModal, setCourseModal] = useState(null)
 
   return (
     <AdminLayout active={route} onLogout={onLogout} onNavigate={onNavigate}>
       {route === 'admin-overview' && <AdminOverview />}
-      {route === 'admin-users' && <AdminUsers onOpenUser={() => setUserModal(adminUsers[0])} />}
+      {route === 'admin-users' && <AdminUsers onOpenUser={setUserModal} />}
       {route === 'admin-documents' && <AdminDocuments />}
-      {route === 'admin-courses' && <AdminCourses onAdd={() => setCourseModal('add')} onEdit={() => setCourseModal('edit')} />}
+      {route === 'admin-courses' && <AdminCourses />}
       {route === 'admin-storage' && <AdminStorage />}
       {route === 'admin-reports' && <AdminReports />}
       {route === 'admin-logs' && <AdminLogs />}
       {route === 'admin-settings' && <AdminSettings />}
       {userModal && <AdminUserModal user={userModal} onClose={() => setUserModal(null)} />}
-      {courseModal && <AdminCourseModal mode={courseModal} onClose={() => setCourseModal(null)} />}
     </AdminLayout>
   )
 }
@@ -40,8 +51,7 @@ function AdminSidebar({ active, onLogout, onNavigate }) {
   return (
     <aside className="admin-sidebar">
       <div className="admin-brand">
-        <StudyHubIcon name="book" size={28} />
-        <span><strong>AI Study Hub</strong><small>FPT University</small></span>
+        <img src="/app-logo.png" alt="AI Study Hub" />
       </div>
       <nav>
         {adminNavItems.map((item) => (
@@ -77,15 +87,28 @@ function AdminTopbar() {
 }
 
 function AdminOverview() {
+  const users = useAdminList(getAdminUsers)
+  const documents = useAdminList(getAdminDocuments)
+  const reports = useAdminList(getAdminReports)
+  const loading = users.loading || documents.loading || reports.loading
+  const error = users.error || documents.error || reports.error
+  const normalizedUsers = useMemo(() => users.items.map(mapAdminUser), [users.items])
+  const normalizedDocuments = useMemo(() => documents.items.map(mapAdminDocument), [documents.items])
+  const normalizedReports = useMemo(() => reports.items.map(mapAdminReport), [reports.items])
+  const adminStats = [
+    ['users', normalizedUsers.length, 'Tổng người dùng', 'API', 'users'],
+    ['documents', normalizedDocuments.length, 'Tổng tài liệu', 'API', 'file'],
+    ['pending-documents', normalizedDocuments.filter((document) => document.status === 'pending').length, 'Tài liệu chờ duyệt', 'API', 'check'],
+    ['reports', normalizedReports.filter((report) => report.status === 'pending').length, 'Báo cáo chờ xử lý', 'API', 'flag'],
+  ]
+  const adminUsers = normalizedUsers
+
   return (
     <main className="admin-page admin-page--dashboard">
+      {loading && <p className="api-status">Đang tải dữ liệu admin...</p>}
+      {error && <p className="api-status api-status--error">{formatAdminError(error)}</p>}
       <div className="admin-stat-grid">
-        {[
-          ['users', '567', 'Tổng người dùng', '+12%', 'users'],
-          ['documents', '1,234', 'Tổng tài liệu', '+8%', 'file'],
-          ['downloads', '45,678', 'Lượt tải xuống', '+23%', 'download'],
-          ['sessions', '2,456', 'AI Chat Sessions', '+15%', 'message'],
-        ].map(([id, value, label, change, icon]) => (
+        {adminStats.map(([id, value, label, change, icon]) => (
           <article className="admin-stat-card" key={id}>
             <span><StudyHubIcon name={icon} size={22} /></span>
             <small>{change}</small>
@@ -122,12 +145,24 @@ function AdminOverview() {
 }
 
 function AdminUsers({ onOpenUser }) {
+  const { error, items, loading, refresh, setError } = useAdminList(getAdminUsers)
+  const adminUsers = useMemo(() => items.map(mapAdminUser), [items])
+
+  const handleToggleBan = (user) => runAdminAction(setError, async () => {
+    if (!user.id) return
+    const blocked = user.status === 'blocked' || user.status === 'suspended' || user.status === 'banned'
+    await (blocked ? unbanAdminUser(user.id) : banAdminUser(user.id))
+    await refresh()
+  })
+
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
         <AdminSectionHeader icon="users" title="Quản lý người dùng">
           <AdminSearch placeholder="Tìm kiếm người dùng..." />
         </AdminSectionHeader>
+        {loading && <p className="api-status">Đang tải người dùng...</p>}
+        {error && <p className="api-status api-status--error">{formatAdminError(error)}</p>}
         <table className="admin-table">
           <thead><tr><th>Người dùng</th><th>Email</th><th>Tham gia</th><th>Tài liệu</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
           <tbody>
@@ -139,8 +174,8 @@ function AdminUsers({ onOpenUser }) {
                 <td>{user.docs}</td>
                 <td><AdminStatus status={user.status} /></td>
                 <td className="admin-actions">
-                  <button onClick={onOpenUser} type="button"><StudyHubIcon name="eye" size={16} /></button>
-                  <button type="button"><StudyHubIcon name="x" size={16} /></button>
+                  <button onClick={() => onOpenUser(user)} type="button"><StudyHubIcon name="eye" size={16} /></button>
+                  <button onClick={() => handleToggleBan(user)} type="button"><StudyHubIcon name={user.status === 'active' ? 'x' : 'check'} size={16} /></button>
                 </td>
               </tr>
             ))}
@@ -152,20 +187,31 @@ function AdminUsers({ onOpenUser }) {
 }
 
 function AdminDocuments() {
+  const { error, items, loading, refresh, setError } = useAdminList(getAdminDocuments)
+  const adminDocuments = useMemo(() => items.map(mapAdminDocumentRow), [items])
+
+  const handleModerate = (documentId, status) => runAdminAction(setError, async () => {
+    if (!documentId) return
+    await moderateAdminDocument(documentId, status)
+    await refresh()
+  })
+
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
         <AdminSectionHeader icon="file" title="Quản lý tài liệu">
           <input className="admin-filter-input" />
+          {loading && <p className="api-status">Đang tải tài liệu...</p>}
+          {error && <p className="api-status api-status--error">{formatAdminError(error)}</p>}
           <AdminSearch placeholder="Tìm kiếm tài liệu..." />
         </AdminSectionHeader>
         <table className="admin-table">
           <thead><tr><th>Tiêu đề</th><th>Người tải</th><th>Ngày tải</th><th>Lượt tải</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
           <tbody>
-            {adminDocuments.map(([title, owner, date, downloads, status]) => (
-              <tr key={title}>
+            {adminDocuments.map(([title, owner, date, downloads, status, id]) => (
+              <tr key={id ?? title}>
                 <td>{title}</td><td>{owner}</td><td>{date}</td><td>{downloads}</td><td><AdminStatus status={status} /></td>
-                <td className="admin-actions"><button><StudyHubIcon name="check" size={16} /></button><button><StudyHubIcon name="x" size={16} /></button><button><StudyHubIcon name="archive" size={16} /></button></td>
+                <td className="admin-actions"><button onClick={() => handleModerate(id, 'APPROVED')} type="button"><StudyHubIcon name="check" size={16} /></button><button onClick={() => handleModerate(id, 'REJECTED')} type="button"><StudyHubIcon name="x" size={16} /></button><button onClick={() => handleModerate(id, 'ARCHIVED')} type="button"><StudyHubIcon name="archive" size={16} /></button></td>
               </tr>
             ))}
           </tbody>
@@ -175,27 +221,109 @@ function AdminDocuments() {
   )
 }
 
-function AdminCourses({ onAdd, onEdit }) {
+function AdminCourses() {
+  const { error, items, loading, refresh, setError } = useAdminList(getAdminCourses)
+  const adminCourses = useMemo(() => items.map(mapAdminCourseRow), [items])
+  const [courseForm, setCourseForm] = useState(createCourseForm)
+  const [editingCourseId, setEditingCourseId] = useState(null)
+  const [showCourseForm, setShowCourseForm] = useState(false)
+
+  const handleStartAdd = () => {
+    setCourseForm(createCourseForm())
+    setEditingCourseId(null)
+    setShowCourseForm(true)
+    setError('')
+  }
+
+  const handleStartEdit = (course) => {
+    setCourseForm(createCourseForm(course))
+    setEditingCourseId(course.id)
+    setShowCourseForm(true)
+    setError('')
+  }
+
+  const handleCancelCourseForm = () => {
+    setCourseForm(createCourseForm())
+    setEditingCourseId(null)
+    setShowCourseForm(false)
+  }
+
+  const handleCourseFormChange = (event) => {
+    const { checked, name, type, value } = event.target
+    setCourseForm((current) => ({
+      ...current,
+      [name]: type === 'checkbox' ? checked : value,
+    }))
+  }
+
+  const handleSubmitCourse = (event) => runAdminAction(setError, async () => {
+    event.preventDefault()
+    const payload = buildCoursePayload(courseForm)
+    if (editingCourseId) {
+      await updateAdminCourse(editingCourseId, payload)
+    } else {
+      await createAdminCourse(payload)
+    }
+    handleCancelCourseForm()
+    await refresh()
+  })
+
+  const handleDelete = (course) => runAdminAction(setError, async () => {
+    if (!course.id || !window.confirm(`Xóa môn ${course.courseCode || course.id}?`)) return
+    await deleteAdminCourse(course.id)
+    await refresh()
+  })
+
   return (
     <main className="admin-page">
       <section className="admin-card admin-course-card">
         <AdminSectionHeader icon="book" title="Quản lý môn học">
-          <button className="admin-primary" onClick={onAdd} type="button"><StudyHubIcon name="plus" size={18} /> Thêm môn học</button>
+          <button className="admin-primary" onClick={handleStartAdd} type="button"><StudyHubIcon name="plus" size={18} /> Thêm môn học</button>
         </AdminSectionHeader>
         <div className="admin-search-row">
           <AdminSearch placeholder="Tìm kiếm môn học..." />
           <input />
         </div>
+        {showCourseForm && (
+          <form className="admin-course-form" onSubmit={handleSubmitCourse}>
+            <label>
+              <span>Mã môn học</span>
+              <input name="courseCode" onChange={handleCourseFormChange} placeholder="VD: CEA201" required value={courseForm.courseCode} />
+            </label>
+            <label>
+              <span>Tên môn học</span>
+              <input name="courseName" onChange={handleCourseFormChange} placeholder="VD: Computer Architecture" required value={courseForm.courseName} />
+            </label>
+            <label>
+              <span>Major ID</span>
+              <input min="1" name="majorId" onChange={handleCourseFormChange} placeholder="VD: 1" required type="number" value={courseForm.majorId} />
+            </label>
+            <label className="admin-course-form__wide">
+              <span>Mô tả</span>
+              <textarea name="description" onChange={handleCourseFormChange} placeholder="Mô tả ngắn về môn học" rows={3} value={courseForm.description} />
+            </label>
+            <label className="admin-course-form__toggle">
+              <input checked={courseForm.isActive} name="isActive" onChange={handleCourseFormChange} type="checkbox" />
+              <span>Đang hoạt động</span>
+            </label>
+            <div className="admin-course-form__actions">
+              <button className="admin-primary" type="submit">{editingCourseId ? 'Cập nhật môn học' : 'Lưu môn học'}</button>
+              <button className="admin-secondary" onClick={handleCancelCourseForm} type="button">Hủy</button>
+            </div>
+          </form>
+        )}
+        {loading && <p className="api-status">Đang tải môn học...</p>}
+        {error && <p className="api-status api-status--error">{formatAdminError(error)}</p>}
         <div className="course-grid">
-          {adminCourses.map(([code, name, semester, major, count]) => (
+          {adminCourses.map(([code, name, semester, major, count, course]) => (
             <article className="course-card" key={code}>
               <div>
                 <h3>{code}</h3>
                 <p>{name}</p>
               </div>
               <div className="course-actions">
-                <button onClick={onEdit} type="button"><StudyHubIcon name="edit" size={16} /></button>
-                <button type="button"><StudyHubIcon name="archive" size={16} /></button>
+                <button onClick={() => handleStartEdit(course)} type="button"><StudyHubIcon name="edit" size={16} /></button>
+                <button onClick={() => handleDelete(course)} type="button"><StudyHubIcon name="archive" size={16} /></button>
               </div>
               <div><Badge tone="purple">{semester}</Badge><Badge tone="blue">{major}</Badge></div>
               <footer><span>{count} tài liệu</span><button type="button">Xem →</button></footer>
@@ -247,12 +375,13 @@ function AdminStorage() {
 }
 
 function AdminReports() {
-  const rows = [
-    ['Nguyễn Văn A', 'Trần Thị B', 'Nội dung không phù hợp', '28/5/2024', 'pending'],
-    ['Lê Văn C', 'Phạm Văn D', 'Vi phạm bản quyền', '27/5/2024', 'rejected'],
-    ['Hoàng Thị E', 'Nguyễn Văn F', 'Spam', '26/5/2024', 'approved'],
-    ['Trần Văn G', 'Lê Thị H', 'Quấy rối', '25/5/2024', 'rejected'],
-  ]
+  const { error, items, loading, refresh, setError } = useAdminList(getAdminReports)
+  const rows = useMemo(() => items.map(mapAdminReportRow), [items])
+  const handleResolve = (reportId, status, deleteDocument = false) => runAdminAction(setError, async () => {
+    if (!reportId) return
+    await resolveAdminReport(reportId, status, deleteDocument)
+    await refresh()
+  })
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
@@ -260,9 +389,11 @@ function AdminReports() {
           <input className="admin-filter-input" />
           <AdminSearch placeholder="Tìm kiếm báo cáo..." />
         </AdminSectionHeader>
+        {loading && <p className="api-status">Đang tải báo cáo...</p>}
+        {error && <p className="api-status api-status--error">{formatAdminError(error)}</p>}
         <table className="admin-table">
           <thead><tr><th>Người báo cáo</th><th>Người vi phạm</th><th>Loại vi phạm</th><th>Ngày báo cáo</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
-          <tbody>{rows.map(([a, b, type, date, status]) => <tr key={type}><td><AdminNameCell name={a} /></td><td><AdminNameCell name={b} orange /></td><td><Badge tone="orange">{type}</Badge></td><td>{date}</td><td><AdminStatus status={status} /></td><td className="admin-actions"><button><StudyHubIcon name="eye" size={15} /></button><button><StudyHubIcon name="check" size={15} /></button><button><StudyHubIcon name="x" size={15} /></button></td></tr>)}</tbody>
+          <tbody>{rows.map(([a, b, type, date, status, id]) => <tr key={id ?? type}><td><AdminNameCell name={a} /></td><td><AdminNameCell name={b} orange /></td><td><Badge tone="orange">{type}</Badge></td><td>{date}</td><td><AdminStatus status={status} /></td><td className="admin-actions"><button type="button"><StudyHubIcon name="eye" size={15} /></button><button onClick={() => handleResolve(id, 'RESOLVED')} type="button"><StudyHubIcon name="check" size={15} /></button><button onClick={() => handleResolve(id, 'REJECTED')} type="button"><StudyHubIcon name="x" size={15} /></button></td></tr>)}</tbody>
         </table>
       </section>
     </main>
@@ -374,19 +505,185 @@ function AdminUserModal({ onClose, user }) {
   )
 }
 
-function AdminCourseModal({ mode, onClose }) {
-  const edit = mode === 'edit'
-  return (
-    <div className="admin-modal-backdrop">
-      <section className="admin-course-modal">
-        <button className="admin-modal-close" onClick={onClose} type="button">×</button>
-        <h2>{edit ? 'Chỉnh sửa môn học' : 'Thêm môn học mới'}</h2>
-        <label>Mã môn học<input placeholder="VD: CEA201" defaultValue={edit ? 'CEA201' : ''} /></label>
-        <label>Tên môn học<input placeholder="VD: Computer Architecture" defaultValue={edit ? 'Computer Architecture' : ''} /></label>
-        <label>Học kỳ<input placeholder="VD: Kỳ 3" defaultValue={edit ? 'Kỳ 3' : ''} /></label>
-        <label>Ngành<input placeholder="VD: SE" defaultValue={edit ? 'SE' : ''} /></label>
-        <footer><button onClick={onClose} type="button">Hủy</button><button className="dark-button" type="button">{edit ? 'Cập nhật' : 'Thêm môn học'}</button></footer>
-      </section>
-    </div>
-  )
+function useAdminList(loadItems) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const data = await loadItems()
+      setItems(Array.isArray(data) ? data : [])
+    } catch (requestError) {
+      setError(requestError)
+    } finally {
+      setLoading(false)
+    }
+  }, [loadItems])
+
+  useEffect(() => {
+    let active = true
+    loadItems()
+      .then((data) => {
+        if (active) setItems(Array.isArray(data) ? data : [])
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [loadItems])
+
+  return { error, items, loading, refresh, setError }
+}
+
+async function runAdminAction(setError, action) {
+  setError('')
+  try {
+    await action()
+  } catch (requestError) {
+    setError(requestError)
+  }
+}
+
+function mapAdminUser(user) {
+  const name = user.fullName || user.email || `User #${user.id ?? ''}`.trim()
+  return {
+    id: user.id,
+    initial: getInitials(name),
+    name,
+    email: user.email || '-',
+    joined: formatAdminDate(user.createdAt),
+    docs: user.planName || user.studentCode || user.roleName || '-',
+    status: mapUserStatus(user.status),
+    raw: user,
+  }
+}
+
+function mapAdminDocument(document) {
+  return {
+    id: document.id,
+    title: document.title || document.fileName || `Document #${document.id ?? ''}`.trim(),
+    owner: document.ownerEmail || '-',
+    date: formatAdminDate(document.createdAt),
+    fileSize: formatAdminFileSize(document.fileSize),
+    status: mapModerationStatus(document.moderationStatus),
+    raw: document,
+  }
+}
+
+function mapAdminDocumentRow(document) {
+  const item = mapAdminDocument(document)
+  return [item.title, item.owner, item.date, item.fileSize, item.status, item.id]
+}
+
+function mapAdminReport(report) {
+  const status = mapReportStatus(report.status)
+  return {
+    id: report.id,
+    reporter: report.reporterEmail || '-',
+    documentId: report.documentId,
+    documentTitle: report.documentTitle || `Document #${report.documentId ?? ''}`.trim(),
+    reportType: report.reportType || 'Report',
+    reportReason: report.reportReason || '',
+    status,
+    statusLabel: status,
+    date: formatAdminDate(report.createdAt),
+    raw: report,
+  }
+}
+
+function mapAdminReportRow(report) {
+  const item = mapAdminReport(report)
+  return [item.reporter, item.documentTitle, item.reportType, item.date, item.status, item.id]
+}
+
+function mapAdminCourseRow(course) {
+  return [
+    course.courseCode || `COURSE-${course.id ?? ''}`,
+    course.courseName || '-',
+    course.isActive === false ? 'Inactive' : 'Active',
+    course.major?.majorCode || course.major?.majorName || '-',
+    course.description || '-',
+    course,
+  ]
+}
+
+function createCourseForm(course = {}) {
+  return {
+    courseCode: course.courseCode || '',
+    courseName: course.courseName || '',
+    description: course.description || '',
+    majorId: course.major?.id ? String(course.major.id) : '',
+    isActive: course.isActive ?? true,
+  }
+}
+
+function buildCoursePayload(form) {
+  const majorId = Number(form.majorId)
+  if (!Number.isFinite(majorId) || majorId <= 0) {
+    throw new Error('Major ID phải là số lớn hơn 0.')
+  }
+
+  return {
+    courseCode: form.courseCode.trim(),
+    courseName: form.courseName.trim(),
+    description: form.description.trim(),
+    majorId,
+    isActive: Boolean(form.isActive),
+  }
+}
+
+function getInitials(name = '') {
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('')
+  return initials.toUpperCase() || 'U'
+}
+
+function formatAdminDate(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short' }).format(date)
+}
+
+function formatAdminFileSize(bytes = 0) {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  return `${(bytes / (1024 ** unitIndex)).toFixed(unitIndex ? 1 : 0)} ${units[unitIndex]}`
+}
+
+function formatAdminError(error) {
+  if (!error) return ''
+  if (error.status === 401 || error.status === 403) return 'Tài khoản hiện tại không có quyền admin hoặc phiên đăng nhập đã hết hạn.'
+  return error.message || 'Không thể gọi API admin.'
+}
+
+function mapUserStatus(status = '') {
+  const value = status.toLowerCase()
+  if (value.includes('ban') || value.includes('block') || value.includes('suspend')) return 'blocked'
+  if (value.includes('active')) return 'active'
+  return value || 'pending'
+}
+
+function mapModerationStatus(status = '') {
+  const value = status.toLowerCase()
+  if (value.includes('approve')) return 'approved'
+  if (value.includes('reject')) return 'rejected'
+  if (value.includes('pending')) return 'pending'
+  return value || 'pending'
+}
+
+function mapReportStatus(status = '') {
+  const value = status.toLowerCase()
+  if (value.includes('resolve') || value.includes('approve')) return 'approved'
+  if (value.includes('reject')) return 'rejected'
+  if (value.includes('pending')) return 'pending'
+  return value || 'pending'
 }

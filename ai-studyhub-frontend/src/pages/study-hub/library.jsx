@@ -358,14 +358,15 @@ function FileRow({ file, onClick, onToggleFavorite }) {
   )
 }
 
-function ShareDocumentModal({ file, loading, onClose, onSave }) {
+export function ShareDocumentModalWithAccess({ file, loading, onClose, onSave }) {
   const [copied, setCopied] = useState(false)
   const [selectedVisibility, setSelectedVisibility] = useState('PUBLIC')
   const shareUrl = `${window.location.origin}${fillRoute(ROUTES.DOCUMENT_DETAIL, { documentId: file.documentId ?? file.id })}`
   const isPublic = selectedVisibility === 'PUBLIC'
   const accessIcon = isPublic ? 'globe' : 'lock'
+  const accessDescription = ''
+  // eslint-disable-next-line no-constant-condition
   const accessTitle = isPublic ? 'Bất kỳ ai có đường liên kết' : 'Hạn chế'
-  const accessDescription = isPublic
     ? 'Bất kỳ ai có kết nối Internet và có đường liên kết này đều có thể xem'
     : 'Chỉ những người được thêm mới có thể mở'
 
@@ -429,6 +430,56 @@ function ShareDocumentModal({ file, loading, onClose, onSave }) {
 
         <button className="share-publish-button" disabled={loading} onClick={() => onSave(selectedVisibility)} type="button">
           {loading ? 'Đang lưu...' : selectedVisibility === 'PUBLIC' ? 'Đăng diễn đàn' : 'Chuyển về riêng tư'}
+        </button>
+        <button className="share-close-button" disabled={loading} onClick={onClose} type="button">Đóng</button>
+      </section>
+    </div>
+  )
+}
+
+export function ShareDocumentModal({ file, loading, onClose, onSave }) {
+  const [copied, setCopied] = useState(false)
+  const shareUrl = `${window.location.origin}${fillRoute(ROUTES.DOCUMENT_DETAIL, { documentId: file.documentId ?? file.id })}`
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1400)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <section className="share-document-modal">
+        <header>
+          <h2>Chia sẻ tài liệu</h2>
+          <button aria-label="Đóng" onClick={onClose} type="button"><StudyHubIcon name="close" size={18} /></button>
+        </header>
+
+        <div className="share-document-card">
+          <div>
+            <Badge tone="blue">{file.subject?.split(',')[0] || file.kind}</Badge>
+            <Badge>{file.kind}</Badge>
+          </div>
+          <strong>{file.name}</strong>
+        </div>
+
+        <label className="share-link-field">
+          Link tài liệu
+          <div>
+            <input readOnly value={shareUrl} />
+            <button onClick={handleCopy} type="button">
+              <StudyHubIcon name="card" size={16} />
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </label>
+
+        <button className="share-publish-button" disabled={loading} onClick={() => onSave('PUBLIC')} type="button">
+          {loading ? 'Đang lưu...' : 'Đăng diễn đàn'}
         </button>
         <button className="share-close-button" disabled={loading} onClick={onClose} type="button">Đóng</button>
       </section>

@@ -6,7 +6,9 @@ import StatsSummary from '../../components/home/StatsSummary'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { appUser, featuredDocuments, featuredFolders, recentActivities } from '../../data/studyHubData'
+import { rateDocument, updateDocumentVisibility } from '../../services/documentService'
 import { pricingPlans } from './config'
+import { ShareDocumentModal } from './library'
 import { DocumentCardMini, ExploreFolderCard, InfoLine, PageTitle, SectionTitle } from './shared'
 
 const uploadSelectFields = [
@@ -277,6 +279,44 @@ export function FolderDetailPage({ onNavigate }) {
 export function DocumentDetailPage({ document, onBack, onChat, onReport }) {
   const doc = document ?? featuredDocuments[1]
   const [favorite, setFavorite] = useState(Boolean(doc.favorite))
+  const [shareOpen, setShareOpen] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [shareError, setShareError] = useState('')
+  const [rating, setRating] = useState(0)
+  const [hoverRating, setHoverRating] = useState(0)
+  const [ratingError, setRatingError] = useState('')
+  const shareFile = {
+    id: doc.documentId ?? doc.id,
+    documentId: doc.documentId ?? doc.id,
+    name: doc.title || doc.name,
+    subject: doc.subject || doc.code,
+    kind: doc.type || 'document',
+  }
+
+  const handleShareSave = async (visibility) => {
+    if (!shareFile.id || sharing) return
+    setSharing(true)
+    setShareError('')
+    try {
+      await updateDocumentVisibility(shareFile.id, visibility)
+      setShareOpen(false)
+    } catch (requestError) {
+      setShareError(requestError.message)
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const handleRate = async (nextRating) => {
+    setRating(nextRating)
+    setRatingError('')
+    if (!shareFile.id) return
+    try {
+      await rateDocument(shareFile.id, nextRating)
+    } catch (requestError) {
+      setRatingError(requestError.message)
+    }
+  }
 
   return (
     <main className="page-surface document-detail-page">
@@ -305,10 +345,32 @@ export function DocumentDetailPage({ document, onBack, onChat, onReport }) {
           <InfoLine icon="file" label="Môn học" value={doc.subject} />
           <button className="primary-action" type="button"><StudyHubIcon name="download" size={16} /> Tải xuống</button>
           <button className="purple-button" onClick={() => onChat?.(doc)} type="button"><StudyHubIcon name="message" size={16} /> Chat với AI</button>
-          <button className="success-button" type="button"><StudyHubIcon name="share" size={16} /> Chia sẻ</button>
+          <button className="success-button" onClick={() => setShareOpen(true)} type="button"><StudyHubIcon name="share" size={16} /> Chia sẻ</button>
           <button className={`muted-button ${favorite ? 'is-active' : ''}`} onClick={() => setFavorite((value) => !value)} type="button"><StudyHubIcon name="heart" size={16} /> Yêu thích</button>
           <button className="danger-outline" onClick={onReport} type="button"><StudyHubIcon name="flag" size={16} /> Báo cáo</button>
           <div className="rating-row">☆ ☆ ☆ ☆ ☆</div>
+          <div className="doc-action-stack">
+            <button className="doc-action-button doc-action-button--download" type="button"><StudyHubIcon name="download" size={16} /> Tải xuống</button>
+            <button className="doc-action-button doc-action-button--chat" onClick={() => onChat?.(doc)} type="button"><StudyHubIcon name="message" size={16} /> Chat với AI</button>
+            <button className="doc-action-button doc-action-button--share" onClick={() => setShareOpen(true)} type="button"><StudyHubIcon name="share" size={16} /> Chia sẻ</button>
+            <button className={`doc-action-button doc-action-button--favorite ${favorite ? 'is-active' : ''}`} onClick={() => setFavorite((value) => !value)} type="button"><StudyHubIcon name="heart" size={16} /> Yêu thích</button>
+            <button className="doc-action-button doc-action-button--report" onClick={onReport} type="button"><StudyHubIcon name="flag" size={16} /> Báo cáo</button>
+          </div>
+          <div className="detail-rating-row" onMouseLeave={() => setHoverRating(0)}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                aria-label={`Đánh giá ${star} sao`}
+                className={star <= (hoverRating || rating) ? 'is-active' : ''}
+                key={star}
+                onClick={() => handleRate(star)}
+                onMouseEnter={() => setHoverRating(star)}
+                type="button"
+              >
+                <StudyHubIcon name="star" size={22} />
+              </button>
+            ))}
+          </div>
+          {ratingError && <p className="api-status api-status--error">{ratingError}</p>}
         </aside>
       </div>
       <section className="comments-card">
@@ -322,6 +384,15 @@ export function DocumentDetailPage({ document, onBack, onChat, onReport }) {
         <textarea placeholder="Viết bình luận của bạn..." />
         <button className="primary-action" type="button">Gửi bình luận</button>
       </section>
+      {shareError && <p className="api-status api-status--error">{shareError}</p>}
+      {shareOpen && (
+        <ShareDocumentModal
+          file={shareFile}
+          loading={sharing}
+          onClose={() => setShareOpen(false)}
+          onSave={handleShareSave}
+        />
+      )}
     </main>
   )
 }
