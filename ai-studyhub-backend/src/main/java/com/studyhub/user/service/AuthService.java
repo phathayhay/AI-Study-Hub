@@ -62,10 +62,6 @@ public class AuthService {
     public void register(RegisterRequest request) {
         log.info("Registering user with email: {}", request.getEmail());
 
-        // 0. Validate Password Confirmation
-        if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
-            throw new IllegalArgumentException("Mật khẩu xác nhận không trùng khớp");
-        }
 
         // 1. Determine Verification Status based on Email Domain
         String email = request.getEmail().trim().toLowerCase();
