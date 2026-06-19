@@ -118,22 +118,21 @@ public class AuthService {
                 .plan(freePlan)
                 .role(userRole)
                 .currentSemester(null)
-                .status(UserStatus.ACTIVE) // Temporarily ACTIVE directly for testing/creation
+                .status(UserStatus.INACTIVE) // Requires email verification
                 .verificationStatus(initialVerificationStatus)
                 .build();
  
          userRepository.save(user);
  
-         // Temporarily disabled verification email for testing
-         /*
+         // Generate email verification token and send verification email
          try {
              String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
              String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
              emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
          } catch (Exception e) {
-             log.error("Failed to send verification email to {}: {}. Registration will proceed, but user must be verified manually.", user.getEmail(), e.getMessage());
+             log.error("Failed to send verification email to {}: {}", user.getEmail(), e.getMessage());
+             throw new IllegalStateException("Không thể gửi email xác nhận tài khoản: " + e.getMessage());
          }
-         */
      }
 
     /**
