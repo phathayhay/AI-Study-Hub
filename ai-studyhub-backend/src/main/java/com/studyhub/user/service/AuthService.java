@@ -130,8 +130,7 @@ public class AuthService {
              String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
              emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
          } catch (Exception e) {
-             log.error("Failed to send verification email to {}: {}", user.getEmail(), e.getMessage());
-             throw new IllegalStateException("Could not send email verification: " + e.getMessage());
+             log.warn("Failed to send verification email to {}: {}. Registration will proceed, but user must be verified manually in the database.", user.getEmail(), e.getMessage());
          }
      }
 
