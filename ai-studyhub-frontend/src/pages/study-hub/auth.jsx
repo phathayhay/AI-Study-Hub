@@ -122,6 +122,7 @@ export function RegisterPage({ onNavigate, onRegister }) {
         fullName: form.fullName.trim(),
         email: form.email.trim(),
         password: form.password,
+        confirmPassword: form.confirmPassword,
       })
       onRegister(session)
     } catch (requestError) {
