@@ -125,9 +125,13 @@ public class AuthService {
         userRepository.save(user);
 
         // Generate email verification token and send verification email
-        String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
-        String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
-        emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
+        try {
+            String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
+            String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
+            emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
+        } catch (Exception e) {
+            log.error("Failed to send verification email to {}: {}. Registration will proceed, but user must be verified manually.", user.getEmail(), e.getMessage());
+        }
     }
 
     /**
