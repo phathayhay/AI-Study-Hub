@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import { studyTabs } from '../../data/studyHubData'
+import AIChat from '../../features/ai/AIChat'
 import {
   generateFlashcards,
   generateQuiz,
@@ -48,7 +49,11 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
   }, [isResizing])
 
   useEffect(() => {
-    if (!documentId) return undefined
+    if (!documentId) {
+      setSummary(null)
+      setSummaryChecked(true)
+      return undefined
+    }
     let active = true
     setLoading(true)
     // Load quizzes separately (still used by quiz tab)
@@ -68,7 +73,8 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
         }
       })
       .catch((requestError) => {
-        if (active) setError(requestError.message)
+        if (!active) return
+        setError(requestError.message)
       })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -276,6 +282,7 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
           </aside>
         </div>
       </main>
+      <AIChat documentId={documentId} documentTitle={file?.name || file?.attachmentName || 'Document'} />
     </div>
   )
 }

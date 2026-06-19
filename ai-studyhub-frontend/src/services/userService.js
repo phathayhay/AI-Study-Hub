@@ -11,3 +11,9 @@ export function verifyStudent(file) {
   formData.append('file', file)
   return apiPost('/users/verify-student', formData)
 }
+
+export function verifyStudent(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return apiPost('/api/users/verify-student', formData)
+}

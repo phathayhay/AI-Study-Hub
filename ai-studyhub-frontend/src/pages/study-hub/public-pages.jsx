@@ -5,8 +5,14 @@ import HeroSearch from '../../components/home/HeroSearch'
 import StatsSummary from '../../components/home/StatsSummary'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
+<<<<<<< HEAD
+import { appUser, featuredDocuments, featuredFolders, recentActivities } from '../../data/studyHubData'
+import { rateDocument, updateDocumentVisibility } from '../../services/documentService'
+=======
 import { appUser, featuredDocuments, featuredFolders, recentActivities, majors, popularCourses } from '../../data/studyHubData'
+>>>>>>> c2cf9c45eb1274b6727995722b1ef621e12d5eaa
 import { pricingPlans } from './config'
+import { ShareDocumentModal } from './library'
 import { DocumentCardMini, ExploreFolderCard, InfoLine, PageTitle, SectionTitle } from './shared'
 import { 
   getMyDocuments, getDocument, uploadDocument, searchDocuments,
@@ -804,6 +810,15 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
           {commentsLoading ? 'Đang gửi...' : 'Gửi bình luận'}
         </button>
       </section>
+      {shareError && <p className="api-status api-status--error">{shareError}</p>}
+      {shareOpen && (
+        <ShareDocumentModal
+          file={shareFile}
+          loading={sharing}
+          onClose={() => setShareOpen(false)}
+          onSave={handleShareSave}
+        />
+      )}
     </main>
   )
 }

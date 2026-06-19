@@ -238,6 +238,28 @@ export default function StudyHubApp() {
     }
   }, [user, role, route])
 
+  useEffect(() => {
+    if (route !== 'doc-detail' || !params.documentId || params.documentId === 'featured') return undefined
+
+    if (location.state?.file) {
+      setDetailFile(location.state.file)
+      return undefined
+    }
+
+    let active = true
+    setDetailFile(createLoadingPublicDocument(params.documentId))
+    getDocumentDetails(params.documentId)
+      .then((document) => {
+        if (active) setDetailFile(mapPublicDocument(document))
+      })
+      .catch(() => {
+        if (active) setDetailFile(createUnavailablePublicDocument(params.documentId))
+      })
+    return () => {
+      active = false
+    }
+  }, [location.state, params.documentId, route])
+
   const navigate = (nextRoute) => {
     if (nextRoute === 'logout') { handleLogout(); return }
     if (nextRoute === 'settings') { setShowSettings(true); return }
@@ -377,6 +399,32 @@ export default function StudyHubApp() {
       params: { file: activeFile }
     })
     navigate('study')
+  }
+
+  const openLibraryFile = (file) => {
+    if (file.public) {
+      const nextFile = mapLibraryPublicDocument(file)
+      setSelectedFile(null)
+      setDetailFile(nextFile)
+      routerNavigate(
+        fillRoute(ROUTES.DOCUMENT_DETAIL, { documentId: nextFile.documentId }),
+        { state: { file: nextFile, from: location.pathname } },
+      )
+      return
+    }
+
+    setSelectedFile(file)
+  }
+
+  const openDetailStudyFile = (document) => {
+    const nextFile = mapPublicStudyDocument(document)
+    setStudyTab('original')
+    setStudyMode('default')
+    setStudyFile(nextFile)
+    routerNavigate(
+      fillRoute(ROUTES.STUDY_DOCUMENT, { documentId: nextFile.documentId }),
+      { state: { file: nextFile, from: location.pathname } },
+    )
   }
 
   const handleStudyUpload = (file) => {
