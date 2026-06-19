@@ -1,527 +1,1493 @@
 import { useEffect, useMemo, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
-import { fillRoute, ROUTES } from '../../constants/routes'
 import { libraryTabs } from './config'
-import {
-  createFolder,
-  deleteFolder,
-  getFolderDetails,
-  getRootFolders,
-  renameFolder,
-} from '../../services/folderService'
-import {
-  addDocumentFavorite,
+import { 
+  getMyDocuments, 
+  getSharedDocuments, 
   deleteDocument,
-  getMyDocuments,
-  removeDocumentFavorite,
-  updateDocumentVisibility,
-} from '../../services/documentService'
+  getFavoriteDocuments, 
+  getHistoryDocuments,
+  moveDocument,
+  shareDocument,
+  updateDocumentVisibility
+} from '../../features/documents/documentService'
+import { 
+  getRootFolders, 
+  getFolder,
+  createFolder, 
+  renameFolder, 
+  deleteFolder,
+  moveFolder
+} from '../../features/folders/folderService'
 
-export function LibraryPage({ activeTab, onNavigate, onOpenFile, onTabChange }) {
+function getItemGroup(dateStr) {
+  if (!dateStr) return 'Older'
+  const date = new Date(dateStr)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  
+  const diffTime = Math.abs(today - date)
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today'
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday'
+  } else if (diffDays <= 7) {
+    return 'This Week'
+  } else {
+    return 'Older'
+  }
+}
+
+function mapDoc(doc) {
+  const dateObj = doc.createdAt ? new Date(doc.createdAt) : new Date()
+  const monthNames = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
+  const month = monthNames[dateObj.getMonth()];
+  const day = dateObj.getDate();
+  const year = dateObj.getFullYear();
+  const displayDate = `${month} ${day < 10 ? '0' + day : day}, ${year}`;
+
+  let docName = doc.title || doc.fileName || 'Untitled';
+  try {
+    const localRenames = JSON.parse(localStorage.getItem('renamedDocs') || '{}');
+    if (localRenames[doc.id]) {
+      docName = localRenames[doc.id];
+    }
+  } catch (e) {
+    console.error('Failed to parse renamedDocs', e);
+  }
+  
+  return {
+    id: doc.id,
+    name: docName,
+    subject: doc.fileType || 'Document',
+    kind: 'document',
+    type: 'session',
+    group: getItemGroup(doc.createdAt),
+    date: displayDate,
+    time: displayDate,
+    shared: doc.visibility === 'PUBLIC',
+    public: doc.visibility === 'PUBLIC',
+    favorite: false,
+    fileUrl: doc.fileUrl || '',
+    folderId: doc.folderId,
+    createdAt: doc.createdAt
+  }
+}
+
+export function LibraryPage({
+  activeTab,
+  onNavigate,
+  onOpenFile,
+  onTabChange,
+  user,
+  onRemoveRecentItem,
+  onPurgeStaleRecent,
+  initialFolderId,
+  onClearInitialFolderId
+}) {
   const [selectedFolder, setSelectedFolder] = useState(null)
-  const [folders, setFolders] = useState([])
-  const [documents, setDocuments] = useState([])
+  const [selectedFolderDetails, setSelectedFolderDetails] = useState(null)
+  const [folderLoading, setFolderLoading] = useState(false)
   const [openFolderMenuId, setOpenFolderMenuId] = useState(null)
   const [openFileMenuId, setOpenFileMenuId] = useState(null)
-  const [shareFile, setShareFile] = useState(null)
-  const [sharing, setSharing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState('lastAccessed')
+  const [apiDocs, setApiDocs] = useState([])
+  const [apiSharedDocs, setApiSharedDocs] = useState([])
+  const [apiFavoriteDocs, setApiFavoriteDocs] = useState([])
+  const [apiHistoryDocs, setApiHistoryDocs] = useState([])
+  const [apiFolders, setApiFolders] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+
+  // Pin & Move states
+  const [pinnedIds, setPinnedIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pinnedItems')
+      return new Set(saved ? JSON.parse(saved) : [])
+    } catch (e) {
+      return new Set()
+    }
+  })
+  const [moveItem, setMoveItem] = useState(null)
+  const [shareItem, setShareItem] = useState(null)
+
+  const loadLibraryData = () => {
+    setLoading(true)
+    Promise.all([
+      getMyDocuments().catch(() => ({ data: [] })),
+      getSharedDocuments().catch(() => ({ data: [] })),
+      getRootFolders().catch(() => ({ data: [] })),
+      getFavoriteDocuments().catch(() => ({ data: [] })),
+      getHistoryDocuments().catch(() => ({ data: [] })),
+    ]).then(([myRes, sharedRes, folderRes, favRes, histRes]) => {
+      const myList = Array.isArray(myRes) ? myRes : (Array.isArray(myRes?.data) ? myRes.data : myRes?.data?.content || [])
+      const sharedList = Array.isArray(sharedRes) ? sharedRes : (Array.isArray(sharedRes?.data) ? sharedRes.data : sharedRes?.data?.content || [])
+      const folderList = Array.isArray(folderRes) ? folderRes : (Array.isArray(folderRes?.data) ? folderRes.data : folderRes?.data?.content || [])
+      const favList = Array.isArray(favRes) ? favRes : (Array.isArray(favRes?.data) ? favRes.data : favRes?.data?.content || [])
+      const histList = Array.isArray(histRes) ? histRes : (Array.isArray(histRes?.data) ? histRes.data : histRes?.data?.content || [])
+      
+      setApiDocs(myList.map(doc => ({ ...mapDoc(doc), favorite: favList.some(f => f.id === doc.id) })))
+      setApiSharedDocs(sharedList.map(mapDoc))
+      setApiFavoriteDocs(favList.map(doc => ({ ...mapDoc(doc), favorite: true })))
+      setApiHistoryDocs(histList.map(mapDoc))
+      
+      const mappedFolders = folderList.map(f => {
+        const dateObj = f.createdAt ? new Date(f.createdAt) : new Date()
+        const monthNames = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
+        const month = monthNames[dateObj.getMonth()];
+        const day = dateObj.getDate();
+        const year = dateObj.getFullYear();
+        const displayDate = `${month} ${day < 10 ? '0' + day : day}, ${year}`;
+        return {
+          id: f.id,
+          name: f.folderName || f.name || 'Untitled Folder',
+          count: f.documents?.length || f.documentCount || 0,
+          date: displayDate,
+          time: displayDate,
+          group: getItemGroup(f.createdAt),
+          type: 'folder',
+          isFolder: true,
+          createdAt: f.createdAt
+        }
+      })
+      setApiFolders(mappedFolders)
+
+      // Purge any stale Recent entries for documents that no longer exist
+      const allDocIds = [
+        ...myList.map(d => d.id),
+        ...sharedList.map(d => d.id),
+      ]
+      onPurgeStaleRecent?.(allDocIds)
+    }).catch(err => {
+      console.error('Failed to load library data:', err)
+    }).finally(() => setLoading(false))
+  }
 
   useEffect(() => {
-    let active = true
-    Promise.all([getRootFolders(), getMyDocuments()])
-      .then(([folderData, documentData]) => {
-        if (!active) return
-        setFolders(folderData.map(mapFolder))
-        setDocuments(documentData.map(mapDocument))
-      })
-      .catch((requestError) => {
-        if (active) setError(requestError.message)
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
+    loadLibraryData()
   }, [])
 
-  const visibleDocuments = useMemo(() => {
-    if (activeTab === 'shared') return documents.filter((document) => document.public)
-    if (activeTab === 'favorites') return documents.filter((document) => document.favorite)
-    return activeTab === 'recent' ? documents : documents.slice(0, 4)
-  }, [activeTab, documents])
-
-  const tabCounts = useMemo(() => ({
-    sessions: documents.length,
-    shared: documents.filter((document) => document.public).length,
-    favorites: documents.filter((document) => document.favorite).length,
-    folders: folders.length,
-    recent: documents.length,
-  }), [documents, folders])
-
-  const runRequest = async (request) => {
-    setError('')
-    try {
-      await request()
-    } catch (requestError) {
-      setError(requestError.message)
+  // Reset folder selection when switching tabs (unless we are opening an initial folder)
+  useEffect(() => {
+    if (!initialFolderId) {
+      setSelectedFolder(null)
+      setSelectedFolderDetails(null)
     }
-  }
+  }, [activeTab, initialFolderId])
 
-  const handleAddFolder = () => runRequest(async () => {
-    const folderName = window.prompt('Nhập tên thư mục mới')?.trim()
-    if (!folderName) return
-    const createdFolder = mapFolder(await createFolder(folderName))
-    setFolders((current) => [...current, createdFolder])
-    setSelectedFolder(null)
-    onTabChange('folders')
-  })
+  useEffect(() => {
+    if (initialFolderId) {
+      handleSelectFolder({ id: initialFolderId, name: 'Đang tải...' })
+      onClearInitialFolderId?.()
+    }
+  }, [initialFolderId])
 
-  const handleRenameFolder = (folder) => runRequest(async () => {
-    const folderName = window.prompt('Nhập tên thư mục mới', folder.name)?.trim()
-    if (!folderName) return
-    const updated = mapFolder(await renameFolder(folder.id, folderName, folder.parentFolderId))
-    setFolders((current) => current.map((item) => item.id === folder.id ? updated : item))
-    setSelectedFolder((current) => current?.id === folder.id ? { ...current, ...updated } : current)
-    setOpenFolderMenuId(null)
-  })
-
-  const handleDeleteFolder = (folder) => runRequest(async () => {
-    if (!window.confirm(`Xóa thư mục "${folder.name}" và toàn bộ nội dung?`)) return
-    await deleteFolder(folder.id)
-    setFolders((current) => current.filter((item) => item.id !== folder.id))
-    if (selectedFolder?.id === folder.id) setSelectedFolder(null)
-    setOpenFolderMenuId(null)
-  })
-
-  const handleOpenFolder = (folder) => runRequest(async () => {
-    const details = await getFolderDetails(folder.id)
-    setSelectedFolder({
-      ...mapFolder(details),
-      documents: (details.documents ?? []).map(mapDocument),
-      subfolders: (details.subfolders ?? []).map(mapFolder),
-    })
-  })
-
-  const handleDeleteDocument = (file) => runRequest(async () => {
-    if (!window.confirm(`Xóa tài liệu "${file.name}"?`)) return
-    await deleteDocument(file.id)
-    setDocuments((current) => current.filter((item) => item.id !== file.id))
-    setSelectedFolder((current) => current
-      ? { ...current, documents: current.documents.filter((item) => item.id !== file.id) }
-      : current)
-    setOpenFileMenuId(null)
-  })
-
-  const updateDocumentState = (updatedDocument) => {
-    setDocuments((current) => current.map((item) => (
-      item.id === updatedDocument.id ? { ...item, ...updatedDocument } : item
-    )))
-    setSelectedFolder((current) => current
-      ? {
-        ...current,
-        documents: current.documents.map((item) => (
-          item.id === updatedDocument.id ? { ...item, ...updatedDocument } : item
-        )),
+  useEffect(() => {
+    const handleGlobalClick = (e) => {
+      if (!e.target.closest('.file-action-menu') && !e.target.closest('.more-btn')) {
+        setOpenFileMenuId(null)
+        setOpenFolderMenuId(null)
       }
-      : current)
-  }
-
-  const handleToggleFavorite = (file) => runRequest(async () => {
-    const updated = file.favorite
-      ? await removeDocumentFavorite(file.id)
-      : await addDocumentFavorite(file.id)
-    updateDocumentState(mapDocument(updated))
-  })
-
-  const handleOpenShare = (file) => {
-    setOpenFileMenuId(null)
-    setShareFile(file)
-  }
-
-  const handleUpdateDocumentVisibility = (visibility) => runRequest(async () => {
-    if (!shareFile || sharing) return
-    setSharing(true)
-    try {
-      const updated = mapDocument(await updateDocumentVisibility(shareFile.id, visibility))
-      updateDocumentState(updated)
-      setShareFile(null)
-      if (visibility === 'PUBLIC') onTabChange('shared')
-    } finally {
-      setSharing(false)
     }
-  })
+    document.addEventListener('click', handleGlobalClick)
+    return () => document.removeEventListener('click', handleGlobalClick)
+  }, [])
+
+  const handleSelectFolder = (folder) => {
+    setSelectedFolder(folder)
+    setSelectedFolderDetails(null)
+    setFolderLoading(true)
+    getFolder(folder.id)
+      .then((res) => {
+        const data = res?.data || res
+        setSelectedFolderDetails({
+          id: data.id || folder.id,
+          name: data.folderName || data.name || folder.name,
+          documents: data.documents || [],
+          subfolders: data.subfolders || []
+        })
+      })
+      .catch((err) => {
+        console.error(err)
+      })
+      .finally(() => {
+        setFolderLoading(false)
+      })
+  }
+
+  const handleAddFolder = () => {
+    const name = window.prompt('Nhập tên thư mục mới:')?.trim()
+    if (!name) return
+    setLoading(true)
+    createFolder(name)
+      .then(() => {
+        loadLibraryData()
+        onTabChange('folders')
+        window.showToast?.('Đã tạo thư mục mới thành công', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+        window.showToast?.('Tạo thư mục thất bại', 'error')
+      })
+  }
+
+  const handleAddSubfolder = (parentFolder) => {
+    const name = window.prompt(`Nhập tên thư mục con trong "${parentFolder.name}":`)
+    if (!name?.trim()) return
+    setFolderLoading(true)
+    createFolder(name.trim(), parentFolder.id)
+      .then(() => {
+        handleSelectFolder(parentFolder)
+        loadLibraryData()
+        window.showToast?.('Đã tạo thư mục con thành công', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setFolderLoading(false)
+        window.showToast?.('Tạo thư mục con thất bại', 'error')
+      })
+  }
+
+  const handleTogglePin = (item) => {
+    const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
+    const key = `${item.id}_${isFolder ? 'folder' : 'document'}`
+    setPinnedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+        window.showToast?.('Đã bỏ ghim tài nguyên', 'success')
+      } else {
+        next.add(key)
+        window.showToast?.('Đã ghim tài nguyên thành công', 'success')
+      }
+      localStorage.setItem('pinnedItems', JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  const handleShareItem = (item) => {
+    const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
+    if (isFolder) {
+      window.showToast?.('Không hỗ trợ chia sẻ thư mục', 'info')
+      return
+    }
+    setShareItem(item)
+  }
+
+  const handleRenameItem = (item) => {
+    const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
+    const nextName = window.prompt(`Nhập tên ${isFolder ? 'thư mục' : 'tài liệu'} mới:`, item.name)?.trim()
+    if (!nextName) return
+
+    if (isFolder) {
+      setLoading(true)
+      renameFolder(item.id, nextName)
+        .then(() => {
+          loadLibraryData()
+          if (selectedFolder && selectedFolder.id === item.id) {
+            setSelectedFolder({ ...selectedFolder, name: nextName })
+          }
+          window.showToast?.('Đổi tên thư mục thành công', 'success')
+        })
+        .catch((err) => {
+          console.error(err)
+          setLoading(false)
+          window.showToast?.('Đổi tên thư mục thất bại', 'error')
+        })
+    } else {
+      try {
+        const localRenames = JSON.parse(localStorage.getItem('renamedDocs') || '{}')
+        localRenames[item.id] = nextName
+        localStorage.setItem('renamedDocs', JSON.stringify(localRenames))
+        
+        loadLibraryData()
+        if (selectedFolder) {
+          handleSelectFolder(selectedFolder)
+        }
+        window.showToast?.('Đổi tên tài liệu thành công', 'success')
+      } catch (err) {
+        console.error('Failed to rename document locally', err)
+        window.showToast?.('Đổi tên tài liệu thất bại', 'error')
+      }
+    }
+    setOpenFileMenuId(null)
+    setOpenFolderMenuId(null)
+  }
+
+  const handleDeleteFolder = (folder) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa thư mục "${folder.name}" không?`)) return
+    setLoading(true)
+    deleteFolder(folder.id)
+      .then(() => {
+        loadLibraryData()
+        onRemoveRecentItem?.(folder.id, 'folder')
+        if (selectedFolder?.id === folder.id) {
+          setSelectedFolder(null)
+          setSelectedFolderDetails(null)
+        }
+        window.showToast?.('Đã xóa thư mục thành công', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+        window.showToast?.('Xóa thư mục thất bại', 'error')
+      })
+    setOpenFolderMenuId(null)
+  }
+
+  const handleDeleteLibraryFile = (file) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${file.name}" không?`)) return
+    setLoading(true)
+    deleteDocument(file.id)
+      .then(() => {
+        loadLibraryData()
+        onRemoveRecentItem?.(file.id)
+        if (selectedFolder) {
+          handleSelectFolder(selectedFolder)
+        }
+        window.showToast?.('Đã xóa tài liệu thành công', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+        window.showToast?.('Xóa tài liệu thất bại', 'error')
+      })
+    setOpenFileMenuId(null)
+  }
+
+  const handleDeleteFolderFile = (folder, file) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${file.name}" khỏi thư mục không?`)) return
+    setLoading(true)
+    deleteDocument(file.id)
+      .then(() => {
+        onRemoveRecentItem?.(file.id)
+        handleSelectFolder(folder)
+        loadLibraryData()
+        window.showToast?.('Đã xóa tài liệu thành công', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+        window.showToast?.('Xóa tài liệu khỏi thư mục thất bại', 'error')
+      })
+    setOpenFileMenuId(null)
+  }
+
+  const handleDeleteItem = (item) => {
+    const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
+    if (isFolder) {
+      handleDeleteFolder(item)
+    } else {
+      if (selectedFolder) {
+        handleDeleteFolderFile(selectedFolder, item)
+      } else {
+        handleDeleteLibraryFile(item)
+      }
+    }
+  }
+
+  const handleConfirmMove = (destFolderId) => {
+    if (!moveItem) return
+    const isFolder = moveItem.isFolder || moveItem.type === 'folder' || moveItem.kind === 'folder'
+    
+    if (isFolder && destFolderId === moveItem.id) {
+      window.showToast?.('Không thể di chuyển thư mục vào chính nó', 'error')
+      return
+    }
+
+    setLoading(true)
+    const movePromise = isFolder 
+      ? moveFolder(moveItem.id, moveItem.name, destFolderId)
+      : moveDocument(moveItem.id, destFolderId)
+
+    movePromise
+      .then(() => {
+        window.showToast?.('Di chuyển tài nguyên thành công', 'success')
+        setMoveItem(null)
+        loadLibraryData()
+        if (selectedFolder) {
+          handleSelectFolder(selectedFolder)
+        }
+      })
+      .catch((err) => {
+        console.error(err)
+        window.showToast?.('Di chuyển tài nguyên thất bại', 'error')
+      })
+      .finally(() => setLoading(false))
+  }
+
+  const handleOpenFile = (item) => {
+    if (item.isFolder || item.type === 'folder') {
+      handleSelectFolder(item)
+    } else {
+      const activeFile = {
+        id: item.id,
+        name: item.name,
+        attachmentName: item.name,
+        subject: item.subject || 'Document',
+        content: '',
+        fileUrl: item.fileUrl || '',
+      }
+      onOpenFile?.(activeFile)
+    }
+  }
+
+  // Study sessions tab: Combine folders and root documents
+  const combinedItems = useMemo(() => {
+    const rootDocs = apiDocs.filter(d => !d.folderId)
+    const combined = [...apiFolders, ...rootDocs]
+    
+    return combined.map(item => {
+      const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
+      const isPinned = pinnedIds.has(`${item.id}_${isFolder ? 'folder' : 'document'}`)
+      return {
+        ...item,
+        group: isPinned ? 'Pinned' : item.group
+      }
+    }).sort((a, b) => {
+      if (a.group === 'Pinned' && b.group !== 'Pinned') return -1
+      if (a.group !== 'Pinned' && b.group === 'Pinned') return 1
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name)
+      } else {
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return timeB - timeA
+      }
+    })
+  }, [apiDocs, apiFolders, sortBy, pinnedIds])
+
+  const filteredCombinedItems = useMemo(() => {
+    return combinedItems.filter(item => 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  }, [combinedItems, searchQuery])
+
+  const filteredSharedDocs = useMemo(() => {
+    return apiSharedDocs.map(item => {
+      const isPinned = pinnedIds.has(`${item.id}_document`)
+      return { ...item, group: isPinned ? 'Pinned' : item.group }
+    }).filter(doc => 
+      doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ).sort((a, b) => {
+      if (a.group === 'Pinned' && b.group !== 'Pinned') return -1
+      if (a.group !== 'Pinned' && b.group === 'Pinned') return 1
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })
+  }, [apiSharedDocs, searchQuery, sortBy, pinnedIds])
+
+  const filteredFavoriteDocs = useMemo(() => {
+    return apiFavoriteDocs.map(item => {
+      const isPinned = pinnedIds.has(`${item.id}_document`)
+      return { ...item, group: isPinned ? 'Pinned' : item.group }
+    }).filter(doc => 
+      doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ).sort((a, b) => {
+      if (a.group === 'Pinned' && b.group !== 'Pinned') return -1
+      if (a.group !== 'Pinned' && b.group === 'Pinned') return 1
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })
+  }, [apiFavoriteDocs, searchQuery, sortBy, pinnedIds])
+
+  const filteredHistoryDocs = useMemo(() => {
+    return apiHistoryDocs.map(item => {
+      const isPinned = pinnedIds.has(`${item.id}_document`)
+      return { ...item, group: isPinned ? 'Pinned' : item.group }
+    }).filter(doc => 
+      doc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ).sort((a, b) => {
+      if (a.group === 'Pinned' && b.group !== 'Pinned') return -1
+      if (a.group !== 'Pinned' && b.group === 'Pinned') return 1
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })
+  }, [apiHistoryDocs, searchQuery, sortBy, pinnedIds])
+
+  const filteredFoldersOnly = useMemo(() => {
+    return apiFolders.map(item => {
+      const isPinned = pinnedIds.has(`${item.id}_folder`)
+      return { ...item, group: isPinned ? 'Pinned' : item.group }
+    }).filter(folder => 
+      folder.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ).sort((a, b) => {
+      if (a.group === 'Pinned' && b.group !== 'Pinned') return -1
+      if (a.group !== 'Pinned' && b.group === 'Pinned') return 1
+      if (sortBy === 'name') return a.name.localeCompare(b.name)
+      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    })
+  }, [apiFolders, searchQuery, sortBy, pinnedIds])
+
+  const customStyles = `
+    .hover-action-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      border-radius: 6px;
+      transition: all 0.15s;
+    }
+    .hover-action-btn:hover {
+      color: #4f46e5;
+      background-color: #f0f0fb;
+    }
+    .file-action-menu button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 14px;
+      text-align: left;
+      border: none;
+      background: transparent;
+      font-size: 13.5px;
+      cursor: pointer;
+      border-radius: 6px;
+      color: #374151;
+      transition: background 0.15s;
+    }
+    .file-action-menu button:hover {
+      background-color: #f3f4f6;
+    }
+    .file-action-menu button.danger:hover {
+      background-color: #fee2e2;
+      color: #ef4444;
+    }
+  `
 
   return (
-    <div className="library-shell">
-      <LibraryRail activeTab={activeTab} counts={tabCounts} onNavigate={onNavigate} onTabChange={onTabChange} />
-      <main className="library-main">
-        <div className="library-header">
-          <div><h1>Thư viện của bạn</h1></div>
-          <div className="library-actions">
-            <label>Sort: <select><option>Last accessed</option></select></label>
-            <button className="square-button" onClick={() => onNavigate('upload')} type="button">
-              <StudyHubIcon name="upload" size={18} />
-            </button>
-            <button className="primary-action" onClick={handleAddFolder} type="button">
-              <StudyHubIcon name="plus" size={18} /> Folder
-            </button>
+    <div style={{ flex: 1, backgroundColor: '#fff', overflowY: 'auto' }}>
+      <style>{customStyles}</style>
+      <main style={{ maxWidth: '1100px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px', padding: '28px 32px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justify: 'space-between', gap: '16px' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: 600, color: '#0f172a', margin: 0, whiteSpace: 'nowrap' }}>
+            Hello, <span style={{ fontWeight: 700 }}>{user?.fullName || 'Sinh viên!'}</span>
+          </h1>
+          
+          <div style={{ flex: 1, maxWidth: '520px', display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 14px', height: '38px', gap: '8px' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input
+              placeholder="Search by title or content type..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ border: 'none', outline: 'none', width: '100%', fontSize: '13.5px', color: '#0f172a', background: 'transparent' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap' }}>
+            <label style={{ fontSize: '13.5px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Sort:&nbsp;
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ border: 'none', background: 'transparent', color: '#4f46e5', fontWeight: 600, fontSize: '13.5px', cursor: 'pointer', outline: 'none' }}
+              >
+                <option value="lastAccessed">Last accessed</option>
+                <option value="name">Name</option>
+              </select>
+            </label>
+            {!selectedFolder && (
+              <button style={{ height: '34px', padding: '0 14px', backgroundColor: '#fff', color: '#4f46e5', border: '1.5px solid #818cf8', borderRadius: '8px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }} onClick={handleAddFolder} type="button">
+                <StudyHubIcon name="plus" size={14} /> Folder
+              </button>
+            )}
           </div>
         </div>
-        <div className="search-line library-search">
-          <StudyHubIcon name="search" size={18} />
-          <input placeholder="Search by title or content type..." />
-        </div>
-        {loading && <p className="api-status">Đang tải thư viện...</p>}
-        {error && <p className="api-status api-status--error">{error}</p>}
 
-        {activeTab === 'folders' ? (
+        <div style={{ flex: 1 }}>
+        {loading ? (
+          <div style={{ padding: '64px', textAlign: 'center', color: '#64748b' }}>
+            Đang tải dữ liệu...
+          </div>
+        ) : activeTab === 'folders' ? (
           selectedFolder ? (
             <FolderFilesView
-              files={selectedFolder.documents ?? []}
-              folder={selectedFolder}
-              onBack={() => setSelectedFolder(null)}
-              onDeleteFile={handleDeleteDocument}
-              onOpenFile={onOpenFile}
-              onShareFile={handleOpenShare}
-              onToggleFavorite={handleToggleFavorite}
+              folder={selectedFolderDetails || selectedFolder}
+              subfolders={selectedFolderDetails?.subfolders || []}
+              files={selectedFolderDetails?.documents || []}
+              loading={folderLoading}
+              onBack={() => { setSelectedFolder(null); setSelectedFolderDetails(null); }}
+              onDeleteFile={handleDeleteItem}
+              onRenameFile={handleRenameItem}
+              onOpenFile={handleOpenFile}
               onToggleFileMenu={setOpenFileMenuId}
               openFileMenuId={openFileMenuId}
+              onSelectSubfolder={handleSelectFolder}
+              onAddSubfolder={() => handleAddSubfolder(selectedFolderDetails || selectedFolder)}
+              pinnedIds={pinnedIds}
+              onPin={handleTogglePin}
+              onMove={setMoveItem}
+              onShare={handleShareItem}
             />
           ) : (
-            <FolderGrid
-              folders={folders}
-              onDeleteFolder={handleDeleteFolder}
-              onRenameFolder={handleRenameFolder}
-              onSelectFolder={handleOpenFolder}
-              onToggleMenu={setOpenFolderMenuId}
-              openMenuId={openFolderMenuId}
+            <GroupedFolders
+              folders={filteredFoldersOnly}
+              onDeleteFolder={handleDeleteItem}
+              onOpenFolder={handleSelectFolder}
+              onRenameFolder={handleRenameItem}
+              onToggleFolderMenu={setOpenFolderMenuId}
+              openFolderMenuId={openFolderMenuId}
+              pinnedIds={pinnedIds}
+              onPin={handleTogglePin}
+              onMove={setMoveItem}
+              onShare={handleShareItem}
             />
           )
-        ) : (
-          <DocumentList
-            files={visibleDocuments}
-            onDeleteFile={handleDeleteDocument}
-            onOpenFile={onOpenFile}
-            onShareFile={handleOpenShare}
-            onToggleFavorite={handleToggleFavorite}
+        ) : activeTab === 'shared' ? (
+          <SharedLibraryFiles
+            allFiles={filteredSharedDocs}
+            onDeleteFile={handleDeleteItem}
+            onOpenFile={handleOpenFile}
+            onRenameFile={handleRenameItem}
             onToggleFileMenu={setOpenFileMenuId}
             openFileMenuId={openFileMenuId}
+            pinnedIds={pinnedIds}
+            onPin={handleTogglePin}
+            onMove={setMoveItem}
+            onShare={handleShareItem}
+          />
+        ) : activeTab === 'favorites' ? (
+          <SharedLibraryFiles
+            allFiles={filteredFavoriteDocs}
+            onDeleteFile={handleDeleteItem}
+            onOpenFile={handleOpenFile}
+            onRenameFile={handleRenameItem}
+            onToggleFileMenu={setOpenFileMenuId}
+            openFileMenuId={openFileMenuId}
+            pinnedIds={pinnedIds}
+            onPin={handleTogglePin}
+            onMove={setMoveItem}
+            onShare={handleShareItem}
+          />
+        ) : activeTab === 'recent' ? (
+          <SharedLibraryFiles
+            allFiles={filteredHistoryDocs}
+            onDeleteFile={handleDeleteItem}
+            onOpenFile={handleOpenFile}
+            onRenameFile={handleRenameItem}
+            onToggleFileMenu={setOpenFileMenuId}
+            openFileMenuId={openFileMenuId}
+            pinnedIds={pinnedIds}
+            onPin={handleTogglePin}
+            onMove={setMoveItem}
+            onShare={handleShareItem}
+          />
+        ) : selectedFolder ? (
+          <FolderFilesView
+            folder={selectedFolderDetails || selectedFolder}
+            subfolders={selectedFolderDetails?.subfolders || []}
+            files={selectedFolderDetails?.documents || []}
+            loading={folderLoading}
+            onBack={() => { setSelectedFolder(null); setSelectedFolderDetails(null); }}
+            onDeleteFile={handleDeleteItem}
+            onRenameFile={handleRenameItem}
+            onOpenFile={handleOpenFile}
+            onToggleFileMenu={setOpenFileMenuId}
+            openFileMenuId={openFileMenuId}
+            onSelectSubfolder={handleSelectFolder}
+            onAddSubfolder={() => handleAddSubfolder(selectedFolderDetails || selectedFolder)}
+            pinnedIds={pinnedIds}
+            onPin={handleTogglePin}
+            onMove={setMoveItem}
+            onShare={handleShareItem}
+          />
+        ) : (
+          <GroupedFiles
+            files={filteredCombinedItems}
+            onDeleteFile={handleDeleteItem}
+            onOpenFile={handleOpenFile}
+            onRenameFile={handleRenameItem}
+            onToggleFileMenu={setOpenFileMenuId}
+            openFileMenuId={openFileMenuId}
+            pinnedIds={pinnedIds}
+            onPin={handleTogglePin}
+            onMove={setMoveItem}
+            onShare={handleShareItem}
           />
         )}
-        {shareFile && (
-          <ShareDocumentModal
-            file={shareFile}
-            loading={sharing}
-            onClose={() => setShareFile(null)}
-            onSave={handleUpdateDocumentVisibility}
-          />
-        )}
-      </main>
-    </div>
-  )
-}
-
-function FolderGrid({ folders, onDeleteFolder, onRenameFolder, onSelectFolder, onToggleMenu, openMenuId }) {
-  return (
-    <div className="folder-library-grid">
-      {folders.map((folder) => (
-        <article className="library-folder" key={folder.id} onClick={() => onSelectFolder(folder)} role="button" tabIndex={0}>
-          <button
-            className="folder-menu-trigger"
-            onClick={(event) => {
-              event.stopPropagation()
-              onToggleMenu(openMenuId === folder.id ? null : folder.id)
-            }}
-            type="button"
-          >
-            ...
-          </button>
-          {openMenuId === folder.id && (
-            <div className="folder-action-menu" onClick={(event) => event.stopPropagation()}>
-              <button onClick={() => onRenameFolder(folder)} type="button">Đổi tên</button>
-              <button className="is-danger" onClick={() => onDeleteFolder(folder)} type="button">Xóa folder</button>
-            </div>
-          )}
-          <span><StudyHubIcon name="folder" size={26} /></span>
-          <h3>{folder.name}</h3>
-          <p>{folder.count} documents</p>
-          <small>{folder.date}</small>
-        </article>
-      ))}
-    </div>
-  )
-}
-
-function FolderFilesView({ files, folder, onBack, onDeleteFile, onOpenFile, onShareFile, onToggleFavorite, onToggleFileMenu, openFileMenuId }) {
-  return (
-    <section className="folder-files-view">
-      <header className="folder-files-header">
-        <button className="text-link" onClick={onBack} type="button">← Back to folders</button>
-        <div>
-          <span><StudyHubIcon name="folder" size={26} /></span>
-          <div><h2>{folder.name}</h2><p>{files.length} files · {folder.date}</p></div>
         </div>
-      </header>
-      <DocumentList
-        files={files}
-        onDeleteFile={onDeleteFile}
-        onOpenFile={onOpenFile}
-        onShareFile={onShareFile}
-        onToggleFavorite={onToggleFavorite}
-        onToggleFileMenu={onToggleFileMenu}
-        openFileMenuId={openFileMenuId}
+      </main>
+
+      <MoveModal 
+        isOpen={!!moveItem} 
+        onClose={() => setMoveItem(null)} 
+        item={moveItem} 
+        folders={apiFolders} 
+        onMove={handleConfirmMove} 
       />
+
+      <ShareModal
+        isOpen={!!shareItem}
+        onClose={() => setShareItem(null)}
+        item={shareItem}
+        onShare={shareDocument}
+        onUpdateVisibility={updateDocumentVisibility}
+        onSuccess={() => {
+          loadLibraryData()
+          if (selectedFolder) {
+            handleSelectFolder(selectedFolder)
+          }
+        }}
+      />
+    </div>
+  )
+}
+
+function FolderFilesView({
+  folder,
+  subfolders = [],
+  files = [],
+  loading = false,
+  onBack,
+  onDeleteFile,
+  onOpenFile,
+  onRenameFile,
+  onToggleFileMenu,
+  openFileMenuId,
+  onSelectSubfolder,
+  onAddSubfolder,
+  pinnedIds,
+  onPin,
+  onMove,
+  onShare
+}) {
+  if (loading) {
+    return (
+      <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+        Đang tải dữ liệu...
+      </div>
+    )
+  }
+
+  const combined = [
+    ...subfolders.map(sf => {
+      const dateObj = sf.createdAt ? new Date(sf.createdAt) : new Date()
+      const monthNames = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
+      const month = monthNames[dateObj.getMonth()];
+      const day = dateObj.getDate();
+      const year = dateObj.getFullYear();
+      const displayDate = `${month} ${day < 10 ? '0' + day : day}, ${year}`;
+      return {
+        id: sf.id,
+        name: sf.folderName || sf.name || 'Untitled Folder',
+        type: 'folder',
+        isFolder: true,
+        date: displayDate,
+        time: displayDate,
+        createdAt: sf.createdAt
+      }
+    }),
+    ...files.map(f => mapDoc(f))
+  ].map(item => {
+    const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
+    const isPinned = pinnedIds?.has(`${item.id}_${isFolder ? 'folder' : 'document'}`)
+    return {
+      ...item,
+      group: isPinned ? 'Pinned' : item.group
+    }
+  })
+
+  // Group items by date
+  const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
+  const grouped = groups.map(g => ({
+    label: g,
+    items: combined.filter(item => {
+      const grp = item.group
+      return grp === g
+    })
+  })).filter(g => g.items.length > 0)
+
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+      {/* Breadcrumb header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+        <button
+          onClick={onBack}
+          style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '13.5px', fontWeight: 500, padding: '4px 0', display: 'flex', alignItems: 'center' }}
+        >
+          Home
+        </button>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        <span style={{ fontSize: '13.5px', fontWeight: 500, color: '#0f172a' }}>{folder.name}</span>
+        {onAddSubfolder && (
+          <button
+            onClick={onAddSubfolder}
+            type="button"
+            title="Tạo thư mục con"
+            style={{ marginLeft: 'auto', height: '32px', padding: '0 12px', backgroundColor: '#fff', color: '#4f46e5', border: '1.5px solid #818cf8', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
+          >
+            <StudyHubIcon name="plus" size={13} />
+            Folder
+          </button>
+        )}
+      </div>
+
+      {/* Content card */}
+      <div style={{ border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff' }}>
+        {combined.length === 0 ? (
+          <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
+            Thư mục này trống
+          </div>
+        ) : (
+          grouped.map(({ label, items }) => (
+            <div key={label}>
+              {/* Group header row - lavender like Mindgrasp */}
+              <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+                {label}
+              </div>
+              {items.map((item) => {
+                const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
+                const isPinned = pinnedIds?.has(`${item.id}_${isFolder ? 'folder' : 'document'}`)
+                return (
+                  <ActionableFileRow
+                    key={item.id}
+                    file={item}
+                    isFolder={isFolder}
+                    isPinned={isPinned}
+                    onPin={onPin}
+                    onMove={onMove}
+                    onShare={onShare}
+                    onDelete={onDeleteFile}
+                    onOpenFile={onOpenFile}
+                    onRename={onRenameFile}
+                    onToggleFileMenu={onToggleFileMenu}
+                    openFileMenuId={openFileMenuId}
+                  />
+                )
+              })}
+            </div>
+          ))
+        )}
+      </div>
     </section>
   )
 }
 
-function DocumentList({ files, onDeleteFile, onOpenFile, onShareFile, onToggleFavorite, onToggleFileMenu, openFileMenuId }) {
-  if (!files.length) return <div className="quiz-empty-card">Không có tài liệu</div>
+function ActionableFileRow({ 
+  file, 
+  isFolder, 
+  onDelete, 
+  onOpenFile, 
+  onRename, 
+  onPin, 
+  onMove, 
+  onShare, 
+  onToggleFileMenu, 
+  openFileMenuId,
+  isPinned
+}) {
+  const isActualFolder = isFolder || file.type === 'folder' || file.kind === 'folder';
+  const [hovered, setHovered] = useState(false)
   return (
-    <div className="file-list">
-      <section>
-        <h2>Documents</h2>
-        {files.map((file) => (
-          <div className="folder-file-row" key={file.id}>
-            <FileRow file={file} onClick={() => onOpenFile(file)} onToggleFavorite={onToggleFavorite} />
-            <button className="file-menu-trigger" onClick={() => onToggleFileMenu(openFileMenuId === file.id ? null : file.id)} type="button">...</button>
-            {openFileMenuId === file.id && (
-              <div className="file-action-menu">
-                <button onClick={() => onShareFile(file)} type="button">Chia sẻ</button>
-                <button className="is-danger" onClick={() => onDeleteFile(file)} type="button">Xóa file</button>
-              </div>
+    <div
+      style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '100%', backgroundColor: (hovered || openFileMenuId === file.id) ? '#f4f4fc' : '#fff', transition: 'background 0.15s', borderBottom: '1px solid #f0f0f8' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => {
+        setHovered(false)
+        if (openFileMenuId === file.id) {
+          onToggleFileMenu(null)
+        }
+      }}
+    >
+      <FileRow file={file} isFolder={isActualFolder} onClick={() => onOpenFile(file)} hovered={hovered} />
+      
+      {/* Inline Hover Action Buttons */}
+      {hovered && openFileMenuId !== file.id && (
+        <div style={{ position: 'absolute', right: '40px', display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: '#f4f4fc', paddingLeft: '8px', zIndex: 10 }}>
+          <button 
+            className="hover-action-btn" 
+            onClick={(e) => { e.stopPropagation(); onPin(file) }} 
+            type="button" 
+            title={isPinned ? 'Unpin' : 'Pin'} 
+            style={isPinned ? { color: '#6366f1', backgroundColor: '#f0f0fb' } : undefined}
+          >
+            <StudyHubIcon name="pin" size={15} />
+          </button>
+          <button 
+            className="hover-action-btn" 
+            onClick={(e) => { e.stopPropagation(); onMove(file) }} 
+            type="button" 
+            title="Move"
+          >
+            <StudyHubIcon name="move" size={15} />
+          </button>
+          <button 
+            className="hover-action-btn" 
+            onClick={(e) => { e.stopPropagation(); onDelete(file) }} 
+            type="button" 
+            title="Delete"
+          >
+            <StudyHubIcon name="trash" size={15} />
+          </button>
+          {!isActualFolder && (
+            <button 
+              className="hover-action-btn" 
+              onClick={(e) => { e.stopPropagation(); onShare(file) }} 
+              type="button" 
+              title="Share"
+            >
+              <StudyHubIcon name="share" size={15} />
+            </button>
+          )}
+          <button 
+            className="hover-action-btn" 
+            onClick={(e) => { e.stopPropagation(); onRename(file) }} 
+            type="button" 
+            title="Rename"
+          >
+            <StudyHubIcon name="edit" size={15} />
+          </button>
+        </div>
+      )}
+
+      {/* Ellipsis Menu Trigger */}
+      <button
+        className="more-btn"
+        onMouseEnter={() => onToggleFileMenu(file.id)}
+        onClick={(e) => { e.stopPropagation(); onToggleFileMenu(openFileMenuId === file.id ? null : file.id) }}
+        type="button"
+        style={{ 
+          position: 'absolute', 
+          right: '12px', 
+          background: 'transparent', 
+          border: 'none', 
+          color: (hovered || openFileMenuId === file.id) ? '#6366f1' : '#94a3b8', 
+          cursor: 'pointer', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          padding: '6px', 
+          borderRadius: '6px', 
+          transition: 'color 0.15s',
+          zIndex: 11
+        }}
+      >
+        <StudyHubIcon name="more-vertical" size={18} />
+      </button>
+
+      {/* Ellipsis Dropdown Menu */}
+      {openFileMenuId === file.id && (
+        <div className="file-action-menu" style={{ position: 'absolute', right: '12px', top: '100%', zIndex: 20, backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)', padding: '6px', display: 'flex', flexDirection: 'column', minWidth: '160px' }}>
+          <button onClick={() => { onPin(file); onToggleFileMenu(null); }} type="button">
+            <StudyHubIcon name="pin" size={14} style={{ color: isPinned ? '#6366f1' : 'inherit' }} /> {isPinned ? 'Unpin' : 'Pin'}
+          </button>
+          <button onClick={() => { onMove(file); onToggleFileMenu(null); }} type="button">
+            <StudyHubIcon name="move" size={14} /> Move
+          </button>
+          <button className="danger" onClick={() => { onDelete(file); onToggleFileMenu(null); }} type="button">
+            <StudyHubIcon name="trash" size={14} /> Delete
+          </button>
+          {!isActualFolder && (
+            <button onClick={() => { onShare(file); onToggleFileMenu(null); }} type="button">
+              <StudyHubIcon name="share" size={14} /> Share
+            </button>
+          )}
+          <button onClick={() => { onRename(file); onToggleFileMenu(null); }} type="button">
+            <StudyHubIcon name="edit" size={14} /> Rename
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GroupedFiles({ 
+  files, 
+  onDeleteFile, 
+  onOpenFile, 
+  onRenameFile, 
+  onToggleFileMenu, 
+  openFileMenuId,
+  pinnedIds,
+  onPin,
+  onMove,
+  onShare
+}) {
+  const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+      {groups.map((group) => {
+        const groupFiles = files.filter((file) => file.group === group)
+        if (groupFiles.length === 0) return null;
+        return (
+          <div key={group}>
+            {/* Lavender group header — Mindgrasp style */}
+            <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+              {group}
+            </div>
+            {groupFiles.map((file) => (
+              <ActionableFileRow
+                file={file}
+                key={file.id}
+                isFolder={false}
+                isPinned={pinnedIds?.has(`${file.id}_document`)}
+                onPin={onPin}
+                onMove={onMove}
+                onShare={onShare}
+                onDelete={onDeleteFile}
+                onOpenFile={onOpenFile}
+                onRename={onRenameFile}
+                onToggleFileMenu={onToggleFileMenu}
+                openFileMenuId={openFileMenuId}
+              />
+            ))}
+          </div>
+        )
+      })}
+      {files.length === 0 && (
+        <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+          Không tìm thấy tài nguyên nào
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GroupedFolders({ 
+  folders, 
+  onDeleteFolder, 
+  onOpenFolder, 
+  onRenameFolder, 
+  onToggleFolderMenu, 
+  openFolderMenuId,
+  pinnedIds,
+  onPin,
+  onMove,
+  onShare
+}) {
+  const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff' }}>
+      {groups.map((group) => {
+        const groupFolders = folders.filter((folder) => folder.group === group)
+        if (groupFolders.length === 0) return null;
+        return (
+          <div key={group}>
+            {/* Lavender group header — Mindgrasp style */}
+            <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+              {group}
+            </div>
+            {groupFolders.map((folder) => (
+              <ActionableFileRow
+                file={folder}
+                key={folder.id}
+                isFolder={true}
+                isPinned={pinnedIds?.has(`${folder.id}_folder`)}
+                onPin={onPin}
+                onMove={onMove}
+                onShare={onShare}
+                onDelete={onDeleteFolder}
+                onOpenFile={onOpenFolder}
+                onRename={onRenameFolder}
+                onToggleFileMenu={onToggleFolderMenu}
+                openFileMenuId={openFolderMenuId}
+              />
+            ))}
+          </div>
+        )
+      })}
+      {folders.length === 0 && (
+        <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+          Không tìm thấy thư mục nào
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SharedLibraryFiles({ 
+  allFiles, 
+  onDeleteFile, 
+  onOpenFile, 
+  onRenameFile, 
+  onToggleFileMenu, 
+  openFileMenuId,
+  pinnedIds,
+  onPin,
+  onMove,
+  onShare
+}) {
+  const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
+  const files = allFiles || []
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff' }}>
+      {groups.map((group) => {
+        const groupFiles = files.filter((file) => file.group === group)
+        if (groupFiles.length === 0) return null;
+        return (
+          <div key={group}>
+            {/* Lavender group header — Mindgrasp style */}
+            <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+              {group}
+            </div>
+            {groupFiles.map((file) => (
+              <ActionableFileRow
+                file={file}
+                key={file.id}
+                isFolder={false}
+                isPinned={pinnedIds?.has(`${file.id}_document`)}
+                onPin={onPin}
+                onMove={onMove}
+                onShare={onShare}
+                onDelete={onDeleteFile}
+                onOpenFile={onOpenFile}
+                onRename={onRenameFile}
+                onToggleFileMenu={onToggleFileMenu}
+                openFileMenuId={openFileMenuId}
+              />
+            ))}
+          </div>
+        )
+      })}
+      {files.length === 0 && (
+        <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
+          Không tìm thấy tài nguyên nào
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FileRow({ file, isFolder, onClick, hovered }) {
+  const isActualFolder = isFolder || file.type === 'folder' || file.kind === 'folder';
+  return (
+    <button
+      onClick={onClick}
+      type="button"
+      style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '13px 20px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+    >
+      <div style={{ color: '#818cf8', marginRight: '14px', flexShrink: 0 }}>
+        <StudyHubIcon name={isActualFolder ? 'folder' : 'file'} size={20} />
+      </div>
+      <span style={{ flex: 1, fontSize: '13.5px', fontWeight: 500, color: '#4f46e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: hovered ? 'underline' : 'none' }}>
+        {file.name}
+      </span>
+      <span style={{ width: '110px', fontSize: '12.5px', color: '#94a3b8', flexShrink: 0 }}>
+        {isActualFolder ? 'folder' : 'session'}
+      </span>
+      <span style={{ width: '110px', fontSize: '12.5px', color: '#94a3b8', textAlign: 'right', paddingRight: '36px', flexShrink: 0, opacity: hovered ? 0 : 1, transition: 'opacity 0.15s' }}>
+        {file.time || ''}
+      </span>
+    </button>
+  )
+}
+
+function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
+  const [currentFolder, setCurrentFolder] = useState(null)
+  const [currentSubfolders, setCurrentSubfolders] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [breadcrumbs, setBreadcrumbs] = useState([])
+
+  useEffect(() => {
+    if (!isOpen) return
+    setCurrentFolder(null)
+    setBreadcrumbs([])
+    setCurrentSubfolders(folders.filter(f => f.id !== item?.id)) // exclude self
+  }, [isOpen, folders, item])
+
+  const navigateToFolder = (folder) => {
+    if (folder.id === item?.id) return // cannot move into self
+    setLoading(true)
+    getFolder(folder.id)
+      .then((res) => {
+        const data = res?.data || res
+        setCurrentFolder(folder)
+        setBreadcrumbs(prev => [...prev, folder])
+        setCurrentSubfolders((data.subfolders || []).filter(f => f.id !== item?.id))
+      })
+      .catch((err) => {
+        console.error(err)
+        window.showToast?.('Không thể tải thư mục con', 'error')
+      })
+      .finally(() => setLoading(false))
+  }
+
+  const navigateUp = () => {
+    const nextBreadcrumbs = [...breadcrumbs]
+    nextBreadcrumbs.pop()
+    setBreadcrumbs(nextBreadcrumbs)
+
+    if (nextBreadcrumbs.length === 0) {
+      setCurrentFolder(null)
+      setCurrentSubfolders(folders.filter(f => f.id !== item?.id))
+    } else {
+      const parentFolder = nextBreadcrumbs[nextBreadcrumbs.length - 1]
+      setLoading(true)
+      getFolder(parentFolder.id)
+        .then((res) => {
+          const data = res?.data || res
+          setCurrentFolder(parentFolder)
+          setCurrentSubfolders((data.subfolders || []).filter(f => f.id !== item?.id))
+        })
+        .catch((err) => {
+          console.error(err)
+        })
+        .finally(() => setLoading(false))
+    }
+  }
+
+  if (!isOpen || !item) return null
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(4px)' }}>
+      <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', width: '90%', maxWidth: '480px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', margin: 0 }}>Di chuyển tài nguyên</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}>&times;</button>
+        </header>
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: '260px', maxHeight: '380px', overflowY: 'auto' }}>
+          <p style={{ fontSize: '13.5px', color: '#475569', margin: 0 }}>
+            Di chuyển <strong>{item.name}</strong> tới:
+          </p>
+          
+          {/* Path Navigator / Breadcrumbs */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+            <button onClick={() => { setCurrentFolder(null); setBreadcrumbs([]); setCurrentSubfolders(folders.filter(f => f.id !== item?.id)); }} style={{ background: 'none', border: 'none', padding: 0, fontSize: '13px', fontWeight: currentFolder === null ? 600 : 500, color: currentFolder === null ? '#4f46e5' : '#64748b', cursor: 'pointer' }}>Root</button>
+            {breadcrumbs.map((b, index) => (
+              <span key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b' }}>
+                <span>&rsaquo;</span>
+                <button onClick={() => {
+                  const nextB = breadcrumbs.slice(0, index + 1)
+                  setBreadcrumbs(nextB)
+                  navigateToFolder(b)
+                }} style={{ background: 'none', border: 'none', padding: 0, fontSize: '13px', fontWeight: index === breadcrumbs.length - 1 ? 600 : 500, color: index === breadcrumbs.length - 1 ? '#4f46e5' : '#64748b', cursor: 'pointer' }}>{b.name || b.folderName}</button>
+              </span>
+            ))}
+          </div>
+
+          {/* Subfolders list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', minHeight: '160px' }}>
+            {breadcrumbs.length > 0 && (
+              <button onClick={navigateUp} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', border: 'none', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#4f46e5' }}>
+                <span>&larr; Quay lại thư mục cha</span>
+              </button>
+            )}
+            
+            {loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: '#94a3b8', fontSize: '13px' }}>Đang tải thư mục con...</div>
+            ) : currentSubfolders.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: '#94a3b8', fontSize: '13px', fontStyle: 'italic' }}>Không có thư mục con nào ở đây</div>
+            ) : (
+              currentSubfolders.map(sub => (
+                <button key={sub.id} onClick={() => navigateToFolder(sub)} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '10px 14px', border: 'none', background: '#fff', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#f8fafc'} onMouseLeave={(e) => e.target.style.backgroundColor = '#fff'}>
+                  <span style={{ color: '#818cf8', display: 'flex', alignItems: 'center' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
+                  </span>
+                  <span style={{ fontSize: '13.5px', color: '#334155', fontWeight: 500 }}>{sub.folderName || sub.name}</span>
+                </button>
+              ))
             )}
           </div>
-        ))}
-      </section>
-    </div>
-  )
-}
-
-function LibraryRail({ activeTab, counts, onNavigate, onTabChange }) {
-  return (
-    <aside className="library-rail">
-      <button className="new-session" onClick={() => onNavigate('new-study-session')} type="button">
-        <StudyHubIcon name="plus" size={18} /> New Study Session
-      </button>
-      <nav className="library-tabs">
-        {libraryTabs.map((tab) => (
-          <button className={activeTab === tab.id ? 'is-active' : ''} key={tab.id} onClick={() => onTabChange(tab.id)} type="button">
-            <StudyHubIcon name={tab.icon} size={20} />
-            <span>{tab.label}</span>
-            <small>{counts[tab.id] ?? 0}</small>
-          </button>
-        ))}
-      </nav>
-      <div className="upgrade-card">
-        <span><StudyHubIcon name="book" size={24} /></span>
-        <p>Upgrade for more features</p>
-        <button onClick={() => onNavigate('pricing')} type="button">Upgrade</button>
+        </div>
+        <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '12px 20px', backgroundColor: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+          <button onClick={onClose} style={{ height: '36px', padding: '0 16px', background: 'transparent', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>Hủy</button>
+          <button onClick={() => onMove(currentFolder?.id || null)} style={{ height: '36px', padding: '0 16px', backgroundColor: '#4f46e5', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Di chuyển tới đây</button>
+        </footer>
       </div>
-    </aside>
-  )
-}
-
-function FileRow({ file, onClick, onToggleFavorite }) {
-  const handleKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onClick()
-    }
-  }
-
-  return (
-    <div className="file-row" onClick={onClick} onKeyDown={handleKeyDown} role="button" tabIndex={0}>
-      <span className="file-row__icon"><StudyHubIcon name="file" size={24} /></span>
-      <span className="file-row__title"><strong>{file.name}</strong><small>{file.subject}</small></span>
-      <span className="file-row__badges">
-        {file.public && <Badge tone="green">Public</Badge>}
-        <Badge tone="purple">{file.kind}</Badge>
-        <small>{file.date}</small>
-        <button
-          aria-label={file.favorite ? `Bỏ yêu thích ${file.name}` : `Yêu thích ${file.name}`}
-          className={`icon-button file-favorite-button ${file.favorite ? 'is-active' : ''}`}
-          onClick={(event) => {
-            event.stopPropagation()
-            onToggleFavorite(file)
-          }}
-          type="button"
-        >
-          <StudyHubIcon name="heart" size={18} />
-        </button>
-      </span>
     </div>
   )
 }
 
-export function ShareDocumentModalWithAccess({ file, loading, onClose, onSave }) {
-  const [copied, setCopied] = useState(false)
-  const [selectedVisibility, setSelectedVisibility] = useState('PUBLIC')
-  const shareUrl = `${window.location.origin}${fillRoute(ROUTES.DOCUMENT_DETAIL, { documentId: file.documentId ?? file.id })}`
-  const isPublic = selectedVisibility === 'PUBLIC'
-  const accessIcon = isPublic ? 'globe' : 'lock'
-  const accessDescription = ''
-  // eslint-disable-next-line no-constant-condition
-  const accessTitle = isPublic ? 'Bất kỳ ai có đường liên kết' : 'Hạn chế'
-    ? 'Bất kỳ ai có kết nối Internet và có đường liên kết này đều có thể xem'
-    : 'Chỉ những người được thêm mới có thể mở'
+function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSuccess }) {
+  const [email, setEmail] = useState('')
+  const [visibility, setVisibility] = useState('PRIVATE')
+  const [loading, setLoading] = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1400)
-    } catch {
-      setCopied(false)
-    }
+  useEffect(() => {
+    if (!isOpen || !item) return
+    setEmail('')
+    setIsCopied(false)
+    setVisibility(item.public || item.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE')
+  }, [isOpen, item])
+
+  if (!isOpen || !item) return null
+
+  const handleAddPerson = (e) => {
+    e.preventDefault()
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) return
+
+    setLoading(true)
+    onShare(item.id, trimmedEmail, 'VIEW')
+      .then(() => {
+        window.showToast?.(`Shared with ${trimmedEmail} successfully`, 'success')
+        setEmail('')
+        onSuccess?.()
+      })
+      .catch((err) => {
+        console.error(err)
+        window.showToast?.(err.message || 'Failed to share document', 'error')
+      })
+      .finally(() => setLoading(false))
+  }
+
+  const handleSaveVisibility = () => {
+    setSaveLoading(true)
+    onUpdateVisibility(item.id, visibility)
+      .then(() => {
+        window.showToast?.('Updated visibility successfully', 'success')
+        onSuccess?.()
+        onClose()
+      })
+      .catch((err) => {
+        console.error(err)
+        window.showToast?.(err.message || 'Failed to update visibility', 'error')
+      })
+      .finally(() => setSaveLoading(false))
+  }
+
+  const handleCopyLink = () => {
+    const docLink = item.fileUrl || `${window.location.origin}/?route=doc-detail&id=${item.id}`
+    navigator.clipboard.writeText(docLink)
+      .then(() => {
+        setIsCopied(true)
+        window.showToast?.('Copied document link to clipboard', 'success')
+        setTimeout(() => setIsCopied(false), 2000)
+      })
+      .catch((err) => {
+        console.error(err)
+        window.showToast?.('Failed to copy link', 'error')
+      })
   }
 
   return (
-    <div className="modal-backdrop">
-      <section className="share-document-modal">
-        <header>
-          <h2>Chia sẻ tài liệu</h2>
-          <button aria-label="Đóng" onClick={onClose} type="button"><StudyHubIcon name="close" size={18} /></button>
-        </header>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(4px)' }}>
+      <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', width: '90%', maxWidth: '460px', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '24px', gap: '20px', position: 'relative' }}>
+        
+        {/* Close Button */}
+        <button onClick={onClose} style={{ position: 'absolute', right: '20px', top: '20px', background: 'none', border: 'none', fontSize: '22px', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', transition: 'color 0.2s' }} onMouseEnter={(e) => e.target.style.color = '#4f46e5'} onMouseLeave={(e) => e.target.style.color = '#94a3b8'}>
+          &times;
+        </button>
 
-        <div className="share-document-card">
-          <div>
-            <Badge tone="blue">{file.subject?.split(',')[0] || file.kind}</Badge>
-            <Badge>{file.kind}</Badge>
+        {/* Title */}
+        <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0f172a', margin: 0, paddingRight: '30px', lineHeight: 1.4 }}>
+          Share "{item.name}"
+        </h3>
+
+        {/* General Access */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            General access
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            {/* Toggle Button Segmented Control */}
+            <div style={{ display: 'flex', border: '1.5px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', height: '36px', width: '80px', flexShrink: 0 }}>
+              <button 
+                type="button" 
+                onClick={() => setVisibility('PRIVATE')} 
+                style={{ 
+                  flex: 1, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  backgroundColor: visibility === 'PRIVATE' ? '#4f46e5' : '#fff', 
+                  color: visibility === 'PRIVATE' ? '#fff' : '#94a3b8',
+                  transition: 'all 0.2s'
+                }}
+                title="Restricted"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setVisibility('PUBLIC')} 
+                style={{ 
+                  flex: 1, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  border: 'none', 
+                  cursor: 'pointer', 
+                  backgroundColor: visibility === 'PUBLIC' ? '#4f46e5' : '#fff', 
+                  color: visibility === 'PUBLIC' ? '#fff' : '#94a3b8',
+                  transition: 'all 0.2s'
+                }}
+                title="Anyone with the link"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+              </button>
+            </div>
+
+            {/* Description Text */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                {visibility === 'PUBLIC' ? 'Anyone with the link' : 'Restricted'}
+              </span>
+              <span style={{ fontSize: '12px', color: '#64748b' }}>
+                {visibility === 'PUBLIC' 
+                  ? 'Anyone on the internet with this link can view.' 
+                  : 'Only the people you invite can view.'}
+              </span>
+            </div>
           </div>
-          <strong>{file.name}</strong>
         </div>
 
-        <label className="share-link-field">
-          Link tài liệu
-          <div>
-            <input readOnly value={shareUrl} />
-            <button onClick={handleCopy} type="button">
-              <StudyHubIcon name="card" size={16} />
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-        </label>
-
-        <span className="share-access-label">Quyền truy cập chung</span>
-        <label className={`share-access ${isPublic ? 'is-public' : ''}`}>
-          <span><StudyHubIcon name={accessIcon} size={18} /></span>
-          <div>
-            <strong>
-              {accessTitle}
-              <StudyHubIcon name="chevron" size={14} />
-            </strong>
-            <small>{accessDescription}</small>
-          </div>
-          <select
-            aria-label="Quyền truy cập chung"
-            disabled={loading}
-            onChange={(event) => setSelectedVisibility(event.target.value)}
-            value={selectedVisibility}
+        {/* Add People */}
+        <form onSubmit={handleAddPerson} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Add people
+          </label>
+          <input
+            type="email"
+            required
+            placeholder="Enter email address to share with"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ width: '100%', height: '40px', padding: '0 14px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13.5px', outline: 'none', color: '#0f172a', transition: 'border-color 0.2s' }}
+            onFocus={(e) => e.target.style.borderColor = '#4f46e5'}
+            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+          />
+          <button 
+            type="submit" 
+            disabled={loading || !email.trim()}
+            style={{ width: '100%', height: '38px', backgroundColor: (loading || !email.trim()) ? '#94a3b8' : '#889ab5', border: 'none', borderRadius: '8px', fontSize: '13.5px', fontWeight: 600, color: '#fff', cursor: (loading || !email.trim()) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'background-color 0.2s' }}
+            onMouseEnter={(e) => { if (!loading && email.trim()) e.target.style.backgroundColor = '#6e829d' }}
+            onMouseLeave={(e) => { if (!loading && email.trim()) e.target.style.backgroundColor = '#889ab5' }}
           >
-            <option value="PRIVATE">Hạn chế</option>
-            <option value="PUBLIC">Bất kỳ ai có đường liên kết</option>
-          </select>
-        </label>
+            {loading ? 'Adding...' : 'Add'}
+          </button>
+        </form>
 
-        <button className="share-publish-button" disabled={loading} onClick={() => onSave(selectedVisibility)} type="button">
-          {loading ? 'Đang lưu...' : selectedVisibility === 'PUBLIC' ? 'Đăng diễn đàn' : 'Chuyển về riêng tư'}
-        </button>
-        <button className="share-close-button" disabled={loading} onClick={onClose} type="button">Đóng</button>
-      </section>
-    </div>
-  )
-}
-
-export function ShareDocumentModal({ file, loading, onClose, onSave }) {
-  const [copied, setCopied] = useState(false)
-  const shareUrl = `${window.location.origin}${fillRoute(ROUTES.DOCUMENT_DETAIL, { documentId: file.documentId ?? file.id })}`
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1400)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  return (
-    <div className="modal-backdrop">
-      <section className="share-document-modal">
-        <header>
-          <h2>Chia sẻ tài liệu</h2>
-          <button aria-label="Đóng" onClick={onClose} type="button"><StudyHubIcon name="close" size={18} /></button>
-        </header>
-
-        <div className="share-document-card">
-          <div>
-            <Badge tone="blue">{file.subject?.split(',')[0] || file.kind}</Badge>
-            <Badge>{file.kind}</Badge>
-          </div>
-          <strong>{file.name}</strong>
+        {/* Footer Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+          <button 
+            type="button" 
+            onClick={handleCopyLink}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px', padding: '0 16px', background: 'transparent', border: '1.5px solid #6366f1', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#6366f1', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={(e) => { e.target.style.backgroundColor = '#f0f2ff' }}
+            onMouseLeave={(e) => { e.target.style.backgroundColor = 'transparent' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            {isCopied ? 'Copied' : 'Copy link'}
+          </button>
+          
+          <button 
+            type="button" 
+            onClick={handleSaveVisibility}
+            disabled={saveLoading}
+            style={{ height: '36px', padding: '0 20px', backgroundColor: saveLoading ? '#94a3b8' : '#889ab5', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: saveLoading ? 'default' : 'pointer', transition: 'background-color 0.2s' }}
+            onMouseEnter={(e) => { if (!saveLoading) e.target.style.backgroundColor = '#6e829d' }}
+            onMouseLeave={(e) => { if (!saveLoading) e.target.style.backgroundColor = '#889ab5' }}
+          >
+            {saveLoading ? 'Saving...' : 'Save'}
+          </button>
         </div>
 
-        <label className="share-link-field">
-          Link tài liệu
-          <div>
-            <input readOnly value={shareUrl} />
-            <button onClick={handleCopy} type="button">
-              <StudyHubIcon name="card" size={16} />
-              {copied ? 'Copied' : 'Copy'}
-            </button>
-          </div>
-        </label>
-
-        <button className="share-publish-button" disabled={loading} onClick={() => onSave('PUBLIC')} type="button">
-          {loading ? 'Đang lưu...' : 'Đăng diễn đàn'}
-        </button>
-        <button className="share-close-button" disabled={loading} onClick={onClose} type="button">Đóng</button>
-      </section>
+      </div>
     </div>
   )
-}
-
-function mapFolder(folder) {
-  return {
-    id: folder.id,
-    name: folder.folderName,
-    parentFolderId: folder.parentFolderId,
-    count: folder.documents?.length ?? 0,
-    date: formatApiDate(folder.createdAt),
-  }
-}
-
-function mapDocument(document) {
-  return {
-    id: document.id,
-    documentId: document.id,
-    name: document.title || document.fileName,
-    attachmentName: document.fileName,
-    subject: document.description || document.tags?.join(', ') || 'Tài liệu cá nhân',
-    kind: document.fileType?.toLowerCase() || 'document',
-    date: formatApiDate(document.updatedAt || document.createdAt),
-    visibility: document.visibility,
-    public: document.visibility === 'PUBLIC',
-    favorite: Boolean(document.favorite),
-    fileUrl: document.fileUrl,
-    sizeLabel: formatFileSize(document.fileSize),
-  }
-}
-
-function formatApiDate(value) {
-  if (!value) return ''
-  return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium' }).format(new Date(value))
-}
-
-function formatFileSize(bytes = 0) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'KB', 'MB', 'GB']
-  const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
-  return `${(bytes / (1024 ** unitIndex)).toFixed(unitIndex ? 1 : 0)} ${units[unitIndex]}`
 }

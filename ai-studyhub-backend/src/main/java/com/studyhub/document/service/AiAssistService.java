@@ -43,7 +43,7 @@ public class AiAssistService {
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
 
         // Check if summary already exists
-        var existing = summaryRepository.findByDocumentId(documentId);
+        var existing = summaryRepository.findByDocument_Id(documentId);
         if (existing.isPresent()) {
             log.info("Summary already exists for document: {}", documentId);
             return existing.get();
@@ -81,6 +81,12 @@ public class AiAssistService {
                 .build();
 
         return summaryRepository.save(summary);
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentSummary getSummaryForDocument(Long documentId) {
+        return summaryRepository.findByDocument_Id(documentId)
+                .orElseThrow(() -> new IllegalArgumentException("Summary not found for this document"));
     }
 
     @Transactional

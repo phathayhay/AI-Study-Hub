@@ -3,10 +3,7 @@ import { apiDelete, apiGet, apiPost, apiPut, buildQueryString } from './api'
 export function uploadDocument(file, metadata) {
   const formData = new FormData()
   formData.append('file', file)
-  formData.append(
-    'request',
-    new Blob([JSON.stringify(buildUploadRequest(metadata))], { type: 'application/json' }),
-  )
+  formData.append('request', JSON.stringify(buildUploadRequest(metadata)))
 
   return apiPost('/api/documents/upload', formData)
 }
