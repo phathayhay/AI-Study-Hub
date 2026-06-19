@@ -30,7 +30,7 @@ public class EmailService {
             log.info("Password reset email sent successfully to {}", toEmail);
         } catch (Exception e) {
             log.error("Failed to send password reset email to {}: {}", toEmail, e.getMessage());
-            throw new IllegalStateException("Không thể gửi email đặt lại mật khẩu: " + e.getMessage(), e);
+            throw new IllegalStateException("Could not send password reset email: " + e.getMessage(), e);
         }
     }
  
@@ -51,7 +51,7 @@ public class EmailService {
             log.info("Email verification email sent successfully to {}", toEmail);
         } catch (Exception e) {
             log.error("Failed to send email verification email to {}: {}", toEmail, e.getMessage());
-            throw new IllegalStateException("Không thể gửi email xác nhận tài khoản: " + e.getMessage(), e);
+            throw new IllegalStateException("Could not send email verification: " + e.getMessage(), e);
         }
     }
 }

@@ -131,7 +131,7 @@ public class AuthService {
              emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
          } catch (Exception e) {
              log.error("Failed to send verification email to {}: {}", user.getEmail(), e.getMessage());
-             throw new IllegalStateException("Không thể gửi email xác nhận tài khoản: " + e.getMessage());
+             throw new IllegalStateException("Could not send email verification: " + e.getMessage());
          }
      }
 
