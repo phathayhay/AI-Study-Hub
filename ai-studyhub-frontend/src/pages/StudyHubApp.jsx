@@ -12,6 +12,7 @@ import StudyDocumentApi from './study-hub/StudyDocumentApi'
 import useAuth from '../hooks/useAuth'
 import { getFolder } from '../features/folders/folderService'
 import { getDocument } from '../features/documents/documentService'
+import { register as apiRegister } from '../features/auth/authService'
 
 const defaultStudyFile = {
   name: '漢字--JPD316 Lesson 5-NEW.pptx',
@@ -346,13 +347,25 @@ export default function StudyHubApp() {
     navigate(r === 'admin' ? 'admin-overview' : 'explore')
   }
 
-  const handleRegister = async (res) => {
-    const u = await authRegister(res)
-    if (u) {
-      migrateGuestHistoryToUser(u.id || u.email || 'user')
+  const handleRegister = async (formData) => {
+    const session = await apiRegister(formData)
+    if (session && session.success) {
+      const u = await authRegister(session)
+      if (u) {
+        migrateGuestHistoryToUser(u.id || u.email || 'user')
+        window.showToast?.('Đăng ký thành công! Chào mừng bạn đến với AI Study Hub 🎉', 'success')
+        navigate('explore')
+      } else {
+        let msg = session.message || 'Đăng ký thành công! Vui lòng kiểm tra email để kích hoạt tài khoản của bạn.'
+        if (msg === 'Registration successful. Please check your email to verify your account.') {
+          msg = 'Đăng ký thành công! Vui lòng kiểm tra email để xác minh tài khoản của bạn.'
+        }
+        window.showToast?.(msg, 'success')
+        navigate('login')
+      }
+    } else {
+      throw new Error(session?.message || 'Đăng ký thất bại. Vui lòng thử lại.')
     }
-    const r = u.role?.toUpperCase() === 'ADMIN' ? 'admin' : 'student'
-    navigate(r === 'admin' ? 'admin-overview' : 'explore')
   }
 
   const handleLogout = async () => {

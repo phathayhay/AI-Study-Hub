@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Brand from '../../components/layout/Brand'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
-import { login, register } from '../../features/auth/authService'
+import { login } from '../../features/auth/authService'
 
 export function LoginPage({ onLogin, onNavigate }) {
   const [email, setEmail] = useState('')
@@ -117,14 +117,13 @@ export function RegisterPage({ onNavigate, onRegister }) {
     setLoading(true)
     setError('')
     try {
-      const session = await register({
+      await onRegister({
         studentCode: form.studentCode.trim(),
         fullName: form.fullName.trim(),
         email: form.email.trim(),
         password: form.password,
         confirmPassword: form.confirmPassword,
       })
-      onRegister(session)
     } catch (requestError) {
       setError(requestError.message)
     } finally {
