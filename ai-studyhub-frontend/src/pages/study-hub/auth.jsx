@@ -1,171 +1,343 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Brand from '../../components/layout/Brand'
-import * as authService from '../../features/auth/authService'
+import StudyHubIcon from '../../components/icons/StudyHubIcons'
+import { login, register } from '../../features/auth/authService'
 
 export function LoginPage({ onLogin, onNavigate }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
+  const transition = useAuthTransition(onNavigate)
 
-  const submit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    setLoading(true)
     setError('')
-    if (!email || !password) { setError('Vui lòng nhập email và mật khẩu'); return }
-    setBusy(true)
     try {
-      await onLogin(email, password)
-    } catch (err) {
-      setError(err?.message || 'Đăng nhập thất bại')
-    } finally { setBusy(false) }
+      onLogin(await login({ email: email.trim(), password }, remember))
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <AuthShell title="Đăng nhập" subtitle="Chào mừng trở lại!" onNavigate={onNavigate}>
-      <form className="auth-card" onSubmit={submit}>
-        <label className="field">
-          Email FPT
-          <span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@fpt.edu.vn" required /></span>
-        </label>
-        <label className="field">
-          Mật khẩu
-          <span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required /></span>
-        </label>
-        {error && <p className="auth-error">{error}</p>}
-        <div className="auth-row"><label><input type="checkbox" /> Ghi nhớ đăng nhập</label><button onClick={() => onNavigate('forgot-password')} type="button" className="link-btn">Quên mật khẩu?</button></div>
-        <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Đang xử lý...' : 'Đăng nhập'}</button>
-        <p>Chưa có tài khoản?<button onClick={() => onNavigate('register')} type="button">Đăng ký ngay</button></p>
-        <hr />
-        <small><strong>Demo:</strong> admin@fpt.edu.vn / admin123 – student@fpt.edu.vn / student123</small>
-      </form>
+    <AuthShell
+      description="Tiếp tục hành trình học tập của bạn với tài liệu, flashcard và trợ lý AI."
+      leaving={transition.leaving}
+      onBack={() => transition.to('explore')}
+      subtitle="Chào mừng trở lại!"
+      title="Đăng nhập"
+    >
+      <AuthCard onSubmit={handleSubmit}>
+        <Field
+          autoComplete="email"
+          icon="mail"
+          label="Email"
+          onChange={setEmail}
+          placeholder="name@fpt.edu.vn"
+          type="email"
+          value={email}
+        />
+        <Field
+          autoComplete="current-password"
+          icon="lock"
+          label="Mật khẩu"
+          onChange={setPassword}
+          placeholder="Nhập mật khẩu"
+          revealable
+          type="password"
+          value={password}
+        />
+        <div className="auth-row">
+          <label className="auth-checkbox">
+            <input
+              id="remember"
+              name="remember"
+              checked={remember}
+              onChange={(event) => setRemember(event.target.checked)}
+              type="checkbox"
+            />
+            <span>Ghi nhớ đăng nhập</span>
+          </label>
+        </div>
+        {error && (
+          <p className="auth-error" role="alert">
+            <StudyHubIcon name="help" size={16} /> {error}
+          </p>
+        )}
+        <button className="auth-submit" disabled={loading} type="submit">
+          {loading ? (
+            <>
+              <span className="auth-spinner" /> Đang đăng nhập...
+            </>
+          ) : (
+            <>
+              Đăng nhập <span aria-hidden="true">→</span>
+            </>
+          )}
+        </button>
+        <p className="auth-switch">
+          Chưa có tài khoản?
+          <button onClick={() => transition.to('register')} type="button">
+            Đăng ký ngay
+          </button>
+        </p>
+      </AuthCard>
     </AuthShell>
   )
 }
 
-export function RegisterPage({ onRegister, onNavigate }) {
-  const [form, setForm] = useState({ studentCode: '', fullName: '', email: '', password: '', confirm: '' })
+export function RegisterPage({ onNavigate, onRegister }) {
+  const [form, setForm] = useState({
+    studentCode: '',
+    fullName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  })
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
+  const transition = useAuthTransition(onNavigate)
 
-  const set = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }))
+  const setField = (name, value) => {
+    setForm((current) => ({ ...current, [name]: value }))
+  }
 
-  const submit = async (e) => {
-    e.preventDefault()
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    if (form.password !== form.confirmPassword) {
+      setError('Mật khẩu xác nhận không khớp.')
+      return
+    }
+
+    setLoading(true)
     setError('')
-    if (form.password !== form.confirm) { setError('Mật khẩu xác nhận không khớp'); return }
-    if (!form.studentCode || !form.fullName || !form.email || !form.password) { setError('Vui lòng điền đầy đủ'); return }
-    setBusy(true)
     try {
-      await onRegister({ studentCode: form.studentCode, fullName: form.fullName, email: form.email, password: form.password })
-    } catch (err) {
-      setError(err?.message || 'Đăng ký thất bại')
-    } finally { setBusy(false) }
+      const session = await register({
+        studentCode: form.studentCode.trim(),
+        fullName: form.fullName.trim(),
+        email: form.email.trim(),
+        password: form.password,
+      })
+      onRegister(session)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <AuthShell title="Đăng ký tài khoản" subtitle="Xác minh sinh viên để tham gia cộng đồng" onNavigate={onNavigate}>
-      <form className="auth-card" onSubmit={submit}>
-        <label className="field">Mã SV<span><input type="text" value={form.studentCode} onChange={set('studentCode')} placeholder="SE123456" required /></span></label>
-        <label className="field">Họ và tên<span><input type="text" value={form.fullName} onChange={set('fullName')} placeholder="Nguyễn Văn A" required /></span></label>
-        <label className="field">Email FPT<span><input type="email" value={form.email} onChange={set('email')} placeholder="email@fpt.edu.vn" required /></span></label>
-        <label className="field">Mật khẩu<span><input type="password" value={form.password} onChange={set('password')} placeholder="••••••••" required minLength={6} /></span></label>
-        <label className="field">Xác nhận mật khẩu<span><input type="password" value={form.confirm} onChange={set('confirm')} placeholder="••••••••" required /></span></label>
-        {error && <p className="auth-error">{error}</p>}
-        <label className="terms"><input type="checkbox" required /> Tôi đồng ý với điều khoản sử dụng</label>
-        <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Đang xử lý...' : 'Đăng ký'}</button>
-        <p>Đã có tài khoản?<button onClick={() => onNavigate('login')} type="button">Đăng nhập</button></p>
-      </form>
+    <AuthShell
+      compact
+      description="Tạo không gian học tập cá nhân và bắt đầu khai thác sức mạnh của AI."
+      leaving={transition.leaving}
+      onBack={() => transition.to('explore')}
+      subtitle="Bắt đầu hành trình học tập thông minh"
+      title="Tạo tài khoản"
+    >
+      <AuthCard compact onSubmit={handleSubmit}>
+        <div className="auth-form-grid">
+          <Field
+            autoComplete="name"
+            icon="user"
+            label="Họ và tên"
+            onChange={(value) => setField('fullName', value)}
+            placeholder="Nguyễn Văn A"
+            value={form.fullName}
+          />
+          <Field
+            autoComplete="username"
+            icon="card"
+            label="Mã sinh viên"
+            onChange={(value) => setField('studentCode', value)}
+            placeholder="SE123456"
+            value={form.studentCode}
+          />
+        </div>
+        <Field
+          autoComplete="email"
+          icon="mail"
+          label="Email"
+          onChange={(value) => setField('email', value)}
+          placeholder="name@fpt.edu.vn"
+          type="email"
+          value={form.email}
+        />
+        <div className="auth-form-grid">
+          <Field
+            autoComplete="new-password"
+            icon="lock"
+            label="Mật khẩu"
+            onChange={(value) => setField('password', value)}
+            placeholder="Tối thiểu 8 ký tự"
+            revealable
+            type="password"
+            value={form.password}
+          />
+          <Field
+            autoComplete="new-password"
+            icon="lock"
+            label="Xác nhận mật khẩu"
+            onChange={(value) => setField('confirmPassword', value)}
+            placeholder="Nhập lại mật khẩu"
+            revealable
+            type="password"
+            value={form.confirmPassword}
+          />
+        </div>
+        {error && (
+          <p className="auth-error" role="alert">
+            <StudyHubIcon name="help" size={16} /> {error}
+          </p>
+        )}
+        <button className="auth-submit" disabled={loading} type="submit">
+          {loading ? (
+            <>
+              <span className="auth-spinner" /> Đang đăng ký...
+            </>
+          ) : (
+            <>
+              Tạo tài khoản <span aria-hidden="true">→</span>
+            </>
+          )}
+        </button>
+        <p className="auth-switch">
+          Đã có tài khoản?
+          <button onClick={() => transition.to('login')} type="button">
+            Đăng nhập
+          </button>
+        </p>
+      </AuthCard>
     </AuthShell>
   )
 }
 
-export function ForgotPasswordPage({ onNavigate }) {
-  const [email, setEmail] = useState('')
-  const [error, setError] = useState('')
-  const [sent, setSent] = useState(false)
-  const [busy, setBusy] = useState(false)
-
-  const submit = async (e) => {
-    e.preventDefault()
-    setError('')
-    if (!email) { setError('Vui lòng nhập email'); return }
-    setBusy(true)
-    try {
-      await authService.forgotPassword(email)
-      setSent(true)
-    } catch (err) {
-      setError(err?.message || 'Gửi yêu cầu thất bại')
-    } finally { setBusy(false) }
-  }
-
-  if (sent) return (
-    <AuthShell title="Đã gửi email" subtitle="Kiểm tra hộp thư của bạn" onNavigate={onNavigate}>
-      <div className="auth-card"><p>Link đặt lại mật khẩu đã được gửi đến <strong>{email}</strong>. Vui lòng kiểm tra email (spam nếu không thấy).</p>
-        <button className="auth-submit" onClick={() => onNavigate('login')} type="button">Quay lại đăng nhập</button></div>
-    </AuthShell>
-  )
-
+function AuthShell({ children, compact = false, description, leaving, onBack, subtitle, title }) {
   return (
-    <AuthShell title="Quên mật khẩu" subtitle="Nhập email FPT để nhận link khôi phục" onNavigate={onNavigate}>
-      <form className="auth-card" onSubmit={submit}>
-        <label className="field">Email FPT<span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@fpt.edu.vn" required /></span></label>
-        {error && <p className="auth-error">{error}</p>}
-        <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Đang xử lý...' : 'Gửi yêu cầu'}</button>
-        <p>Nhớ mật khẩu?<button onClick={() => onNavigate('login')} type="button">Đăng nhập</button></p>
-      </form>
-    </AuthShell>
-  )
-}
+    <main className={`auth-page ${compact ? 'auth-page--compact' : ''} ${leaving ? 'is-leaving' : ''}`}>
+      <div className="auth-orb auth-orb--one" />
+      <div className="auth-orb auth-orb--two" />
 
-export function ResetPasswordPage({ onNavigate }) {
-  const [token, setToken] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [error, setError] = useState('')
-  const [done, setDone] = useState(false)
-  const [busy, setBusy] = useState(false)
+      <section className="auth-showcase" aria-hidden="true">
+        <div className="auth-showcase__brand">
+          <Brand compact />
+        </div>
+        <div className="auth-showcase__content">
+          <span className="auth-eyebrow">
+            <StudyHubIcon name="sparkle" size={16} /> Học thông minh hơn mỗi ngày
+          </span>
+          <h2>
+            Biến tài liệu thành<br />
+            <strong>kiến thức của bạn.</strong>
+          </h2>
+          <p>{description}</p>
+          <div className="auth-feature-list">
+            <span>
+              <StudyHubIcon name="message" size={18} /> Trò chuyện với tài liệu bằng AI
+            </span>
+            <span>
+              <StudyHubIcon name="card" size={18} /> Tạo flashcard và quiz tức thì
+            </span>
+            <span>
+              <StudyHubIcon name="folder" size={18} /> Quản lý học liệu tập trung
+            </span>
+          </div>
+        </div>
+        <div className="auth-showcase__quote">
+          <span>"</span>
+          <p>Mỗi phiên học đều có thể trở nên rõ ràng và thú vị hơn.</p>
+        </div>
+      </section>
 
-  const submit = async (e) => {
-    e.preventDefault()
-    setError('')
-    if (password !== confirm) { setError('Mật khẩu xác nhận không khớp'); return }
-    if (!token || !password) { setError('Vui lòng điền đầy đủ'); return }
-    setBusy(true)
-    try {
-      await authService.resetPassword({ token, newPassword: password })
-      setDone(true)
-    } catch (err) {
-      setError(err?.message || 'Đặt lại mật khẩu thất bại')
-    } finally { setBusy(false) }
-  }
-
-  if (done) return (
-    <AuthShell title="Thành công!" subtitle="Mật khẩu đã được đặt lại" onNavigate={onNavigate}>
-      <div className="auth-card"><button className="auth-submit" onClick={() => onNavigate('login')} type="button">Đăng nhập ngay</button></div>
-    </AuthShell>
-  )
-
-  return (
-    <AuthShell title="Đặt lại mật khẩu" subtitle="Nhập token từ email và mật khẩu mới" onNavigate={onNavigate}>
-      <form className="auth-card" onSubmit={submit}>
-        <label className="field">Token<span><input type="text" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Nhập token từ email" required /></span></label>
-        <label className="field">Mật khẩu mới<span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required minLength={6} /></span></label>
-        <label className="field">Xác nhận mk<span><input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" required /></span></label>
-        {error && <p className="auth-error">{error}</p>}
-        <button className="auth-submit" type="submit" disabled={busy}>{busy ? 'Đang xử lý...' : 'Đặt lại mật khẩu'}</button>
-      </form>
-    </AuthShell>
-  )
-}
-
-function AuthShell({ children, onNavigate, subtitle, title }) {
-  return (
-    <main className="auth-page">
-      <Brand compact />
-      <h1>{title}</h1>
-      <p>{subtitle}</p>
-      {children}
-      <button className="auth-back" onClick={() => onNavigate('guest-home')} type="button">← Quay về trang chủ</button>
+      <section className="auth-panel">
+        <div className="auth-panel__inner">
+          <div className="auth-mobile-brand">
+            <Brand compact />
+          </div>
+          <header className="auth-heading">
+            <span className="auth-heading__icon">
+              <StudyHubIcon name="book" size={22} />
+            </span>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </header>
+          {children}
+          <button className="auth-back" onClick={onBack} type="button">
+            <StudyHubIcon name="arrow-left" size={16} /> Quay về trang chủ
+          </button>
+        </div>
+      </section>
     </main>
   )
+}
+
+function AuthCard({ children, compact = false, onSubmit }) {
+  return (
+    <form className={`auth-card ${compact ? 'auth-card--compact' : ''}`} onSubmit={onSubmit}>
+      {children}
+    </form>
+  )
+}
+
+function Field({
+  autoComplete,
+  icon,
+  label,
+  onChange,
+  placeholder,
+  revealable = false,
+  type = 'text',
+  value,
+}) {
+  const [visible, setVisible] = useState(false)
+  const inputType = revealable && visible ? 'text' : type
+
+  return (
+    <label className="field">
+      <span className="field__label">{label}</span>
+      <span className="field__control">
+        <StudyHubIcon name={icon} size={18} />
+        <input
+          id={autoComplete}
+          name={autoComplete}
+          autoComplete={autoComplete}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          required
+          type={inputType}
+          value={value}
+        />
+        {revealable && (
+          <button
+            aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            className="field__reveal"
+            onClick={() => setVisible((current) => !current)}
+            type="button"
+          >
+            <StudyHubIcon name="eye" size={18} />
+          </button>
+        )}
+      </span>
+    </label>
+  )
+}
+
+function useAuthTransition(onNavigate) {
+  const [leaving, setLeaving] = useState(false)
+  const timerRef = useRef(null)
+
+  useEffect(() => () => window.clearTimeout(timerRef.current), [])
+
+  const to = (route) => {
+    if (leaving) return
+    setLeaving(true)
+    timerRef.current = window.setTimeout(() => onNavigate(route), 240)
+  }
+
+  return { leaving, to }
 }

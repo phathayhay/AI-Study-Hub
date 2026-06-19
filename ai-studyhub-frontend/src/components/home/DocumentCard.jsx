@@ -1,7 +1,10 @@
+import { useState } from 'react'
 import StudyHubIcon from '../icons/StudyHubIcons'
 import Badge from '../ui/Badge'
 
 export default function DocumentCard({ document }) {
+  const [favorite, setFavorite] = useState(Boolean(document.favorite))
+
   return (
     <article className="document-card">
       <div className="document-card__header">
@@ -9,7 +12,15 @@ export default function DocumentCard({ document }) {
           <Badge tone="blue">{document.code}</Badge>
           <Badge>{document.type}</Badge>
         </div>
-        <button className="icon-button" type="button" aria-label={`Lưu ${document.title}`}>
+        <button
+          className={`icon-button ${favorite ? 'is-active' : ''}`}
+          type="button"
+          aria-label={`Lưu ${document.title}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            setFavorite((value) => !value)
+          }}
+        >
           <StudyHubIcon name="heart" size={20} />
         </button>
       </div>
