@@ -1,15 +1,35 @@
 import StudyHubIcon from '../icons/StudyHubIcons'
 
-export default function Brand({ compact = false }) {
+import logo from '../../assets/logo.png'
+import logoCompact from '../../assets/logo-compact.png'
+
+export default function Brand({ compact = false, onClick }) {
+  const content = (
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+      <img 
+        src={compact ? logoCompact : logo} 
+        alt="AI Study Hub" 
+        style={{ 
+          height: compact ? '32px' : '48px', 
+          width: 'auto', 
+          objectFit: 'contain'
+        }} 
+      />
+    </div>
+  )
+
+  if (onClick) {
+    return (
+      <button onClick={onClick} style={{ background: 'transparent', border: 'none', padding: 0, margin: 0, cursor: 'pointer', textAlign: 'left' }} aria-label="AI Study Hub">
+        {content}
+      </button>
+    )
+  }
+
   return (
-    <div className={`brand ${compact ? 'brand--compact' : ''}`} aria-label="AI Study Hub">
-      <span className="brand__mark">
-        <StudyHubIcon name="book" size={20} />
-      </span>
-      <span>
-        <strong>AI Study Hub</strong>
-        <small>FPT University</small>
-      </span>
+    <div aria-label="AI Study Hub">
+      {content}
     </div>
   )
 }
+

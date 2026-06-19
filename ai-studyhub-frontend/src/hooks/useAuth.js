@@ -1,101 +1,56 @@
-import { useState, useEffect, useCallback } from 'react'
-import * as authService from '../features/auth/authService'
-
-function loadUser() {
-  try {
-    const saved = localStorage.getItem('user')
-    return saved ? JSON.parse(saved) : null
-  } catch { return null }
-}
-
-function saveUser(u) {
-  if (u) localStorage.setItem('user', JSON.stringify(u))
-  else localStorage.removeItem('user')
-}
+import { useState, useEffect } from 'react'
+import { logout as apiLogout } from '../features/auth/authService'
 
 export default function useAuth() {
-  const [user, setUser] = useState(loadUser)
+  const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem('accessToken')
-    if (!token) { setLoading(false); return }
-    const cached = loadUser()
-    if (cached) { setUser(cached); setLoading(false); return }
-    authService.getMe().then((res) => {
-      if (res?.data) {
-        const d = res.data
-        const u = { email: d.email, fullName: d.fullName, studentCode: d.studentCode, role: d.roleName }
-        setUser(u)
-        saveUser(u)
+    // Check if user is logged in
+    const accessToken = localStorage.getItem('accessToken')
+    const savedUser = localStorage.getItem('user')
+    if (accessToken && savedUser) {
+      setUser(JSON.parse(savedUser))
+    }
+    setLoading(false)
+  }, [])
+
+  const saveSession = (res) => {
+    if (res?.data) {
+      const u = res.data
+      localStorage.setItem('accessToken', u.accessToken)
+      if (u.refreshToken) {
+        localStorage.setItem('refreshToken', u.refreshToken)
       }
-      setLoading(false)
-    }).catch(() => setLoading(false))
-  }, [])
+      localStorage.setItem('user', JSON.stringify(u))
+      setUser(u)
+      return u
+    }
+    return null
+  }
 
-  const login = useCallback(async (email, password) => {
-    const res = await authService.login({ email, password })
-    const d = res.data || res
-    if (d.accessToken) localStorage.setItem('accessToken', d.accessToken)
-    if (d.refreshToken) localStorage.setItem('refreshToken', d.refreshToken)
-    const u = { email: d.email, fullName: d.fullName, studentCode: d.studentCode, role: d.role }
-    setUser(u)
-    saveUser(u)
-    return u
-  }, [])
+  const login = async (res) => {
+    return saveSession(res)
+  }
 
-  const register = useCallback(async (data) => {
-    const res = await authService.register(data)
-    const d = res.data || res
-    if (d.accessToken) localStorage.setItem('accessToken', d.accessToken)
-    if (d.refreshToken) localStorage.setItem('refreshToken', d.refreshToken)
-    const u = { email: d.email, fullName: d.fullName, studentCode: d.studentCode, role: d.role }
-    setUser(u)
-    saveUser(u)
-    return u
-  }, [])
+  const register = async (res) => {
+    return saveSession(res)
+  }
 
-  const logout = useCallback(async () => {
-    const rt = localStorage.getItem('refreshToken')
-    await authService.logout(rt)
+  const logout = async () => {
+    const refreshToken = localStorage.getItem('refreshToken')
+    if (refreshToken) {
+      try {
+        await apiLogout(refreshToken)
+      } catch (err) {
+        console.error('Logout API error:', err)
+      }
+    }
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
-    saveUser(null)
+    localStorage.removeItem('user')
     setUser(null)
-  }, [])
+  }
 
-  const refresh = useCallback(async () => {
-    const rt = localStorage.getItem('refreshToken')
-    if (!rt) return null
-    try {
-      const res = await authService.refresh(rt)
-      const d = res.data || res
-      if (d.accessToken) localStorage.setItem('accessToken', d.accessToken)
-      if (d.refreshToken) localStorage.setItem('refreshToken', d.refreshToken)
-      const u = { email: d.email, fullName: d.fullName, studentCode: d.studentCode, role: d.role }
-      setUser(u)
-      saveUser(u)
-      return u
-    } catch {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('refreshToken')
-      saveUser(null)
-      setUser(null)
-      return null
-    }
-  }, [])
-
-  const changePassword = useCallback(async (data) => {
-    return authService.changePassword(data)
-  }, [])
-
-  const forgotPassword = useCallback(async (email) => {
-    return authService.forgotPassword(email)
-  }, [])
-
-  const resetPassword = useCallback(async (data) => {
-    return authService.resetPassword(data)
-  }, [])
-
-  return { user, loading, login, register, logout, refresh, changePassword, forgotPassword, resetPassword }
+  return { user, loading, login, register, logout, setUser }
 }
