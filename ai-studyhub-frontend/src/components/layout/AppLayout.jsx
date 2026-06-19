@@ -7,7 +7,8 @@ export default function AppLayout({
   sidebarCollapsed = false, onToggleCollapse,
   recentItems = [], onOpenRecentItem, activeItemContext = {},
   breadcrumbs = [],
-  onBreadcrumbClick
+  onBreadcrumbClick,
+  onRenameTitle
 }) {
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'app-shell--collapsed' : ''} ${className}`}>
@@ -24,7 +25,17 @@ export default function AppLayout({
       />
       <div className="app-shell__body">
         {withTopbar && (
-          <Topbar guest={guest} onNavigate={onNavigate} onNotifications={onNotifications} user={user} title={title} active={active} breadcrumbs={breadcrumbs} onBreadcrumbClick={onBreadcrumbClick} />
+          <Topbar 
+            guest={guest} 
+            onNavigate={onNavigate} 
+            onNotifications={onNotifications} 
+            user={user} 
+            title={title} 
+            active={active} 
+            breadcrumbs={breadcrumbs} 
+            onBreadcrumbClick={onBreadcrumbClick}
+            onRenameTitle={onRenameTitle}
+          />
         )}
         {children}
       </div>

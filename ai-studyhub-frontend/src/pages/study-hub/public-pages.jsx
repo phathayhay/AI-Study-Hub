@@ -476,7 +476,7 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument }) {
     }).catch(() => {
       onLoad?.({ id, name: 'PRF192 - Programming Fundamentals Full Pack' })
     })
-  }, [id, onLoad])
+  }, [id])
 
   const f = folder || {
     name: 'PRF192 - Programming Fundamentals Full Pack',
@@ -562,7 +562,7 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
         })
         .catch((err) => console.error('Failed to check favorites', err))
     }
-  }, [id, onLoad, guest])
+  }, [id, guest])
 
   const d = doc || featuredDocuments[1]
 

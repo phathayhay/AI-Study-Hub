@@ -424,6 +424,20 @@ export default function StudyHubApp() {
       activeItemContext={{ route, studyFileId: studyFile?.id, selectedDocId, selectedFolderId }}
       breadcrumbs={studyBreadcrumbs}
       onBreadcrumbClick={handleBreadcrumbClick}
+      onRenameTitle={(newName) => {
+        if (!studyFile?.id) return
+        try {
+          const localRenames = JSON.parse(localStorage.getItem('renamedDocs') || '{}')
+          localRenames[studyFile.id] = newName
+          localStorage.setItem('renamedDocs', JSON.stringify(localRenames))
+          
+          setStudyFile(prev => ({ ...prev, name: newName }))
+          window.showToast?.('Đổi tên tài liệu thành công', 'success')
+        } catch (e) {
+          console.error(e)
+          window.showToast?.('Đổi tên tài liệu thất bại', 'error')
+        }
+      }}
     >
       {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
 

@@ -71,4 +71,10 @@ export function reportDocument(id, reportType, reportReason) {
   return apiPost(`/documents/${id}/report`, { reportType, reportReason })
 }
 
+export function shareDocument(id, sharedUserEmail, permission = 'VIEW') {
+  return apiPost(`/documents/${id}/share`, { sharedUserEmail, permission })
+}
 
+export function updateDocumentVisibility(id, visibility) {
+  return apiPut(`/documents/${id}/visibility?visibility=${visibility}`)
+}

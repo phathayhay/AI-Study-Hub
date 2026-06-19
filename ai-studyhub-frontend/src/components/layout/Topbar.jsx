@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import StudyHubIcon from '../icons/StudyHubIcons'
 
 export default function Topbar({
@@ -8,8 +9,35 @@ export default function Topbar({
   title,
   active = 'home',
   breadcrumbs = [],
-  onBreadcrumbClick
+  onBreadcrumbClick,
+  onRenameTitle
 }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedName, setEditedName] = useState('')
+
+  useEffect(() => {
+    if (title) {
+      setEditedName(title)
+    }
+  }, [title])
+
+  const handleSave = () => {
+    const trimmed = editedName.trim()
+    if (trimmed && trimmed !== title) {
+      onRenameTitle?.(trimmed)
+    }
+    setIsEditing(false)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleSave()
+    } else if (e.key === 'Escape') {
+      setEditedName(title || '')
+      setIsEditing(false)
+    }
+  }
+
   const displayTitle = active === 'explore' ? 'Khám phá tài liệu'
                      : active === 'library' ? 'Thư viện'
                      : active === 'library-shared' ? 'Thư viện'
@@ -42,7 +70,7 @@ export default function Topbar({
             </button>
             {breadcrumbs.map((crumb) => (
               <span key={crumb.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <StudyHubIcon name="chevron-right" size={16} />
+                <StudyHubIcon name="chevron" size={14} style={{ color: '#94a3b8', display: 'flex', alignItems: 'center' }} />
                 <button
                   onClick={() => onBreadcrumbClick?.(crumb.id)}
                   style={{
@@ -61,11 +89,51 @@ export default function Topbar({
                 </button>
               </span>
             ))}
-            <StudyHubIcon name="chevron-right" size={16} />
-            <span style={{ color: '#0f172a', borderBottom: '1px dashed #4f46e5', paddingBottom: '2px' }}>{title}</span>
-            <button style={{ background: 'transparent', border: 'none', color: '#4f46e5', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px' }}>
-               <StudyHubIcon name="edit" size={14} />
-            </button>
+            <StudyHubIcon name="chevron" size={14} style={{ color: '#94a3b8', display: 'flex', alignItems: 'center' }} />
+            
+            {isEditing ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  onBlur={handleSave}
+                  onKeyDown={handleKeyDown}
+                  autoFocus
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#0f172a',
+                    backgroundColor: '#fff',
+                    border: '1.5px solid #4f46e5',
+                    borderRadius: '8px',
+                    padding: '4px 12px',
+                    outline: 'none',
+                    width: '240px'
+                  }}
+                />
+                <button 
+                  onClick={handleSave}
+                  style={{ background: 'transparent', border: 'none', color: '#4f46e5', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px' }}
+                >
+                  <StudyHubIcon name="edit" size={16} />
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span 
+                  onClick={() => setIsEditing(true)}
+                  style={{ color: '#0f172a', borderBottom: '1px dashed #4f46e5', paddingBottom: '2px', cursor: 'pointer' }}
+                >
+                  {title}
+                </span>
+                <button 
+                  onClick={() => setIsEditing(true)}
+                  style={{ background: 'transparent', border: 'none', color: '#4f46e5', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px' }}
+                >
+                  <StudyHubIcon name="edit" size={16} />
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           displayTitle

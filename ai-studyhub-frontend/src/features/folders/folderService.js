@@ -16,6 +16,10 @@ export function renameFolder(id, folderName) {
   return apiPut(`/folders/${id}`, { folderName })
 }
 
+export function moveFolder(id, folderName, parentFolderId) {
+  return apiPut(`/folders/${id}`, { folderName, parentFolderId })
+}
+
 export function deleteFolder(id) {
   return apiDelete(`/folders/${id}`)
 }
