@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import { studyTabs } from '../../data/studyHubData'
 import {
@@ -9,6 +9,10 @@ import {
   getDocumentQuizzes,
   getFlashcardSet,
   getQuiz,
+  createChatSession,
+  getUserChatSessions,
+  getChatSessionMessages,
+  sendChatMessage,
 } from '../../features/ai/aiService'
 
 export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange }) {
@@ -21,6 +25,182 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
   const [error, setError] = useState('')
   const [rightPanelWidth, setRightPanelWidth] = useState(380)
   const [isResizing, setIsResizing] = useState(false)
+
+  // ── AI CHATBOT STATES & HANDLERS ─────────────────────────────
+  const [chatSessions, setChatSessions] = useState([])
+  const [currentSessionId, setCurrentSessionId] = useState(null)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatMessagesLoading, setChatMessagesLoading] = useState(false)
+  const [chatSendLoading, setChatSendLoading] = useState(false)
+  const [chatInput, setChatInput] = useState('')
+  const [chatScope, setChatScope] = useState('document') // 'document' or 'general'
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+
+  const messagesEndRef = useRef(null)
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [chatMessages])
+
+  // Load sessions and history on mount or when context changes
+  useEffect(() => {
+    let active = true
+    setChatMessagesLoading(true)
+    setChatMessages([])
+    setCurrentSessionId(null)
+
+    getUserChatSessions()
+      .then((res) => {
+        if (!active) return
+        const list = res?.data || res || []
+        const isArr = Array.isArray(list)
+        setChatSessions(isArr ? list : [])
+        
+        let matchingSession = null
+        if (isArr) {
+          if (chatScope === 'document' && documentId) {
+            matchingSession = list.find(s => s.documentId === Number(documentId))
+          } else if (chatScope === 'general') {
+            matchingSession = list.find(s => s.documentId === null || s.documentId === undefined)
+          }
+        }
+
+        if (matchingSession) {
+          setCurrentSessionId(matchingSession.id)
+          return getChatSessionMessages(matchingSession.id)
+        }
+      })
+      .then((res) => {
+        if (!active || !res) return
+        const msgList = res?.data || res || []
+        setChatMessages(Array.isArray(msgList) ? msgList : [])
+      })
+      .catch((err) => {
+        console.error('Failed to load chat:', err)
+      })
+      .finally(() => {
+        if (active) setChatMessagesLoading(false)
+      })
+
+    return () => { active = false }
+  }, [documentId, chatScope])
+
+  const handleSendChatMessage = async (overrideContent = null) => {
+    const textToSend = (overrideContent || chatInput).trim()
+    if (!textToSend || chatSendLoading) return
+
+    setChatSendLoading(true)
+    if (!overrideContent) setChatInput('')
+
+    // Add optimistic user message
+    const userMsg = {
+      id: Date.now(),
+      senderType: 'USER',
+      messageContent: textToSend,
+      createdAt: new Date().toISOString()
+    }
+    setChatMessages(prev => [...prev, userMsg])
+
+    try {
+      let sessionId = currentSessionId
+      if (!sessionId) {
+        const docIdToLink = chatScope === 'document' ? documentId : null
+        const sessionTitle = chatScope === 'document' 
+          ? `Trò chuyện về: ${file?.name || file?.attachmentName || 'Tài liệu'}`
+          : 'Cuộc trò chuyện mới'
+        
+        const createRes = await createChatSession(docIdToLink, sessionTitle)
+        const newSession = createRes?.data || createRes
+        if (newSession && newSession.id) {
+          sessionId = newSession.id
+          setCurrentSessionId(sessionId)
+          setChatSessions(prev => [newSession, ...prev])
+        } else {
+          throw new Error('Không thể tạo phiên trò chuyện')
+        }
+      }
+
+      const sendRes = await sendChatMessage(sessionId, textToSend)
+      const aiReply = sendRes?.data || sendRes
+      if (aiReply) {
+        setChatMessages(prev => [...prev, aiReply])
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err)
+      window.showToast?.(err.message || 'Lỗi khi gửi tin nhắn', 'error')
+    } finally {
+      setChatSendLoading(false)
+    }
+  }
+
+  const handleSuggestionClick = (type) => {
+    let prompt = ''
+    if (type === 'summary') {
+      prompt = 'Tóm tắt nội dung chính của tài liệu này một cách ngắn gọn.'
+    } else if (type === 'concept') {
+      prompt = 'Giải thích các khái niệm quan trọng nhất xuất hiện trong tài liệu.'
+    } else if (type === 'compare') {
+      prompt = 'So sánh các luận điểm chính trong tài liệu này và rút ra kết luận.'
+    }
+    handleSendChatMessage(prompt)
+  }
+
+  const parseInline = (text) => {
+    const parts = text.split(/\*\*([^*]+)\*\*/g)
+    return parts.map((part, index) => {
+      if (index % 2 === 1) {
+        return <strong key={index} style={{ fontWeight: 600, color: '#0f172a' }}>{part}</strong>
+      }
+      return part
+    })
+  }
+
+  const renderMarkdown = (text) => {
+    if (!text) return ''
+    const lines = text.split('\n')
+    return lines.map((line, idx) => {
+      const content = line.trim()
+      if (!content) return <div key={idx} style={{ height: '8px' }} />
+
+      if (content.startsWith('### ')) {
+        return <h4 key={idx} style={{ fontSize: '15px', fontWeight: 700, margin: '8px 0 4px', color: '#0f172a' }}>{parseInline(content.substring(4))}</h4>
+      }
+      if (content.startsWith('## ')) {
+        return <h3 key={idx} style={{ fontSize: '16px', fontWeight: 700, margin: '12px 0 6px', color: '#0f172a' }}>{parseInline(content.substring(3))}</h3>
+      }
+      if (content.startsWith('# ')) {
+        return <h2 key={idx} style={{ fontSize: '18px', fontWeight: 700, margin: '16px 0 8px', color: '#0f172a' }}>{parseInline(content.substring(2))}</h2>
+      }
+
+      if (content.startsWith('* ') || content.startsWith('- ')) {
+        return (
+          <li key={idx} style={{ marginLeft: '16px', listStyleType: 'disc', margin: '4px 0', fontSize: '14px', color: '#334155', lineHeight: 1.5 }}>
+            {parseInline(content.substring(2))}
+          </li>
+        )
+      }
+
+      const numListMatch = content.match(/^(\d+)\.\s(.*)/)
+      if (numListMatch) {
+        return (
+          <li key={idx} style={{ marginLeft: '16px', listStyleType: 'decimal', margin: '4px 0', fontSize: '14px', color: '#334155', lineHeight: 1.5 }}>
+            {parseInline(numListMatch[2])}
+          </li>
+        )
+      }
+
+      return (
+        <p key={idx} style={{ fontSize: '14px', color: '#334155', margin: '4px 0 8px', lineHeight: 1.5 }}>
+          {parseInline(content)}
+        </p>
+      )
+    })
+  }
+
 
   useEffect(() => {
     if (!isResizing) return undefined
@@ -242,33 +422,245 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
                 
                 {/* Scrollable Content */}
                 <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingRight: '8px', marginRight: '-8px' }}>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginBottom: '16px', marginTop: '32px' }}>
-                    <h4 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '12px', color: '#0f172a' }}>Have a Question about your import?</h4>
-                    <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '32px', lineHeight: 1.6, maxWidth: '280px' }}>You can ask questions about your imported content, and your answers will appear here</p>
-                    
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                      <button style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Write a paragraph...</button>
-                      <button style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Explain concept...</button>
-                      <button style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Compare with...</button>
+                  {chatMessagesLoading ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', color: '#6366f1', padding: '48px' }}>
+                      <div style={{ width: '32px', height: '32px', border: '3px solid #e0e7ff', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Loading chat history...</p>
                     </div>
-                  </div>
+                  ) : chatMessages.length === 0 ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginBottom: '16px', marginTop: '32px' }}>
+                      <h4 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '12px', color: '#0f172a' }}>Have a Question about your import?</h4>
+                      <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '32px', lineHeight: 1.6, maxWidth: '280px' }}>You can ask questions about your imported content, and your answers will appear here</p>
+                      
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <button onClick={() => handleSuggestionClick('summary')} style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Write a paragraph...</button>
+                        <button onClick={() => handleSuggestionClick('concept')} style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Explain concept...</button>
+                        <button onClick={() => handleSuggestionClick('compare')} style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Compare with...</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '16px' }}>
+                      {chatMessages.map((msg) => {
+                        const isUser = msg.senderType === 'USER'
+                        return (
+                          <div 
+                            key={msg.id} 
+                            style={{ 
+                              alignSelf: isUser ? 'flex-end' : 'flex-start',
+                              maxWidth: isUser ? '85%' : '100%',
+                              backgroundColor: isUser ? '#f1f5f9' : 'transparent',
+                              borderRadius: isUser ? '16px 16px 0 16px' : '0',
+                              padding: isUser ? '10px 16px' : '4px 0',
+                              color: isUser ? '#0f172a' : '#334155',
+                              boxShadow: isUser ? '0 1px 2px rgba(0,0,0,0.02)' : 'none'
+                            }}
+                          >
+                            {isUser ? (
+                              <p style={{ fontSize: '14px', margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{msg.messageContent}</p>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                {renderMarkdown(msg.messageContent)}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {chatSendLoading && (
+                        <div style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '13px', fontStyle: 'italic', padding: '4px 0' }}>
+                          <div style={{ width: '6px', height: '6px', backgroundColor: '#94a3b8', borderRadius: '50%', animation: 'pulse 1s infinite alternate' }} />
+                          <div style={{ width: '6px', height: '6px', backgroundColor: '#94a3b8', borderRadius: '50%', animation: 'pulse 1s infinite alternate 0.2s' }} />
+                          <div style={{ width: '6px', height: '6px', backgroundColor: '#94a3b8', borderRadius: '50%', animation: 'pulse 1s infinite alternate 0.4s' }} />
+                          AI is thinking...
+                        </div>
+                      )}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
                 </div>
 
                 {/* Chat Input */}
                 <div style={{ marginTop: '16px', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', flexShrink: 0 }}>
-                  <input 
-                    type="text" 
-                    placeholder="Ask AI assistant..." 
-                    style={{ width: '100%', border: 'none', padding: '16px', fontSize: '14px', outline: 'none', color: '#0f172a', minWidth: 0 }}
+                  <textarea 
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSendChatMessage()
+                      }
+                    }}
+                    placeholder={chatScope === 'document' ? "Ask about this document..." : "Ask AI tutor anything..."} 
+                    rows={2}
+                    style={{ 
+                      width: '100%', 
+                      border: 'none', 
+                      padding: '16px 16px 8px', 
+                      fontSize: '14px', 
+                      outline: 'none', 
+                      color: '#0f172a', 
+                      minWidth: 0,
+                      resize: 'none',
+                      fontFamily: 'inherit',
+                      lineHeight: '1.5'
+                    }}
                   />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px 16px', flexWrap: 'wrap', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '16px', color: '#94a3b8' }}>
-                      <button style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: '#94a3b8' }}><StudyHubIcon name="file" size={20} /></button>
-                      <button style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: '#94a3b8' }}><StudyHubIcon name="mic" size={20} /></button>
+                    <div style={{ display: 'flex', gap: '16px', color: '#94a3b8', alignItems: 'center' }}>
+                      <button 
+                        type="button"
+                        style={{ 
+                          border: '1px solid #e2e8f0', 
+                          background: '#fff', 
+                          cursor: 'pointer', 
+                          width: '38px', 
+                          height: '38px', 
+                          borderRadius: '50%', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          color: '#6366f1',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.backgroundColor = '#f8fafc' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.backgroundColor = '#fff' }}
+                      >
+                        <StudyHubIcon name="image" size={18} />
+                      </button>
                     </div>
-                    <button style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#4f46e5', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(79, 70, 229, 0.3)' }}>
-                      <StudyHubIcon name="arrow-up" size={16} />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {/* Scope Selector Capsule */}
+                      <div style={{ position: 'relative' }}>
+                        <button 
+                          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                          type="button"
+                          style={{ 
+                            width: '38px', 
+                            height: '38px', 
+                            borderRadius: '50%', 
+                            backgroundColor: '#6366f1', 
+                            color: '#fff', 
+                            border: 'none', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            cursor: 'pointer', 
+                            boxShadow: '0 2px 6px rgba(99, 102, 241, 0.25)',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4f46e5' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6366f1' }}
+                          title={chatScope === 'document' ? 'This Session' : 'General Chat'}
+                        >
+                          <StudyHubIcon name={chatScope === 'document' ? 'file-text' : 'message'} size={18} />
+                        </button>
+                        
+                        {isDropdownOpen && (
+                          <div style={{ 
+                            position: 'absolute', 
+                            bottom: '100%', 
+                            right: 0, 
+                            marginBottom: '8px', 
+                            backgroundColor: '#fff', 
+                            border: '1px solid #e2e8f0', 
+                            borderRadius: '12px', 
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)', 
+                            zIndex: 100, 
+                            width: '140px',
+                            overflow: 'hidden'
+                          }}>
+                            <button
+                              onClick={() => {
+                                setChatScope('document')
+                                setIsDropdownOpen(false)
+                              }}
+                              type="button"
+                              style={{
+                                width: '100%',
+                                padding: '10px 14px',
+                                fontSize: '13px',
+                                color: chatScope === 'document' ? '#6366f1' : '#334155',
+                                backgroundColor: chatScope === 'document' ? '#f0f2ff' : 'transparent',
+                                border: 'none',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                fontWeight: chatScope === 'document' ? 600 : 400,
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              This Session
+                            </button>
+                            <button
+                              onClick={() => {
+                                setChatScope('general')
+                                setIsDropdownOpen(false)
+                              }}
+                              type="button"
+                              style={{
+                                width: '100%',
+                                padding: '10px 14px',
+                                fontSize: '13px',
+                                color: chatScope === 'general' ? '#6366f1' : '#334155',
+                                backgroundColor: chatScope === 'general' ? '#f0f2ff' : 'transparent',
+                                border: 'none',
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                fontWeight: chatScope === 'general' ? 600 : 400,
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              General Chat
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <button 
+                        type="button"
+                        style={{ 
+                          border: 'none', 
+                          background: 'transparent', 
+                          cursor: 'pointer', 
+                          padding: 0, 
+                          color: '#475569',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '50%',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f1f5f9' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                      >
+                        <StudyHubIcon name="mic" size={20} />
+                      </button>
+                      
+                      <button 
+                        onClick={() => handleSendChatMessage()}
+                        disabled={chatSendLoading}
+                        style={{ 
+                          width: '38px', 
+                          height: '38px', 
+                          borderRadius: '50%', 
+                          backgroundColor: '#6366f1', 
+                          color: '#fff', 
+                          border: 'none', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          cursor: 'pointer', 
+                          boxShadow: '0 2px 6px rgba(99, 102, 241, 0.25)',
+                          opacity: chatSendLoading ? 0.6 : 1,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => { if (!chatSendLoading) e.currentTarget.style.backgroundColor = '#4f46e5' }}
+                        onMouseLeave={(e) => { if (!chatSendLoading) e.currentTarget.style.backgroundColor = '#6366f1' }}
+                      >
+                        <StudyHubIcon name="arrow-up" size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

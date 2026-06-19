@@ -62,6 +62,10 @@ public class AuthService {
     public TokenResponse register(RegisterRequest request) {
         log.info("Registering user with email: {}", request.getEmail());
 
+        if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
+            throw new IllegalArgumentException("Mật khẩu xác nhận không trùng khớp");
+        }
+
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new IllegalArgumentException("Email is already in use");
         }

@@ -27,7 +27,7 @@ public class GlobalExceptionHandler {
             errors.put(field, error.getDefaultMessage());
         });
         return ResponseEntity.badRequest()
-                .body(ApiResponse.error("Validation failed"));
+                .body(ApiResponse.error("Validation failed", errors));
     }
 
     @ExceptionHandler(EntityNotFoundException.class)
