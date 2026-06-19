@@ -31,3 +31,7 @@ export async function forgotPassword(email) {
 export async function resetPassword(data) {
   return apiPost('/auth/reset-password', data)
 }
+
+export async function verifyEmail(token) {
+  return apiGet(`/auth/verify-email?token=${token}`)
+}

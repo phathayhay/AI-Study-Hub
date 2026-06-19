@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Brand from '../../components/layout/Brand'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
-import { login, register } from '../../features/auth/authService'
+import { login, register, verifyEmail } from '../../features/auth/authService'
 
 export function LoginPage({ onLogin, onNavigate }) {
   const [email, setEmail] = useState('')
@@ -340,4 +340,121 @@ function useAuthTransition(onNavigate) {
   }
 
   return { leaving, to }
+}
+
+export function VerifyEmailPage({ onNavigate }) {
+  const [status, setStatus] = useState('loading') // 'loading', 'success', 'error'
+  const [message, setMessage] = useState('')
+  const effectRan = useRef(false)
+
+  useEffect(() => {
+    if (effectRan.current) return
+    effectRan.current = true
+
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('token')
+
+    if (!token) {
+      setStatus('error')
+      setMessage('Mã xác thực không hợp lệ hoặc đã hết hạn.')
+      return
+    }
+
+    verifyEmail(token)
+      .then((res) => {
+        setStatus('success')
+        setMessage(res?.message || 'Xác nhận email tài khoản thành công!')
+      })
+      .catch((err) => {
+        setStatus('error')
+        setMessage(err.message || 'Xác nhận email thất bại. Vui lòng kiểm tra lại liên kết.')
+      })
+  }, [])
+
+  const transition = useAuthTransition(onNavigate)
+
+  return (
+    <AuthShell
+      description="Cảm ơn bạn đã lựa chọn AI Study Hub FPT. Hãy kích hoạt tài khoản để tiếp tục."
+      leaving={transition.leaving}
+      onBack={() => transition.to('explore')}
+      subtitle="Xác thực tài khoản của bạn"
+      title="Xác nhận Email"
+    >
+      <div className="auth-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+        {status === 'loading' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+            <span className="auth-spinner" style={{ width: '40px', height: '40px', borderWidth: '4px' }} />
+            <p style={{ color: 'var(--text-secondary, #475569)', fontSize: '15px' }}>
+              Đang xác thực tài khoản của bạn, vui lòng đợi trong giây lát...
+            </p>
+          </div>
+        )}
+
+        {status === 'success' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: '#dcfce7',
+              color: '#15803d',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '32px'
+            }}>
+              ✓
+            </div>
+            <h3 style={{ color: 'var(--text-primary, #0f172a)', fontSize: '18px', fontWeight: 600 }}>
+              Xác thực thành công!
+            </h3>
+            <p style={{ color: 'var(--text-secondary, #475569)', fontSize: '14px', lineHeight: 1.5 }}>
+              {message}
+            </p>
+            <button
+              className="auth-submit"
+              onClick={() => transition.to('login')}
+              type="button"
+              style={{ marginTop: '10px', width: '100%' }}
+            >
+              Đăng nhập ngay <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        )}
+
+        {status === 'error' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: '#fee2e2',
+              color: '#b91c1c',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '32px'
+            }}>
+              ×
+            </div>
+            <h3 style={{ color: 'var(--text-primary, #0f172a)', fontSize: '18px', fontWeight: 600 }}>
+              Xác thực thất bại
+            </h3>
+            <p style={{ color: '#b91c1c', fontSize: '14px', lineHeight: 1.5 }}>
+              {message}
+            </p>
+            <button
+              className="auth-submit"
+              onClick={() => transition.to('explore')}
+              type="button"
+              style={{ marginTop: '10px', width: '100%', backgroundColor: 'var(--text-secondary, #475569)' }}
+            >
+              Quay lại Trang chủ
+            </button>
+          </div>
+        )}
+      </div>
+    </AuthShell>
+  )
 }
