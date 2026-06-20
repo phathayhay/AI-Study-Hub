@@ -29,7 +29,7 @@ function AdminLayout({ active, children, onNavigate, onLogout }) {
     <div className="admin-shell">
       <AdminSidebar active={active} onNavigate={onNavigate} onLogout={onLogout} />
       <div className="admin-body">
-        <AdminTopbar />
+        <AdminTopbar active={active} />
         {children}
       </div>
     </div>
@@ -67,11 +67,19 @@ function AdminSidebar({ active, onNavigate, onLogout }) {
   )
 }
 
-function AdminTopbar() {
+function AdminTopbar({ active }) {
+  const currentPage = adminNavItems.find((item) => item.id === active)
+
   return (
     <header className="admin-topbar">
-      <Badge tone="purple">Admin</Badge>
-      <strong>FPTU Admin</strong>
+      <div>
+        <strong>{currentPage?.label || 'Admin'}</strong>
+        <small>Manage AI Study Hub workspace</small>
+      </div>
+      <div>
+        <Badge tone="purple">Admin</Badge>
+        <strong>FPTU Admin</strong>
+      </div>
     </header>
   )
 }
