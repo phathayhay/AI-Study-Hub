@@ -11,18 +11,18 @@ export function NotificationPanel({ onClose }) {
   return (
     <aside className="notification-panel">
       <header>
-        <h2><StudyHubIcon name="bell" size={22} /> Thông báo <span>3</span></h2>
-        <button type="button">✓ Đọc tất cả</button>
+        <h2><StudyHubIcon name="bell" size={22} /> Notifications <span>3</span></h2>
+        <button type="button">✓ Mark all read</button>
         <button onClick={onClose} type="button"><StudyHubIcon name="close" size={18} /></button>
       </header>
-      <nav>{['Tất cả', 'Chưa đọc', 'Tài liệu', 'Tương tác'].map((item, index) => <button className={index === 0 ? 'is-active' : ''} key={item}>{item}<small>{index ? index + 1 : ''}</small></button>)}</nav>
+      <nav>{['All', 'Unread', 'Documents', 'Interactions'].map((item, index) => <button className={index === 0 ? 'is-active' : ''} key={item}>{item}<small>{index ? index + 1 : ''}</small></button>)}</nav>
       {notifications.map((item) => (
         <article className={`notice-item notice-item--${item.type}`} key={item.id}>
           <span><StudyHubIcon name={item.icon} size={22} /></span>
           <div><h3>{item.title}</h3><p>{item.text}</p><strong>{item.author}</strong> <small>{item.time}</small></div>
         </article>
       ))}
-      <button className="all-notifications" type="button">Xem tất cả thông báo ›</button>
+      <button className="all-notifications" type="button">See all notifications ›</button>
     </aside>
   )
 }
@@ -69,25 +69,25 @@ export function ReportModal({ onClose, documentId }) {
         setDoc(res?.data || res)
       })
       .catch(() => {
-        setDoc({ id: documentId, title: 'Đang tải...', code: 'DOC' })
+        setDoc({ id: documentId, title: 'Loading...', code: 'DOC' })
       })
   }, [documentId])
 
-  const d = doc || { title: 'Đang tải...', code: 'DOC' }
+  const d = doc || { title: 'Loading...', code: 'DOC' }
 
   const handleSubmit = () => {
     if (!reason.trim()) {
-      window.showToast?.('Vui lòng nhập lý do báo cáo', 'error')
+      window.showToast?.('Please enter a reason for reporting', 'error')
       return
     }
     setLoading(true)
     reportDocument(documentId, reportType, reason.trim())
       .then(() => {
-        window.showToast?.('Gửi báo cáo thành công', 'success')
+        window.showToast?.('Report submitted successfully', 'success')
         onClose()
       })
       .catch(err => {
-        window.showToast?.(err.message || 'Gửi báo cáo thất bại', 'error')
+        window.showToast?.(err.message || 'Failed to submit report', 'error')
       })
       .finally(() => setLoading(false))
   }
@@ -95,38 +95,38 @@ export function ReportModal({ onClose, documentId }) {
   return (
     <div className="modal-backdrop">
       <section className="report-modal">
-        <header><h2><StudyHubIcon name="flag" size={18} /> Báo cáo tài liệu</h2><button onClick={onClose} type="button">×</button></header>
+        <header><h2><StudyHubIcon name="flag" size={18} /> Report Document</h2><button onClick={onClose} type="button">×</button></header>
         <div className="report-doc"><Badge tone="blue">{d.code || d.id?.toString().slice(-6)}</Badge><strong>{d.title}</strong></div>
         
         <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-          Loại vi phạm *
+          Violation Type *
           <select 
             value={reportType} 
             onChange={(e) => setReportType(e.target.value)}
             style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
           >
-            <option value="SPAM">Spam / Rác</option>
-            <option value="COPYRIGHT">Bản quyền</option>
-            <option value="INAPPROPRIATE">Không phù hợp</option>
-            <option value="OTHER">Lý do khác</option>
+            <option value="SPAM">Spam / Junk</option>
+            <option value="COPYRIGHT">Copyright Infringement</option>
+            <option value="INAPPROPRIATE">Inappropriate Content</option>
+            <option value="OTHER">Other Reason</option>
           </select>
         </label>
 
         <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-          Mô tả chi tiết *
+          Detailed Description *
           <textarea 
-            placeholder="Vui lòng mô tả chi tiết vấn đề bạn gặp phải với tài liệu này..." 
+            placeholder="Please describe in detail the issue you encountered with this document..." 
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             style={{ width: '100%', minHeight: '100px', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13.5px', resize: 'vertical', outline: 'none' }}
           />
         </label>
         
-        <div className="warning-box">Lưu ý: Báo cáo sai sự thật có thể dẫn đến việc tài khoản bị khóa.</div>
+        <div className="warning-box">Note: False reporting may lead to account suspension.</div>
         <footer>
-          <button onClick={onClose} disabled={loading} type="button">Hủy</button>
+          <button onClick={onClose} disabled={loading} type="button">Cancel</button>
           <button className="danger-button" disabled={loading} onClick={handleSubmit} type="button">
-            {loading ? 'Đang gửi...' : 'Gửi báo cáo'}
+            {loading ? 'Submitting...' : 'Submit Report'}
           </button>
         </footer>
       </section>
@@ -163,12 +163,12 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
       if (res?.success && res?.data) {
         const updatedUser = { ...user, avatarUrl: res.data }
         onUserUpdate(updatedUser)
-        setSuccessMsg('Tải lên ảnh đại diện thành công!')
+        setSuccessMsg('Profile picture uploaded successfully!')
       } else {
-        setErrorMsg('Không thể tải lên ảnh đại diện.')
+        setErrorMsg('Unable to upload profile picture.')
       }
     } catch (err) {
-      setErrorMsg(err.message || 'Lỗi tải lên ảnh đại diện.')
+      setErrorMsg(err.message || 'Error uploading profile picture.')
     } finally {
       setLoading(false)
     }
@@ -177,7 +177,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
   const handlePasswordSubmit = async (e) => {
     e.preventDefault()
     if (newPassword !== confirmPassword) {
-      setErrorMsg('Mật khẩu mới và xác nhận mật khẩu không khớp.')
+      setErrorMsg('New password and confirm password do not match.')
       return
     }
     
@@ -186,12 +186,12 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
     setErrorMsg('')
     try {
       await changePassword({ oldPassword, newPassword, confirmPassword })
-      setSuccessMsg('Đổi mật khẩu thành công!')
+      setSuccessMsg('Password changed successfully!')
       setOldPassword('')
       setNewPassword('')
       setConfirmPassword('')
     } catch (err) {
-      setErrorMsg(err.message || 'Mật khẩu cũ không chính xác.')
+      setErrorMsg(err.message || 'Incorrect current password.')
     } finally {
       setLoading(false)
     }
@@ -200,7 +200,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
   const handleVerificationSubmit = async (e) => {
     e.preventDefault()
     if (!verificationFile) {
-      setErrorMsg('Vui lòng chọn ảnh thẻ sinh viên để tải lên.')
+      setErrorMsg('Please select your student ID Card image to upload.')
       return
     }
 
@@ -211,10 +211,10 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
       await verifyStudent(verificationFile)
       setVerificationStatus('pending')
       localStorage.setItem('verificationStatus', 'pending')
-      setSuccessMsg('Gửi yêu cầu xác minh thành công! Vui lòng chờ admin phê duyệt.')
+      setSuccessMsg('Verification request submitted successfully! Please wait for admin approval.')
       setVerificationFile(null)
     } catch (err) {
-      setErrorMsg(err.message || 'Không thể gửi yêu cầu xác minh.')
+      setErrorMsg(err.message || 'Unable to submit verification request.')
     } finally {
       setLoading(false)
     }
@@ -225,15 +225,15 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
       <section className="settings-modal">
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
           <h2 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <StudyHubIcon name="settings" size={20} /> Cài đặt tài khoản
+            <StudyHubIcon name="settings" size={20} /> Account Settings
           </h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-muted, #94a3b8)' }} type="button">×</button>
         </header>
 
         <nav className="settings-modal-tabs">
-          <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => { setActiveTab('profile'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Thông tin</button>
-          <button className={activeTab === 'password' ? 'active' : ''} onClick={() => { setActiveTab('password'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Bảo mật</button>
-          <button className={activeTab === 'verification' ? 'active' : ''} onClick={() => { setActiveTab('verification'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Xác minh</button>
+          <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => { setActiveTab('profile'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Profile</button>
+          <button className={activeTab === 'password' ? 'active' : ''} onClick={() => { setActiveTab('password'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Security</button>
+          <button className={activeTab === 'verification' ? 'active' : ''} onClick={() => { setActiveTab('verification'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Verification</button>
         </nav>
 
         <div className="settings-modal-content">
@@ -250,26 +250,26 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
                 />
                 <div className="avatar-upload-btn-container">
                   <label className="avatar-upload-btn">
-                    Thay ảnh đại diện
+                    Change Avatar
                     <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} disabled={loading} />
                   </label>
-                  <span className="avatar-upload-info">Chấp nhận JPG, PNG tối đa 5MB.</span>
+                  <span className="avatar-upload-info">Supports JPG, PNG max 5MB.</span>
                 </div>
               </div>
 
               <div className="settings-input-group">
-                <label>Họ và tên</label>
+                <label>Full Name</label>
                 <input value={user?.fullName || ''} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
               </div>
 
               <div className="settings-input-group">
-                <label>Email đăng ký</label>
+                <label>Registered Email</label>
                 <input value={user?.email || ''} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
               </div>
 
               {user?.studentCode && (
                 <div className="settings-input-group">
-                  <label>Mã sinh viên</label>
+                  <label>Student ID</label>
                   <input value={user.studentCode} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
                 </div>
               )}
@@ -279,19 +279,19 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
           {activeTab === 'password' && (
             <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="settings-input-group">
-                <label>Mật khẩu cũ *</label>
-                <input type="password" required value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} disabled={loading} placeholder="Nhập mật khẩu hiện tại" />
+                <label>Current Password *</label>
+                <input type="password" required value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} disabled={loading} placeholder="Enter current password" />
               </div>
               <div className="settings-input-group">
-                <label>Mật khẩu mới *</label>
-                <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={loading} placeholder="Ít nhất 6 ký tự" />
+                <label>New Password *</label>
+                <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={loading} placeholder="At least 6 characters" />
               </div>
               <div className="settings-input-group">
-                <label>Xác nhận mật khẩu mới *</label>
-                <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading} placeholder="Nhập lại mật khẩu mới" />
+                <label>Confirm New Password *</label>
+                <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading} placeholder="Enter new password again" />
               </div>
               <button className="purple-button" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', marginTop: '8px', padding: '10px 18px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600 }}>
-                {loading ? 'Đang lưu...' : 'Đổi mật khẩu'}
+                {loading ? 'Saving...' : 'Change Password'}
               </button>
             </form>
           )}
@@ -299,34 +299,34 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
           {activeTab === 'verification' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '10px', backgroundColor: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)' }}>
-                <span style={{ fontSize: '14px', fontWeight: 500 }}>Trạng thái xác minh:</span>
-                {verificationStatus === 'verified' && <span className="settings-status-badge verified">Đã xác minh</span>}
-                {verificationStatus === 'pending' && <span className="settings-status-badge pending">Chờ duyệt</span>}
-                {verificationStatus === 'unverified' && <span className="settings-status-badge unverified">Chưa xác minh</span>}
+                <span style={{ fontSize: '14px', fontWeight: 500 }}>Verification Status:</span>
+                {verificationStatus === 'verified' && <span className="settings-status-badge verified">Verified</span>}
+                {verificationStatus === 'pending' && <span className="settings-status-badge pending">Pending</span>}
+                {verificationStatus === 'unverified' && <span className="settings-status-badge unverified">Unverified</span>}
               </div>
 
               {verificationStatus === 'unverified' && (
                 <form onSubmit={handleVerificationSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div className="settings-input-group">
-                    <label>Tải lên ảnh Thẻ sinh viên (Mặt trước) *</label>
+                    <label>Upload Student ID Card image (Front) *</label>
                     <div className="avatar-upload-container">
                       <div className="avatar-upload-btn-container" style={{ flex: 1 }}>
                         <input type="file" accept="image/*" onChange={(e) => setVerificationFile(e.target.files[0])} disabled={loading} required />
                         <span className="avatar-upload-info" style={{ marginTop: '4px' }}>
-                          {verificationFile ? `Đã chọn: ${verificationFile.name}` : 'Vui lòng chọn ảnh thẻ sinh viên của bạn.'}
+                          {verificationFile ? `Selected: ${verificationFile.name}` : 'Please select your student ID Card image.'}
                         </span>
                       </div>
                     </div>
                   </div>
                   <button className="purple-button" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', padding: '10px 18px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600 }}>
-                    {loading ? 'Đang gửi...' : 'Gửi yêu cầu xác minh'}
+                    {loading ? 'Submitting...' : 'Submit Verification Request'}
                   </button>
                 </form>
               )}
 
               {verificationStatus === 'pending' && (
                 <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', color: '#b45309', fontSize: '13px', lineHeight: '18px' }}>
-                  Yêu cầu xác minh của bạn đã được gửi thành công. Admin sẽ kiểm tra và phê duyệt thẻ sinh viên của bạn trong vòng 24-48 giờ tới.
+                  Your verification request has been submitted successfully. Admin will review and approve your student ID card within the next 24-48 hours.
                 </div>
               )}
 
@@ -335,7 +335,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  Tài khoản của bạn đã được xác minh là sinh viên chính thức.
+                  Your account has been verified as an official student.
                 </div>
               )}
             </div>
@@ -343,7 +343,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
         </div>
 
         <footer style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', borderTop: '1px solid var(--border-color, #e2e8f0)', gap: '12px' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Đóng</button>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Close</button>
         </footer>
       </section>
     </div>
@@ -379,7 +379,7 @@ export function FeatureRequestModal({ onClose }) {
               <circle cx="6" cy="9" r="1" />
               <circle cx="6" cy="13" r="1" />
             </svg>
-            Yêu cầu tính năng mới
+            Request New Feature
           </h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-muted, #94a3b8)' }} type="button">×</button>
         </header>
@@ -392,23 +392,23 @@ export function FeatureRequestModal({ onClose }) {
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               </div>
-              <strong style={{ fontSize: '16px', color: 'var(--text-primary, #0f172a)' }}>Gửi yêu cầu thành công!</strong>
+              <strong style={{ fontSize: '16px', color: 'var(--text-primary, #0f172a)' }}>Request Submitted Successfully!</strong>
               <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary, #475569)', lineHeight: '20px' }}>
-                Cảm ơn đóng góp quý giá của bạn. Chúng tôi sẽ nghiên cứu tính năng này để cải thiện AI Study Hub trong thời gian tới.
+                Thank you for your valuable contribution. We will research this feature to improve AI Study Hub in the future.
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="settings-input-group">
-                <label>Tên tính năng đề xuất *</label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Ví dụ: Tính năng thi thử trắc nghiệm online" />
+                <label>Proposed Feature Name *</label>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g. Online quiz mock exam feature" />
               </div>
               <div className="settings-input-group">
-                <label>Mô tả chi tiết *</label>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} required rows={4} placeholder="Vui lòng mô tả tính năng này sẽ hoạt động như thế nào và lợi ích của nó..." />
+                <label>Detailed Description *</label>
+                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} required rows={4} placeholder="Please describe how this feature will work and its benefits..." />
               </div>
               <button className="purple-button" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', padding: '10px 18px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600 }}>
-                {loading ? 'Đang gửi...' : 'Gửi yêu cầu'}
+                {loading ? 'Submitting...' : 'Submit Request'}
               </button>
             </form>
           )}
@@ -416,9 +416,9 @@ export function FeatureRequestModal({ onClose }) {
 
         <footer style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', borderTop: '1px solid var(--border-color, #e2e8f0)', gap: '12px' }}>
           {success ? (
-            <button onClick={onClose} className="purple-button" style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', fontWeight: 600 }} type="button">Xong</button>
+            <button onClick={onClose} className="purple-button" style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', fontWeight: 600 }} type="button">Done</button>
           ) : (
-            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Hủy</button>
+            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Cancel</button>
           )}
         </footer>
       </section>
@@ -452,16 +452,16 @@ export function SupportModal({ onClose }) {
               <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
               <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
             </svg>
-            Trung tâm hỗ trợ
+            Support Center
           </h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-muted, #94a3b8)' }} type="button">×</button>
         </header>
 
         <div className="settings-modal-content">
           <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div><strong>Kênh chính thức:</strong></div>
+            <div><strong>Official Channels:</strong></div>
             <div>📧 Email: support@aistudyhub.vn</div>
-            <div>📞 Hotline: 1900 8198 (8h00 - 22h00)</div>
+            <div>📞 Hotline: 1900 8198 (8:00 AM - 10:00 PM)</div>
           </div>
 
           {success ? (
@@ -471,23 +471,23 @@ export function SupportModal({ onClose }) {
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               </div>
-              <strong style={{ fontSize: '16px', color: 'var(--text-primary, #0f172a)' }}>Gửi thành công!</strong>
+              <strong style={{ fontSize: '16px', color: 'var(--text-primary, #0f172a)' }}>Submitted Successfully!</strong>
               <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary, #475569)', lineHeight: '20px' }}>
-                Yêu cầu hỗ trợ của bạn đã được tiếp nhận. Đội ngũ kỹ thuật sẽ liên hệ lại với bạn qua email sớm nhất có thể.
+                Your support ticket has been received. Our technical team will reach back to you via email as soon as possible.
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="settings-input-group">
-                <label>Email liên hệ *</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="Nhập email của bạn để chúng tôi phản hồi" />
+                <label>Contact Email *</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="Enter your email for our response" />
               </div>
               <div className="settings-input-group">
-                <label>Mô tả vấn đề cần giúp đỡ *</label>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} required rows={4} placeholder="Ví dụ: Tôi không tải được tài liệu mặc dù đã trả phí..." />
+                <label>Describe the issue you need help with *</label>
+                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} required rows={4} placeholder="e.g. I cannot download documents despite having paid..." />
               </div>
               <button className="purple-button" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', padding: '10px 18px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600 }}>
-                {loading ? 'Đang gửi...' : 'Gửi yêu cầu trợ giúp'}
+                {loading ? 'Submitting...' : 'Submit Support Ticket'}
               </button>
             </form>
           )}
@@ -495,9 +495,9 @@ export function SupportModal({ onClose }) {
 
         <footer style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', borderTop: '1px solid var(--border-color, #e2e8f0)', gap: '12px' }}>
           {success ? (
-            <button onClick={onClose} className="purple-button" style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', fontWeight: 600 }} type="button">Xong</button>
+            <button onClick={onClose} className="purple-button" style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', fontWeight: 600 }} type="button">Done</button>
           ) : (
-            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Hủy</button>
+            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Cancel</button>
           )}
         </footer>
       </section>
@@ -534,17 +534,17 @@ export function ChromeExtensionModal({ onClose }) {
 
         <div className="settings-modal-content" style={{ gap: '14px' }}>
           <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary, #475569)', lineHeight: '20px' }}>
-            AI Study Hub Chrome Extension giúp bạn phân tích, tóm tắt và đặt câu hỏi cho bất kỳ tài liệu hay trang web nào ngay khi đang lướt web học tập trên Chrome.
+            AI Study Hub Chrome Extension helps you analyze, summarize, and ask questions about any document or website directly while browsing and studying on Chrome.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '14px', borderRadius: '12px', backgroundColor: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)' }}>
-            <span style={{ fontSize: '14px', fontWeight: 600 }}>Hướng dẫn cài đặt tiện ích:</span>
+            <span style={{ fontSize: '14px', fontWeight: 600 }}>Extension Installation Guide:</span>
             <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', lineHeight: '20px', color: 'var(--text-secondary, #475569)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <li>Bấm nút <strong>Tải tiện ích (Beta)</strong> bên dưới để tải file <code>ai-studyhub-extension.zip</code>.</li>
-              <li>Giải nén file zip vừa tải xuống một thư mục trên máy tính.</li>
-              <li>Mở trình duyệt Google Chrome và truy cập đường dẫn: <code>chrome://extensions/</code></li>
-              <li>Bật chế độ nhà phát triển (<strong>Developer mode</strong>) ở góc trên bên phải Chrome.</li>
-              <li>Bấm chọn nút <strong>Load unpacked</strong> ở góc trên bên trái, rồi chọn thư mục bạn đã giải nén ở bước 2.</li>
+              <li>Click the <strong>Download Extension (Beta)</strong> button below to download the <code>ai-studyhub-extension.zip</code> file.</li>
+              <li>Extract the downloaded zip file into a folder on your computer.</li>
+              <li>Open Google Chrome and navigate to: <code>chrome://extensions/</code></li>
+              <li>Enable Developer mode (<strong>Developer mode</strong>) in the top-right corner of Chrome.</li>
+              <li>Click the <strong>Load unpacked</strong> button in the top-left corner, then select the folder you extracted in step 2.</li>
             </ol>
           </div>
 
@@ -554,15 +554,14 @@ export function ChromeExtensionModal({ onClose }) {
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            Tải tiện ích (Beta)
+            Download Extension (Beta)
           </button>
         </div>
 
         <footer style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', borderTop: '1px solid var(--border-color, #e2e8f0)', gap: '12px' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Đóng</button>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Close</button>
         </footer>
       </section>
     </div>
   )
 }
-

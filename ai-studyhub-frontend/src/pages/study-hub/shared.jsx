@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import StudyHubIcon from '../../components/icons/StudyHubIcons'
+import StudyHubIcon, { getFileIconName, getFileIconColor } from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { favoriteDocument, unfavoriteDocument } from '../../features/documents/documentService'
 
@@ -29,8 +29,12 @@ export function ExploreFolderCard({ folder, onOpen }) {
       </div>
       <h3>{folder.title}</h3>
       <p>{folder.description}</p>
-      <div className="card-stats"><span><StudyHubIcon name="file" size={14} /> {folder.files} tài liệu</span><span><StudyHubIcon name="download" size={14} /> {folder.downloads} lượt tải</span><button className="download-button" type="button">Tải về</button></div>
-      <small>Tạo bởi {folder.author}</small>
+      <div className="card-stats">
+        <span><StudyHubIcon name="file" size={14} /> {folder.files} documents</span>
+        <span><StudyHubIcon name="download" size={14} /> {folder.downloads} downloads</span>
+        <button className="download-button" type="button">Download</button>
+      </div>
+      <small>Created by {folder.author}</small>
     </article>
   )
 }
@@ -53,7 +57,7 @@ export function DocumentCardMini({ document, doc, onOpen }) {
 
     const docId = d?.id
     if (!docId) {
-      window.showToast?.('Tài liệu không có ID hợp lệ', 'error')
+      window.showToast?.('Document does not have a valid ID', 'error')
       return
     }
 
@@ -68,10 +72,26 @@ export function DocumentCardMini({ document, doc, onOpen }) {
       })
   }
 
+  const typeUpper = (d?.type || 'PDF').toUpperCase()
+  let typeBadgeBg = 'bg-slate-100 text-slate-600 border border-slate-200'
+  if (typeUpper === 'PDF') {
+    typeBadgeBg = 'bg-red-50 text-red-600 border border-red-100'
+  } else if (typeUpper === 'DOCX' || typeUpper === 'DOC') {
+    typeBadgeBg = 'bg-blue-50 text-blue-600 border border-blue-100'
+  } else if (typeUpper === 'PPTX' || typeUpper === 'PPT') {
+    typeBadgeBg = 'bg-amber-50 text-amber-600 border border-amber-100'
+  }
+
   return (
     <article className="document-card" onClick={onOpen}>
       <div className="document-card__header">
-        <div className="document-card__badges"><Badge tone="blue">{d?.code}</Badge><Badge>{d?.type}</Badge></div>
+        <div className="document-card__badges">
+          <Badge tone="blue">{d?.code}</Badge>
+          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold ${typeBadgeBg}`}>
+            <StudyHubIcon name={getFileIconName(typeUpper)} size={12} className="flex-shrink-0" />
+            {typeUpper}
+          </span>
+        </div>
         <button
           className={`icon-button ${favorite ? 'is-active' : ''}`}
           onClick={handleToggleFavorite}
@@ -84,7 +104,7 @@ export function DocumentCardMini({ document, doc, onOpen }) {
       <p>{d?.description}</p>
       <div className="document-card__footer">
         <div className="card-stats"><span><StudyHubIcon name="download" size={14} /> {d?.downloads}</span><span className="rating">★ {d?.rating}</span></div>
-        <button className="download-button" type="button">Tải về</button>
+        <button className="download-button" type="button">Download</button>
       </div>
     </article>
   )

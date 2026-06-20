@@ -15,7 +15,7 @@ export default function DocumentCard({ document }) {
         <button
           className={`icon-button ${favorite ? 'is-active' : ''}`}
           type="button"
-          aria-label={`Lưu ${document.title}`}
+          aria-label={`Save ${document.title}`}
           onClick={(event) => {
             event.stopPropagation()
             setFavorite((value) => !value)
@@ -38,7 +38,7 @@ export default function DocumentCard({ document }) {
         </div>
         <button className="download-button" type="button">
           <StudyHubIcon name="download" size={16} />
-          Tải về
+          Download
         </button>
       </div>
     </article>

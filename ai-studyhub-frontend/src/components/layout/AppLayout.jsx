@@ -8,7 +8,9 @@ export default function AppLayout({
   recentItems = [], onOpenRecentItem, activeItemContext = {},
   breadcrumbs = [],
   onBreadcrumbClick,
-  onRenameTitle
+  onRenameTitle,
+  visibility = null,
+  route = ''
 }) {
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'app-shell--collapsed' : ''} ${className}`}>
@@ -35,6 +37,8 @@ export default function AppLayout({
             breadcrumbs={breadcrumbs} 
             onBreadcrumbClick={onBreadcrumbClick}
             onRenameTitle={onRenameTitle}
+            visibility={visibility}
+            route={route}
           />
         )}
         {children}

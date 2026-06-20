@@ -26,11 +26,11 @@ export function LoginPage({ onLogin, onNavigate }) {
 
   return (
     <AuthShell
-      description="Tiếp tục hành trình học tập của bạn với tài liệu, flashcard và trợ lý AI."
+      description="Continue your learning journey with documents, flashcards, and AI assistants."
       leaving={transition.leaving}
       onBack={() => transition.to('explore')}
-      subtitle="Chào mừng trở lại!"
-      title="Đăng nhập"
+      subtitle="Welcome back!"
+      title="Sign In"
     >
       <AuthCard onSubmit={handleSubmit}>
         <Field
@@ -45,9 +45,9 @@ export function LoginPage({ onLogin, onNavigate }) {
         <Field
           autoComplete="current-password"
           icon="lock"
-          label="Mật khẩu"
+          label="Password"
           onChange={setPassword}
-          placeholder="Nhập mật khẩu"
+          placeholder="Enter your password"
           revealable
           type="password"
           value={password}
@@ -61,7 +61,7 @@ export function LoginPage({ onLogin, onNavigate }) {
               onChange={(event) => setRemember(event.target.checked)}
               type="checkbox"
             />
-            <span>Ghi nhớ đăng nhập</span>
+            <span>Remember me</span>
           </label>
         </div>
         {error && (
@@ -72,18 +72,18 @@ export function LoginPage({ onLogin, onNavigate }) {
         <button className="auth-submit" disabled={loading} type="submit">
           {loading ? (
             <>
-              <span className="auth-spinner" /> Đang đăng nhập...
+              <span className="auth-spinner" /> Signing in...
             </>
           ) : (
             <>
-              Đăng nhập <span aria-hidden="true">→</span>
+              Sign In <span aria-hidden="true">→</span>
             </>
           )}
         </button>
         <p className="auth-switch">
-          Chưa có tài khoản?
+          Don't have an account?
           <button onClick={() => transition.to('register')} type="button">
-            Đăng ký ngay
+            Sign up now
           </button>
         </p>
       </AuthCard>
@@ -110,7 +110,7 @@ export function RegisterPage({ onNavigate, onRegister }) {
   const handleSubmit = async (event) => {
     event.preventDefault()
     if (form.password !== form.confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp.')
+      setError('Passwords do not match.')
       return
     }
 
@@ -134,26 +134,26 @@ export function RegisterPage({ onNavigate, onRegister }) {
   return (
     <AuthShell
       compact
-      description="Tạo không gian học tập cá nhân và bắt đầu khai thác sức mạnh của AI."
+      description="Create a personal study space and start leveraging the power of AI."
       leaving={transition.leaving}
       onBack={() => transition.to('explore')}
-      subtitle="Bắt đầu hành trình học tập thông minh"
-      title="Tạo tài khoản"
+      subtitle="Start your smart learning journey"
+      title="Create Account"
     >
       <AuthCard compact onSubmit={handleSubmit}>
         <div className="auth-form-grid">
           <Field
             autoComplete="name"
             icon="user"
-            label="Họ và tên"
+            label="Full Name"
             onChange={(value) => setField('fullName', value)}
-            placeholder="Nguyễn Văn A"
+            placeholder="John Doe"
             value={form.fullName}
           />
           <Field
             autoComplete="username"
             icon="card"
-            label="Mã sinh viên"
+            label="Student Code"
             onChange={(value) => setField('studentCode', value)}
             placeholder="SE123456"
             value={form.studentCode}
@@ -172,9 +172,9 @@ export function RegisterPage({ onNavigate, onRegister }) {
           <Field
             autoComplete="new-password"
             icon="lock"
-            label="Mật khẩu"
+            label="Password"
             onChange={(value) => setField('password', value)}
-            placeholder="Tối thiểu 8 ký tự"
+            placeholder="At least 8 characters"
             revealable
             type="password"
             value={form.password}
@@ -182,9 +182,9 @@ export function RegisterPage({ onNavigate, onRegister }) {
           <Field
             autoComplete="new-password"
             icon="lock"
-            label="Xác nhận mật khẩu"
+            label="Confirm Password"
             onChange={(value) => setField('confirmPassword', value)}
-            placeholder="Nhập lại mật khẩu"
+            placeholder="Re-enter password"
             revealable
             type="password"
             value={form.confirmPassword}
@@ -198,18 +198,18 @@ export function RegisterPage({ onNavigate, onRegister }) {
         <button className="auth-submit" disabled={loading} type="submit">
           {loading ? (
             <>
-              <span className="auth-spinner" /> Đang đăng ký...
+              <span className="auth-spinner" /> Registering...
             </>
           ) : (
             <>
-              Tạo tài khoản <span aria-hidden="true">→</span>
+              Create Account <span aria-hidden="true">→</span>
             </>
           )}
         </button>
         <p className="auth-switch">
-          Đã có tài khoản?
+          Already have an account?
           <button onClick={() => transition.to('login')} type="button">
-            Đăng nhập
+            Sign In
           </button>
         </p>
       </AuthCard>
@@ -217,7 +217,7 @@ export function RegisterPage({ onNavigate, onRegister }) {
   )
 }
 
-function AuthShell({ children, compact = false, description, leaving, onBack, subtitle, title }) {
+export function AuthShell({ children, compact = false, description, leaving, onBack, subtitle, title }) {
   return (
     <main className={`auth-page ${compact ? 'auth-page--compact' : ''} ${leaving ? 'is-leaving' : ''}`}>
       <div className="auth-orb auth-orb--one" />
@@ -229,28 +229,28 @@ function AuthShell({ children, compact = false, description, leaving, onBack, su
         </div>
         <div className="auth-showcase__content">
           <span className="auth-eyebrow">
-            <StudyHubIcon name="sparkle" size={16} /> Học thông minh hơn mỗi ngày
+            <StudyHubIcon name="sparkle" size={16} /> Learn smarter every day
           </span>
           <h2>
-            Biến tài liệu thành<br />
-            <strong>kiến thức của bạn.</strong>
+            Turn documents into<br />
+            <strong>your knowledge.</strong>
           </h2>
           <p>{description}</p>
           <div className="auth-feature-list">
             <span>
-              <StudyHubIcon name="message" size={18} /> Trò chuyện với tài liệu bằng AI
+              <StudyHubIcon name="message" size={18} /> Chat with documents using AI
             </span>
             <span>
-              <StudyHubIcon name="card" size={18} /> Tạo flashcard và quiz tức thì
+              <StudyHubIcon name="card" size={18} /> Create flashcards and quizzes instantly
             </span>
             <span>
-              <StudyHubIcon name="folder" size={18} /> Quản lý học liệu tập trung
+              <StudyHubIcon name="folder" size={18} /> Centralized study materials management
             </span>
           </div>
         </div>
         <div className="auth-showcase__quote">
           <span>"</span>
-          <p>Mỗi phiên học đều có thể trở nên rõ ràng và thú vị hơn.</p>
+          <p>Every study session can become clearer and more engaging.</p>
         </div>
       </section>
 
@@ -268,7 +268,7 @@ function AuthShell({ children, compact = false, description, leaving, onBack, su
           </header>
           {children}
           <button className="auth-back" onClick={onBack} type="button">
-            <StudyHubIcon name="arrow-left" size={16} /> Quay về trang chủ
+            <StudyHubIcon name="arrow-left" size={16} /> Back to Home
           </button>
         </div>
       </section>
@@ -314,7 +314,7 @@ function Field({
         />
         {revealable && (
           <button
-            aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            aria-label={visible ? 'Hide password' : 'Show password'}
             className="field__reveal"
             onClick={() => setVisible((current) => !current)}
             type="button"

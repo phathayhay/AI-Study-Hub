@@ -630,7 +630,7 @@ export default function Sidebar({
               />
               {!collapsed && (
                 <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary, #0f172a)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {user?.fullName || 'Anh Nhật'}
+                  {user?.fullName || 'Student'}
                 </div>
               )}
             </div>

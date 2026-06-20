@@ -1,13 +1,17 @@
 import { apiPost } from './api'
 
-export function uploadAvatar(file) {
-  const formData = new FormData()
-  formData.append('file', file)
-  return apiPost('/users/avatar', formData)
+/**
+ * Submit student identity verification
+ * Uploads a student card image to Cloudinary, registers/updates the student verification request, and sets the user's verification status to PENDING.
+ */
+export function verifyStudent(body) {
+  return apiPost('/users/verify-student', body);
 }
 
-export function verifyStudent(file) {
-  const formData = new FormData()
-  formData.append('file', file)
-  return apiPost('/users/verify-student', formData)
+/**
+ * Upload user avatar
+ * Uploads an avatar image to Firebase Storage, automatically cleans up the old one if it exists, and updates avatarUrl in the database.
+ */
+export function uploadAvatar(body) {
+  return apiPost('/users/avatar', body);
 }

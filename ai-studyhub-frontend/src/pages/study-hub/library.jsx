@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import StudyHubIcon from '../../components/icons/StudyHubIcons'
+import StudyHubIcon, { getFileIconName, getFileIconColor } from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { libraryTabs } from './config'
 import { 
@@ -44,11 +44,7 @@ function getItemGroup(dateStr) {
 
 function mapDoc(doc) {
   const dateObj = doc.createdAt ? new Date(doc.createdAt) : new Date()
-  const monthNames = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
-  const month = monthNames[dateObj.getMonth()];
-  const day = dateObj.getDate();
-  const year = dateObj.getFullYear();
-  const displayDate = `${month} ${day < 10 ? '0' + day : day}, ${year}`;
+  const displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
 
   let docName = doc.title || doc.fileName || 'Untitled';
   try {
@@ -71,6 +67,7 @@ function mapDoc(doc) {
     time: displayDate,
     shared: doc.visibility === 'PUBLIC',
     public: doc.visibility === 'PUBLIC',
+    visibility: doc.visibility,
     favorite: false,
     fileUrl: doc.fileUrl || '',
     folderId: doc.folderId,
@@ -137,11 +134,7 @@ export function LibraryPage({
       
       const mappedFolders = folderList.map(f => {
         const dateObj = f.createdAt ? new Date(f.createdAt) : new Date()
-        const monthNames = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
-        const month = monthNames[dateObj.getMonth()];
-        const day = dateObj.getDate();
-        const year = dateObj.getFullYear();
-        const displayDate = `${month} ${day < 10 ? '0' + day : day}, ${year}`;
+        const displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
         return {
           id: f.id,
           name: f.folderName || f.name || 'Untitled Folder',
@@ -181,7 +174,7 @@ export function LibraryPage({
 
   useEffect(() => {
     if (initialFolderId) {
-      handleSelectFolder({ id: initialFolderId, name: 'Đang tải...' })
+      handleSelectFolder({ id: initialFolderId, name: 'Loading...' })
       onClearInitialFolderId?.()
     }
   }, [initialFolderId])
@@ -220,36 +213,36 @@ export function LibraryPage({
   }
 
   const handleAddFolder = () => {
-    const name = window.prompt('Nhập tên thư mục mới:')?.trim()
+    const name = window.prompt('Enter new folder name:')?.trim()
     if (!name) return
     setLoading(true)
     createFolder(name)
       .then(() => {
         loadLibraryData()
         onTabChange('folders')
-        window.showToast?.('Đã tạo thư mục mới thành công', 'success')
+        window.showToast?.('Folder created successfully', 'success')
       })
       .catch((err) => {
         console.error(err)
         setLoading(false)
-        window.showToast?.('Tạo thư mục thất bại', 'error')
+        window.showToast?.('Failed to create folder', 'error')
       })
   }
 
   const handleAddSubfolder = (parentFolder) => {
-    const name = window.prompt(`Nhập tên thư mục con trong "${parentFolder.name}":`)
+    const name = window.prompt(`Enter subfolder name in "${parentFolder.name}":`)
     if (!name?.trim()) return
     setFolderLoading(true)
     createFolder(name.trim(), parentFolder.id)
       .then(() => {
         handleSelectFolder(parentFolder)
         loadLibraryData()
-        window.showToast?.('Đã tạo thư mục con thành công', 'success')
+        window.showToast?.('Subfolder created successfully', 'success')
       })
       .catch((err) => {
         console.error(err)
         setFolderLoading(false)
-        window.showToast?.('Tạo thư mục con thất bại', 'error')
+        window.showToast?.('Failed to create subfolder', 'error')
       })
   }
 
@@ -260,10 +253,10 @@ export function LibraryPage({
       const next = new Set(prev)
       if (next.has(key)) {
         next.delete(key)
-        window.showToast?.('Đã bỏ ghim tài nguyên', 'success')
+        window.showToast?.('Item unpinned successfully', 'success')
       } else {
         next.add(key)
-        window.showToast?.('Đã ghim tài nguyên thành công', 'success')
+        window.showToast?.('Item pinned successfully', 'success')
       }
       localStorage.setItem('pinnedItems', JSON.stringify([...next]))
       return next
@@ -273,7 +266,7 @@ export function LibraryPage({
   const handleShareItem = (item) => {
     const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
     if (isFolder) {
-      window.showToast?.('Không hỗ trợ chia sẻ thư mục', 'info')
+      window.showToast?.('Sharing folders is not supported', 'info')
       return
     }
     setShareItem(item)
@@ -281,7 +274,7 @@ export function LibraryPage({
 
   const handleRenameItem = (item) => {
     const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
-    const nextName = window.prompt(`Nhập tên ${isFolder ? 'thư mục' : 'tài liệu'} mới:`, item.name)?.trim()
+    const nextName = window.prompt(`Enter new ${isFolder ? 'folder' : 'document'} name:`, item.name)?.trim()
     if (!nextName) return
 
     if (isFolder) {
@@ -292,12 +285,12 @@ export function LibraryPage({
           if (selectedFolder && selectedFolder.id === item.id) {
             setSelectedFolder({ ...selectedFolder, name: nextName })
           }
-          window.showToast?.('Đổi tên thư mục thành công', 'success')
+          window.showToast?.('Folder renamed successfully', 'success')
         })
         .catch((err) => {
           console.error(err)
           setLoading(false)
-          window.showToast?.('Đổi tên thư mục thất bại', 'error')
+          window.showToast?.('Failed to rename folder', 'error')
         })
     } else {
       try {
@@ -309,10 +302,10 @@ export function LibraryPage({
         if (selectedFolder) {
           handleSelectFolder(selectedFolder)
         }
-        window.showToast?.('Đổi tên tài liệu thành công', 'success')
+        window.showToast?.('Document renamed successfully', 'success')
       } catch (err) {
         console.error('Failed to rename document locally', err)
-        window.showToast?.('Đổi tên tài liệu thất bại', 'error')
+        window.showToast?.('Failed to rename document', 'error')
       }
     }
     setOpenFileMenuId(null)
@@ -320,7 +313,7 @@ export function LibraryPage({
   }
 
   const handleDeleteFolder = (folder) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa thư mục "${folder.name}" không?`)) return
+    if (!window.confirm(`Are you sure you want to delete the folder "${folder.name}"?`)) return
     setLoading(true)
     deleteFolder(folder.id)
       .then(() => {
@@ -330,18 +323,18 @@ export function LibraryPage({
           setSelectedFolder(null)
           setSelectedFolderDetails(null)
         }
-        window.showToast?.('Đã xóa thư mục thành công', 'success')
+        window.showToast?.('Folder deleted successfully', 'success')
       })
       .catch((err) => {
         console.error(err)
         setLoading(false)
-        window.showToast?.('Xóa thư mục thất bại', 'error')
+        window.showToast?.('Failed to delete folder', 'error')
       })
     setOpenFolderMenuId(null)
   }
 
   const handleDeleteLibraryFile = (file) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${file.name}" không?`)) return
+    if (!window.confirm(`Are you sure you want to delete the document "${file.name}"?`)) return
     setLoading(true)
     deleteDocument(file.id)
       .then(() => {
@@ -350,30 +343,30 @@ export function LibraryPage({
         if (selectedFolder) {
           handleSelectFolder(selectedFolder)
         }
-        window.showToast?.('Đã xóa tài liệu thành công', 'success')
+        window.showToast?.('Document deleted successfully', 'success')
       })
       .catch((err) => {
         console.error(err)
         setLoading(false)
-        window.showToast?.('Xóa tài liệu thất bại', 'error')
+        window.showToast?.('Failed to delete document', 'error')
       })
     setOpenFileMenuId(null)
   }
 
   const handleDeleteFolderFile = (folder, file) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${file.name}" khỏi thư mục không?`)) return
+    if (!window.confirm(`Are you sure you want to remove the document "${file.name}" from the folder?`)) return
     setLoading(true)
     deleteDocument(file.id)
       .then(() => {
         onRemoveRecentItem?.(file.id)
         handleSelectFolder(folder)
         loadLibraryData()
-        window.showToast?.('Đã xóa tài liệu thành công', 'success')
+        window.showToast?.('Document removed successfully', 'success')
       })
       .catch((err) => {
         console.error(err)
         setLoading(false)
-        window.showToast?.('Xóa tài liệu khỏi thư mục thất bại', 'error')
+        window.showToast?.('Failed to remove document from folder', 'error')
       })
     setOpenFileMenuId(null)
   }
@@ -396,7 +389,7 @@ export function LibraryPage({
     const isFolder = moveItem.isFolder || moveItem.type === 'folder' || moveItem.kind === 'folder'
     
     if (isFolder && destFolderId === moveItem.id) {
-      window.showToast?.('Không thể di chuyển thư mục vào chính nó', 'error')
+      window.showToast?.('Cannot move folder into itself', 'error')
       return
     }
 
@@ -407,7 +400,7 @@ export function LibraryPage({
 
     movePromise
       .then(() => {
-        window.showToast?.('Di chuyển tài nguyên thành công', 'success')
+        window.showToast?.('Item moved successfully', 'success')
         setMoveItem(null)
         loadLibraryData()
         if (selectedFolder) {
@@ -416,7 +409,7 @@ export function LibraryPage({
       })
       .catch((err) => {
         console.error(err)
-        window.showToast?.('Di chuyển tài nguyên thất bại', 'error')
+        window.showToast?.('Failed to move item', 'error')
       })
       .finally(() => setLoading(false))
   }
@@ -432,6 +425,7 @@ export function LibraryPage({
         subject: item.subject || 'Document',
         content: '',
         fileUrl: item.fileUrl || '',
+        visibility: item.visibility,
       }
       onOpenFile?.(activeFile)
     }
@@ -571,7 +565,7 @@ export function LibraryPage({
       <main style={{ maxWidth: '1100px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px', padding: '28px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justify: 'space-between', gap: '16px' }}>
           <h1 style={{ fontSize: '22px', fontWeight: 600, color: '#0f172a', margin: 0, whiteSpace: 'nowrap' }}>
-            Hello, <span style={{ fontWeight: 700 }}>{user?.fullName || 'Sinh viên!'}</span>
+            Hello, <span style={{ fontWeight: 700 }}>{user?.fullName || 'Student!'}</span>
           </h1>
           
           <div style={{ flex: 1, maxWidth: '520px', display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 14px', height: '38px', gap: '8px' }}>
@@ -607,7 +601,7 @@ export function LibraryPage({
         <div style={{ flex: 1 }}>
         {loading ? (
           <div style={{ padding: '64px', textAlign: 'center', color: '#64748b' }}>
-            Đang tải dữ liệu...
+            Loading data...
           </div>
         ) : activeTab === 'folders' ? (
           selectedFolder ? (
@@ -764,7 +758,7 @@ function FolderFilesView({
   if (loading) {
     return (
       <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-        Đang tải dữ liệu...
+        Loading data...
       </div>
     )
   }
@@ -772,11 +766,7 @@ function FolderFilesView({
   const combined = [
     ...subfolders.map(sf => {
       const dateObj = sf.createdAt ? new Date(sf.createdAt) : new Date()
-      const monthNames = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
-      const month = monthNames[dateObj.getMonth()];
-      const day = dateObj.getDate();
-      const year = dateObj.getFullYear();
-      const displayDate = `${month} ${day < 10 ? '0' + day : day}, ${year}`;
+      const displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
       return {
         id: sf.id,
         name: sf.folderName || sf.name || 'Untitled Folder',
@@ -823,7 +813,7 @@ function FolderFilesView({
           <button
             onClick={onAddSubfolder}
             type="button"
-            title="Tạo thư mục con"
+            title="Create subfolder"
             style={{ marginLeft: 'auto', height: '32px', padding: '0 12px', backgroundColor: '#fff', color: '#4f46e5', border: '1.5px solid #818cf8', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
           >
             <StudyHubIcon name="plus" size={13} />
@@ -836,7 +826,7 @@ function FolderFilesView({
       <div style={{ border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff' }}>
         {combined.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
-            Thư mục này trống
+            This folder is empty
           </div>
         ) : (
           grouped.map(({ label, items }) => (
@@ -1046,7 +1036,7 @@ function GroupedFiles({
       })}
       {files.length === 0 && (
         <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-          Không tìm thấy tài nguyên nào
+          No items found
         </div>
       )}
     </div>
@@ -1098,7 +1088,7 @@ function GroupedFolders({
       })}
       {folders.length === 0 && (
         <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-          Không tìm thấy thư mục nào
+          No folders found
         </div>
       )}
     </div>
@@ -1151,7 +1141,7 @@ function SharedLibraryFiles({
       })}
       {files.length === 0 && (
         <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-          Không tìm thấy tài nguyên nào
+          No items found
         </div>
       )}
     </div>
@@ -1160,14 +1150,18 @@ function SharedLibraryFiles({
 
 function FileRow({ file, isFolder, onClick, hovered }) {
   const isActualFolder = isFolder || file.type === 'folder' || file.kind === 'folder';
+  const fileRef = file.name.includes('.') ? file.name : file.subject
+  const iconName = isActualFolder ? 'folder' : getFileIconName(fileRef)
+  const iconColor = isActualFolder ? '#818cf8' : getFileIconColor(fileRef)
+  
   return (
     <button
       onClick={onClick}
       type="button"
       style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '13px 20px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
     >
-      <div style={{ color: '#818cf8', marginRight: '14px', flexShrink: 0 }}>
-        <StudyHubIcon name={isActualFolder ? 'folder' : 'file'} size={20} />
+      <div style={{ color: iconColor, marginRight: '14px', flexShrink: 0 }}>
+        <StudyHubIcon name={iconName} size={20} />
       </div>
       <span style={{ flex: 1, fontSize: '13.5px', fontWeight: 500, color: '#4f46e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: hovered ? 'underline' : 'none' }}>
         {file.name}
@@ -1207,7 +1201,7 @@ function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
       })
       .catch((err) => {
         console.error(err)
-        window.showToast?.('Không thể tải thư mục con', 'error')
+        window.showToast?.('Unable to load subfolders', 'error')
       })
       .finally(() => setLoading(false))
   }
@@ -1242,12 +1236,12 @@ function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(4px)' }}>
       <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', width: '90%', maxWidth: '480px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', margin: 0 }}>Di chuyển tài nguyên</h3>
+          <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', margin: 0 }}>Move item</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}>&times;</button>
         </header>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: '260px', maxHeight: '380px', overflowY: 'auto' }}>
           <p style={{ fontSize: '13.5px', color: '#475569', margin: 0 }}>
-            Di chuyển <strong>{item.name}</strong> tới:
+            Move <strong>{item.name}</strong> to:
           </p>
           
           {/* Path Navigator / Breadcrumbs */}
@@ -1269,14 +1263,14 @@ function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', minHeight: '160px' }}>
             {breadcrumbs.length > 0 && (
               <button onClick={navigateUp} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', border: 'none', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#4f46e5' }}>
-                <span>&larr; Quay lại thư mục cha</span>
+                <span>&larr; Back to parent folder</span>
               </button>
             )}
             
             {loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: '#94a3b8', fontSize: '13px' }}>Đang tải thư mục con...</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: '#94a3b8', fontSize: '13px' }}>Loading subfolders...</div>
             ) : currentSubfolders.length === 0 ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: '#94a3b8', fontSize: '13px', fontStyle: 'italic' }}>Không có thư mục con nào ở đây</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: '#94a3b8', fontSize: '13px', fontStyle: 'italic' }}>No subfolders here</div>
             ) : (
               currentSubfolders.map(sub => (
                 <button key={sub.id} onClick={() => navigateToFolder(sub)} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '10px 14px', border: 'none', background: '#fff', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#f8fafc'} onMouseLeave={(e) => e.target.style.backgroundColor = '#fff'}>
@@ -1290,8 +1284,8 @@ function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
           </div>
         </div>
         <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '12px 20px', backgroundColor: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
-          <button onClick={onClose} style={{ height: '36px', padding: '0 16px', background: 'transparent', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>Hủy</button>
-          <button onClick={() => onMove(currentFolder?.id || null)} style={{ height: '36px', padding: '0 16px', backgroundColor: '#4f46e5', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Di chuyển tới đây</button>
+          <button onClick={onClose} style={{ height: '36px', padding: '0 16px', background: 'transparent', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>Cancel</button>
+          <button onClick={() => onMove(currentFolder?.id || null)} style={{ height: '36px', padding: '0 16px', backgroundColor: '#4f46e5', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Move here</button>
         </footer>
       </div>
     </div>
