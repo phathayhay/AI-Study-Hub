@@ -4604,6 +4604,15 @@
   color: #fb923c;
 }
 
+.admin-brand img {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
 .admin-brand strong {
   font-size: 17px;
   letter-spacing: 0;
