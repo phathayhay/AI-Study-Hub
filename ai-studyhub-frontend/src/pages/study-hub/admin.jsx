@@ -41,7 +41,20 @@ const unwrapList = (response) => {
   if (Array.isArray(data)) return data
   if (Array.isArray(data?.content)) return data.content
   if (Array.isArray(data?.items)) return data.items
+  if (Array.isArray(data?.data)) return data.data
+  if (Array.isArray(data?.result)) return data.result
+  if (Array.isArray(data?.results)) return data.results
+  if (Array.isArray(data?.list)) return data.list
+  if (Array.isArray(data?.records)) return data.records
   return []
+}
+
+const formatAdminError = (err) => {
+  const target = err.path ? `${err.method || 'GET'} ${err.path}` : 'admin data'
+  if (err.status >= 500) return `Server error while loading ${target}. Please check the backend logs.`
+  if (err.status === 403) return `You do not have permission to load ${target}. Please sign in with an admin account.`
+  if (err.status === 401) return `Your session expired while loading ${target}. Please sign in again.`
+  return err.message || 'Unable to load admin data'
 }
 
 const formatDate = (value) => {
@@ -75,7 +88,7 @@ function useAdminList(loader) {
       const response = await loader()
       setState({ data: unwrapList(response), error: '', loading: false })
     } catch (err) {
-      setState({ data: [], error: err.message || 'Unable to load admin data', loading: false })
+      setState({ data: [], error: formatAdminError(err), loading: false })
     }
   }, [loader])
 
@@ -601,21 +614,23 @@ function promptLookup(type, item = {}) {
 
 function LookupRows({ fields, items, labelKey, loading, onCreate, onDelete, onUpdate, title }) {
   return (
-    <div className="setting-row">
-      <p><strong>{title}</strong><small>{loading ? 'Loading...' : `${items.length} records`}</small></p>
-      <span className="admin-actions">
+    <div className="setting-row lookup-row">
+      <p className="lookup-summary"><strong>{title}</strong><small>{loading ? 'Loading...' : `${items.length} records`}</small></p>
+      <span className="admin-actions lookup-create">
         <button onClick={onCreate} type="button"><StudyHubIcon name="plus" size={16} /></button>
       </span>
-      {items.slice(0, 4).map((item) => (
-        <p key={item.id || item[labelKey]}>
-          <strong>{item[labelKey]}</strong>
-          <small>{fields.map((field) => item[field]).filter(Boolean).join(' - ')}</small>
-          <span className="admin-actions">
-            <button onClick={() => onUpdate(item)} type="button"><StudyHubIcon name="edit" size={16} /></button>
-            <button onClick={() => onDelete(item)} type="button"><StudyHubIcon name="archive" size={16} /></button>
-          </span>
-        </p>
-      ))}
+      <div className="lookup-list">
+        {items.map((item) => (
+          <p className="lookup-item" key={item.id || item[labelKey]}>
+            <strong>{item[labelKey]}</strong>
+            <small>{fields.map((field) => item[field]).filter(Boolean).join(' - ')}</small>
+            <span className="admin-actions">
+              <button onClick={() => onUpdate(item)} type="button"><StudyHubIcon name="edit" size={16} /></button>
+              <button onClick={() => onDelete(item)} type="button"><StudyHubIcon name="archive" size={16} /></button>
+            </span>
+          </p>
+        ))}
+      </div>
     </div>
   )
 }
@@ -695,6 +710,7 @@ function AdminUserModal({ onClose, user }) {
 function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
   const edit = mode === 'edit'
   const majors = useAdminList(getAdminMajors)
+  const hasMajors = majors.data.length > 0
   const [form, setForm] = useState(() => ({
     courseCode: course.courseCode || '',
     courseName: course.courseName || '',
@@ -724,10 +740,14 @@ function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
         <label>Description<input onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Short description" value={form.description} /></label>
         <label>
           Major
-          <select onChange={(e) => setForm({ ...form, majorId: e.target.value })} required value={form.majorId}>
-            <option value="">Select major</option>
+          <select disabled={majors.loading || Boolean(majors.error) || !hasMajors} onChange={(e) => setForm({ ...form, majorId: e.target.value })} required value={form.majorId}>
+            <option value="">
+              {majors.loading ? 'Loading majors...' : majors.error ? 'Unable to load majors' : hasMajors ? 'Select major' : 'No majors available'}
+            </option>
             {majors.data.map((major) => <option key={major.id} value={major.id}>{major.majorCode} - {major.majorName}</option>)}
           </select>
+          {majors.error && <small className="admin-field-error">{majors.error}</small>}
+          {!majors.loading && !majors.error && !hasMajors && <small className="admin-field-error">Please create a major in Settings first.</small>}
         </label>
         <footer><button onClick={onClose} type="button">Cancel</button><button className="dark-button" type="submit">{edit ? 'Update' : 'Add Subject'}</button></footer>
       </form>

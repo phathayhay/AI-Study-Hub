@@ -4546,6 +4546,31 @@
   color: #64748b;
 }
 
+.lookup-row {
+  display: grid;
+  grid-template-columns: 96px 52px 1fr;
+  align-items: start;
+}
+
+.lookup-summary {
+  padding-top: 6px;
+}
+
+.lookup-create {
+  padding-top: 2px;
+}
+
+.lookup-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 18px 28px;
+  width: 100%;
+}
+
+.lookup-item {
+  min-width: 0;
+}
+
 .setting-row--danger {
   color: #dc2626;
   background: #fef2f2;
@@ -5184,11 +5209,24 @@
   font-weight: 800;
 }
 
-.admin-course-modal input {
+.admin-course-modal input,
+.admin-course-modal select {
   height: 42px;
   padding: 0 12px;
   background: #f3f4f6;
   border-radius: 8px;
+}
+
+.admin-course-modal select:disabled {
+  color: #6b7280;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.admin-field-error {
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .admin-course-modal footer {
