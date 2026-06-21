@@ -23,7 +23,7 @@ spring:
 
   mail:
     host: smtp.gmail.com
-    port: 465
+    port: 587
     username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
     properties:
@@ -33,12 +33,8 @@ spring:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
-          ssl:
+          starttls:
             enable: true
-          socketFactory:
-            port: 465
-            class: javax.net.ssl.SSLSocketFactory
-            fallback: false
 
   servlet:
     multipart:
