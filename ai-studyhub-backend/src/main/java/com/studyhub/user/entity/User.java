@@ -21,11 +21,15 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "student_code", unique = true, nullable = false, length = 20)
-    private String studentCode;
+    @Column(name = "first_name", nullable = false, length = 50)
+    private String firstName;
 
-    @Column(name = "full_name", nullable = false, length = 100)
-    private String fullName;
+    @Column(name = "last_name", nullable = false, length = 50)
+    private String lastName;
+
+    public String getFullName() {
+        return (lastName != null ? lastName : "") + (firstName != null ? " " + firstName : "");
+    }
 
     @Column(nullable = false, unique = true, length = 150)
     private String email;

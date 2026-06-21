@@ -257,22 +257,21 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
                 </div>
               </div>
 
-              <div className="settings-input-group">
-                <label>Họ và tên</label>
-                <input value={user?.fullName || ''} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
+              <div className="settings-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="settings-input-group">
+                  <label>Họ và tên đệm</label>
+                  <input value={user?.lastName || ''} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
+                </div>
+                <div className="settings-input-group">
+                  <label>Tên</label>
+                  <input value={user?.firstName || ''} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
+                </div>
               </div>
 
-              <div className="settings-input-group">
+              <div className="settings-input-group" style={{ marginTop: '16px' }}>
                 <label>Email đăng ký</label>
                 <input value={user?.email || ''} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
               </div>
-
-              {user?.studentCode && (
-                <div className="settings-input-group">
-                  <label>Mã sinh viên</label>
-                  <input value={user.studentCode} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
-                </div>
-              )}
             </>
           )}
 

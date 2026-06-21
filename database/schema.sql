@@ -72,8 +72,8 @@ CREATE TABLE roles (
 
 CREATE TABLE users (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
-    student_code VARCHAR(20) UNIQUE NOT NULL,
-    full_name VARCHAR(100) NOT NULL,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     avatar_url VARCHAR(500),
@@ -242,8 +242,6 @@ CREATE TABLE document_categories (
 CREATE INDEX idx_users_email
 ON users(email);
 
-CREATE INDEX idx_users_student_code
-ON users(student_code);
 
 CREATE INDEX idx_users_major
 ON users(major_id);

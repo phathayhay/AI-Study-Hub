@@ -30,4 +30,5 @@ public class DocumentResponse {
     private Long courseId;
     private Long categoryId;
     private Set<String> tags;
+    private String uploader;
 }

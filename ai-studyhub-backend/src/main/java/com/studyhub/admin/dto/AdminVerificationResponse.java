@@ -13,7 +13,6 @@ public class AdminVerificationResponse {
     private Long userId;
     private String userEmail;
     private String userFullName;
-    private String studentCode;
     private String imageUrl;
     private String status;
     private String reviewNote;

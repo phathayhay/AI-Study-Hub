@@ -93,8 +93,8 @@ export function LoginPage({ onLogin, onNavigate }) {
 
 export function RegisterPage({ onNavigate, onRegister }) {
   const [form, setForm] = useState({
-    studentCode: '',
-    fullName: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -118,8 +118,8 @@ export function RegisterPage({ onNavigate, onRegister }) {
     setError('')
     try {
       const session = await register({
-        studentCode: form.studentCode.trim(),
-        fullName: form.fullName.trim(),
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
         email: form.email.trim(),
         password: form.password,
       })
@@ -143,20 +143,20 @@ export function RegisterPage({ onNavigate, onRegister }) {
       <AuthCard compact onSubmit={handleSubmit}>
         <div className="auth-form-grid">
           <Field
-            autoComplete="name"
+            autoComplete="family-name"
             icon="user"
-            label="Họ và tên"
-            onChange={(value) => setField('fullName', value)}
-            placeholder="Nguyễn Văn A"
-            value={form.fullName}
+            label="Họ và tên đệm"
+            onChange={(value) => setField('lastName', value)}
+            placeholder="Nguyễn Văn"
+            value={form.lastName}
           />
           <Field
-            autoComplete="username"
-            icon="card"
-            label="Mã sinh viên"
-            onChange={(value) => setField('studentCode', value)}
-            placeholder="SE123456"
-            value={form.studentCode}
+            autoComplete="given-name"
+            icon="user"
+            label="Tên"
+            onChange={(value) => setField('firstName', value)}
+            placeholder="A"
+            value={form.firstName}
           />
         </div>
         <Field

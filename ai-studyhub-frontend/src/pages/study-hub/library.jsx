@@ -571,7 +571,7 @@ export function LibraryPage({
       <main style={{ maxWidth: '1100px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px', padding: '28px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justify: 'space-between', gap: '16px' }}>
           <h1 style={{ fontSize: '22px', fontWeight: 600, color: '#0f172a', margin: 0, whiteSpace: 'nowrap' }}>
-            Hello, <span style={{ fontWeight: 700 }}>{user?.fullName || 'Sinh viên!'}</span>
+            Hello, <span style={{ fontWeight: 700 }}>{user?.firstName || 'Sinh viên!'}</span>
           </h1>
           
           <div style={{ flex: 1, maxWidth: '520px', display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 14px', height: '38px', gap: '8px' }}>

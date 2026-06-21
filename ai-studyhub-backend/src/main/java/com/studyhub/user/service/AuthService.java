@@ -70,20 +70,9 @@ public class AuthService {
             initialVerificationStatus = VerificationStatus.APPROVED;
         }
 
-        // 2. Validate Student Code format (e.g. SE160000, MC160000, MKT16000)
-        String studentCode = request.getStudentCode().trim().toUpperCase();
-        if (!studentCode.matches("^[A-Z]{2,4}\\d{5,7}$")) {
-            throw new IllegalArgumentException("Mã sinh viên không đúng định dạng (Ví dụ: SE160000)");
-        }
-
-        // 3. Validate Email Uniqueness
+        // 2. Validate Email Uniqueness
         if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("Email is already in use");
-        }
-
-        // 4. Validate Student Code Uniqueness
-        if (userRepository.existsByStudentCode(studentCode)) {
-            throw new IllegalArgumentException("Student code is already in use");
         }
 
         // Lấy hoặc tạo vai trò USER mặc định
@@ -105,8 +94,8 @@ public class AuthService {
                 });
 
         User user = User.builder()
-                .studentCode(studentCode)
-                .fullName(request.getFullName().trim())
+                .firstName(request.getFirstName().trim())
+                .lastName(request.getLastName().trim())
                 .email(email)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .campus(Campus.HCM)
@@ -162,8 +151,9 @@ public class AuthService {
                 .refreshToken(refreshToken)
                 .email(user.getEmail())
                 .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
                 .fullName(user.getFullName())
-                .studentCode(user.getStudentCode())
                 .build();
     }
 
@@ -217,8 +207,9 @@ public class AuthService {
                 .refreshToken(newRefreshToken)
                 .email(user.getEmail())
                 .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
                 .fullName(user.getFullName())
-                .studentCode(user.getStudentCode())
                 .build();
     }
 

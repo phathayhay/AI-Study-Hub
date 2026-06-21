@@ -12,13 +12,13 @@ import lombok.*;
 @Builder
 public class RegisterRequest {
 
-    @NotBlank(message = "Student code cannot be blank")
-    @Size(max = 20, message = "Student code must be at most 20 characters")
-    private String studentCode;
+    @NotBlank(message = "First name cannot be blank")
+    @Size(max = 50, message = "First name must be at most 50 characters")
+    private String firstName;
 
-    @NotBlank(message = "Full name cannot be blank")
-    @Size(max = 100, message = "Full name must be at most 100 characters")
-    private String fullName;
+    @NotBlank(message = "Last name cannot be blank")
+    @Size(max = 50, message = "Last name must be at most 50 characters")
+    private String lastName;
 
     @NotBlank(message = "Email cannot be blank")
     @Email(message = "Invalid email address")

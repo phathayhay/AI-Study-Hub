@@ -67,7 +67,8 @@ class SubscriptionServiceTest {
         mockUser = User.builder()
                 .id(10L)
                 .email("student@fpt.edu.vn")
-                .fullName("FPT Student")
+                .firstName("Student")
+                .lastName("FPT")
                 .plan(freePlan)
                 .build();
     }
