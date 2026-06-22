@@ -255,34 +255,36 @@ function AdminOverview({ onOpenUser }) {
           </article>
         ))}
       </div>
-      <section className="admin-card recent-users">
-        <h2><StudyHubIcon name="users" size={20} /> New Users</h2>
-        {users.slice(0, 3).map((user) => (
-          <button className="admin-user-mini" key={user.id || user.email} onClick={() => onOpenUser(user)} type="button">
-            <span>{getInitial(user.fullName || user.email)}</span>
-            <p><strong>{user.fullName || user.email}</strong><small>{user.email}</small></p>
-            <AdminStatus status={user.status} />
-            <StudyHubIcon name="eye" size={15} />
-          </button>
-        ))}
-      </section>
+      <div className="admin-dashboard-panels">
+        <section className="admin-card recent-users">
+          <h2><StudyHubIcon name="users" size={20} /> New Users</h2>
+          {users.slice(0, 3).map((user) => (
+            <button className="admin-user-mini" key={user.id || user.email} onClick={() => onOpenUser(user)} type="button">
+              <span>{getInitial(user.fullName || user.email)}</span>
+              <p><strong>{user.fullName || user.email}</strong><small>{user.email}</small></p>
+              <AdminStatus status={user.status} />
+              <StudyHubIcon name="eye" size={15} />
+            </button>
+          ))}
+        </section>
+        <section className="admin-card system-activity">
+          <h2><StudyHubIcon name="trend" size={18} /> System Activities</h2>
+          {reports.slice(0, 3).map((report) => (
+            <AdminLogItem
+              key={report.id}
+              text={`${report.documentTitle || 'Document'} - ${formatDate(report.createdAt)}`}
+              title={report.reportType || 'Report'}
+              tone="orange"
+            />
+          ))}
+        </section>
+      </div>
       <div className="admin-chart-grid">
         <AdminChart title="Upload/Download Trends" type="line" />
         <AdminChart title="Document Distribution by Subject" type="pie" />
         <AdminChart title="Active Users by Day" type="bars" />
         <AdminChart title="AI Chat Usage (24h)" type="curve" />
       </div>
-      <section className="admin-card system-activity">
-        <h2><StudyHubIcon name="trend" size={18} /> System Activities</h2>
-        {reports.slice(0, 3).map((report) => (
-          <AdminLogItem
-            key={report.id}
-            text={`${report.documentTitle || 'Document'} - ${formatDate(report.createdAt)}`}
-            title={report.reportType || 'Report'}
-            tone="orange"
-          />
-        ))}
-      </section>
     </main>
   )
 }
@@ -667,6 +669,7 @@ function AdminStatus({ status }) {
     banned: 'Banned',
     blocked: 'Banned',
     suspended: 'Suspended',
+    inactive: 'Inactive',
     pending: 'Pending',
     approved: 'Approved',
     rejected: 'Rejected',

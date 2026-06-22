@@ -4810,6 +4810,19 @@
   color: #64748b;
 }
 
+.admin-dashboard-panels {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  margin-top: 18px;
+  align-items: stretch;
+}
+
+.admin-dashboard-panels > .recent-users,
+.admin-dashboard-panels > .system-activity {
+  margin-top: 0;
+}
+
 .recent-users,
 .system-activity,
 .logs-card,
@@ -4837,7 +4850,35 @@
 }
 
 .admin-user-mini {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 36px minmax(0, 1fr) auto 34px;
+  gap: 12px;
+  padding: 14px 0;
+  text-align: left;
+  background: transparent;
   border-top: 1px solid #edf2f7;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  cursor: pointer;
+}
+
+.admin-user-mini:hover {
+  background: #f8fafc;
+  box-shadow: 0 0 0 12px #f8fafc;
+}
+
+.admin-user-mini p {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.admin-user-mini strong,
+.admin-user-mini small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-user-mini > span:first-child,
@@ -4873,6 +4914,12 @@
   color: #b91c1c;
   background: #fee2e2;
   border-color: #fca5a5;
+}
+
+.admin-user-mini > .admin-status.admin-status--inactive {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .admin-user-mini > svg {
@@ -5034,6 +5081,12 @@
   color: #b91c1c;
   background: #fef2f2;
   border-color: #fecaca;
+}
+
+.admin-status--inactive {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .admin-status--pending {
@@ -5379,6 +5432,7 @@
   }
 
   .admin-stat-grid,
+  .admin-dashboard-panels,
   .admin-chart-grid,
   .course-grid,
   .storage-summary,
