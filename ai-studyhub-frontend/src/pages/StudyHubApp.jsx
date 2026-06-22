@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import AppLayout from '../components/layout/AppLayout'
 import { AdminApp } from './study-hub/admin'
-import { LoginPage, RegisterPage, VerifyEmailPage } from './study-hub/auth'
+import { LoginPage, RegisterPage, VerifyEmailPage, ResetPasswordPage } from './study-hub/auth'
 import { LibraryPage } from './study-hub/library'
 import { NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal } from './study-hub/modals'
 import {
@@ -73,6 +73,8 @@ export default function StudyHubApp() {
       setRoute('register')
     } else if (path === '/pricing') {
       setRoute('pricing')
+    } else if (path === '/reset-password') {
+      setRoute('reset-password')
     }
   }, [])
 
@@ -239,12 +241,12 @@ export default function StudyHubApp() {
 
   useEffect(() => {
     if (guest) {
-      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'verify-email']
+      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'verify-email', 'reset-password']
       if (!publicRoutes.includes(route)) {
         setRoute('login')
       }
     } else {
-      const guestOnlyRoutes = ['login', 'register']
+      const guestOnlyRoutes = ['login', 'register', 'reset-password']
       if (guestOnlyRoutes.includes(route)) {
         setRoute(role === 'admin' ? 'admin-overview' : 'explore')
       }
@@ -261,7 +263,7 @@ export default function StudyHubApp() {
     // Enforce route guards
     const hasToken = !!localStorage.getItem('accessToken')
     const isGuest = !user && !hasToken
-    const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
+    const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'verify-email', 'reset-password']
     let targetBaseRoute = nextRoute
     if (nextRoute === 'new-study-session') {
       targetBaseRoute = 'upload'
@@ -418,6 +420,7 @@ export default function StudyHubApp() {
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
   if (route === 'register') return <RegisterPage onRegister={handleRegister} onNavigate={navigate} />
   if (route === 'verify-email') return <VerifyEmailPage onNavigate={navigate} />
+  if (route === 'reset-password') return <ResetPasswordPage onNavigate={navigate} />
   if (route.startsWith('admin-')) return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />
 
   const activeRoute = ['explore', 'folder-detail', 'doc-detail'].includes(route) ? 'explore'

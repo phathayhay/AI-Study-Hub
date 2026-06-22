@@ -140,6 +140,10 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
+  // Avatar upload states
+  const [avatarLoading, setAvatarLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+
   // Password state
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -151,16 +155,38 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
     return localStorage.getItem('verificationStatus') || 'unverified' // unverified, pending, verified
   })
 
+  // Simulated progress bar effect
+  useEffect(() => {
+    let interval
+    if (avatarLoading) {
+      setUploadProgress(10)
+      interval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 95) return 95
+          const increment = Math.max(1, Math.floor((95 - prev) * 0.15))
+          return prev + increment
+        })
+      }, 150)
+    } else {
+      setUploadProgress(0)
+    }
+    return () => clearInterval(interval)
+  }, [avatarLoading])
+
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0]
     if (!file) return
     
-    setLoading(true)
+    setAvatarLoading(true)
     setSuccessMsg('')
     setErrorMsg('')
     try {
       const res = await uploadAvatar(file)
       if (res?.success && res?.data) {
+        setUploadProgress(100)
+        // Wait a short moment to show 100% completion
+        await new Promise(resolve => setTimeout(resolve, 600))
+        
         const updatedUser = { ...user, avatarUrl: res.data }
         onUserUpdate(updatedUser)
         setSuccessMsg('Tải lên ảnh đại diện thành công!')
@@ -170,7 +196,8 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
     } catch (err) {
       setErrorMsg(err.message || 'Lỗi tải lên ảnh đại diện.')
     } finally {
-      setLoading(false)
+      setAvatarLoading(false)
+      setUploadProgress(0)
     }
   }
 
@@ -243,17 +270,69 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
           {activeTab === 'profile' && (
             <>
               <div className="avatar-upload-container">
-                <img 
-                  src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&h=100"} 
-                  alt="Avatar" 
-                  className="avatar-upload-preview"
-                />
-                <div className="avatar-upload-btn-container">
-                  <label className="avatar-upload-btn">
-                    Thay ảnh đại diện
-                    <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} disabled={loading} />
+                <div style={{ position: 'relative', width: '80px', height: '80px', flexShrink: 0 }}>
+                  <img 
+                    src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&h=100"} 
+                    alt="Avatar" 
+                    className="avatar-upload-preview"
+                    style={{ width: '100%', height: '100%', display: 'block', margin: 0 }}
+                  />
+                  {avatarLoading && (
+                    <div style={{
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundColor: 'rgba(15, 23, 42, 0.65)',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}>
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                        borderTopColor: '#fff',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite'
+                      }} />
+                      <span>{uploadProgress}%</span>
+                    </div>
+                  )}
+                </div>
+                <div className="avatar-upload-btn-container" style={{ flex: 1 }}>
+                  <label className="avatar-upload-btn" style={{
+                    display: 'inline-block',
+                    textAlign: 'center',
+                    cursor: avatarLoading ? 'not-allowed' : 'pointer',
+                    opacity: avatarLoading ? 0.7 : 1
+                  }}>
+                    {avatarLoading ? 'Đang tải lên...' : 'Thay ảnh đại diện'}
+                    <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} disabled={avatarLoading} />
                   </label>
-                  <span className="avatar-upload-info">Chấp nhận JPG, PNG tối đa 5MB.</span>
+                  
+                  {avatarLoading && (
+                    <div style={{ marginTop: '8px', width: '100%', maxWidth: '200px' }}>
+                      <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${uploadProgress}%`,
+                          height: '100%',
+                          backgroundColor: '#6366f1',
+                          borderRadius: '3px',
+                          transition: 'width 0.2s ease-out'
+                        }} />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {!avatarLoading && (
+                    <span className="avatar-upload-info">Chấp nhận JPG, PNG tối đa 5MB.</span>
+                  )}
                 </div>
               </div>
 
