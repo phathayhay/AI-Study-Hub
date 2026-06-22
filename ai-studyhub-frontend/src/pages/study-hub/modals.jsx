@@ -38,16 +38,23 @@ export function FilePreviewModal({ file, onClose, onView }) {
 
   return (
     <div className="modal-backdrop">
-      <section className="file-modal">
-        <header><h2>{file.name}</h2><button onClick={onClose} type="button">×</button></header>
-        <div className="file-preview-hero"><StudyHubIcon name="file" size={82} /><p>{file.kind} Document</p><small>{file.category ?? file.subject}</small></div>
+      <section className="file-modal bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors duration-300 ease-in-out">
+        <header className="border-b border-slate-100 dark:border-slate-700 transition-colors duration-300">
+          <h2 className="text-slate-900 dark:text-white transition-colors duration-300">{file.name}</h2>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" type="button">×</button>
+        </header>
+        <div className="file-preview-hero bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-slate-900 dark:to-slate-900 border border-purple-100/50 dark:border-slate-700 transition-colors duration-300 ease-in-out">
+          <StudyHubIcon name="file" size={82} className="text-indigo-500 dark:text-indigo-400" />
+          <p className="text-slate-800 dark:text-slate-200 font-medium transition-colors duration-300">{file.kind} Document</p>
+          <small className="text-slate-500 dark:text-slate-400 transition-colors duration-300">{file.category ?? file.subject}</small>
+        </div>
         <InfoBlock label="Document Name" value={file.name} />
         <InfoBlock label="Type" value={file.kind} />
         <InfoBlock label="Category" value={file.category ?? file.subject} />
         <InfoBlock label="Upload Date" value={file.date} />
-        <footer>
-          <button disabled={opening} onClick={onClose} type="button">Close</button>
-          <button className="purple-button" disabled={opening} onClick={handleView} type="button">
+        <footer className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 transition-colors duration-300">
+          <button disabled={opening} onClick={onClose} className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200" style={{ minHeight: '40px', padding: '0 18px', background: 'transparent', borderRadius: '8px', cursor: 'pointer' }} type="button">Close</button>
+          <button className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200" disabled={opening} onClick={handleView} style={{ minHeight: '40px', padding: '0 18px', border: 'none', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }} type="button">
             <StudyHubIcon name="eye" size={16} /> {opening ? 'Opening...' : 'View Full Document'}
           </button>
         </footer>
@@ -94,16 +101,25 @@ export function ReportModal({ onClose, documentId }) {
 
   return (
     <div className="modal-backdrop">
-      <section className="report-modal">
-        <header><h2><StudyHubIcon name="flag" size={18} /> Report Document</h2><button onClick={onClose} type="button">×</button></header>
-        <div className="report-doc"><Badge tone="blue">{d.code || d.id?.toString().slice(-6)}</Badge><strong>{d.title}</strong></div>
-        
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+      <section className="report-modal bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors duration-300 ease-in-out">
+        <header className="border-b border-slate-100 dark:border-slate-700 transition-colors duration-300">
+          <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <StudyHubIcon name="flag" size={18} /> Report Document
+          </h2>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" type="button">×</button>
+        </header>
+        <div className="report-doc bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-700 transition-colors duration-300 ease-in-out" style={{ display: 'grid', gap: '8px', padding: '14px', borderRadius: '8px' }}>
+          <Badge tone="blue">{d.code || d.id?.toString().slice(-6)}</Badge>
+          <strong className="text-slate-800 dark:text-slate-200">{d.title}</strong>
+        </div>
+
+        <label className="text-slate-600 dark:text-slate-400 transition-colors duration-300" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
           Violation Type *
-          <select 
-            value={reportType} 
+          <select
+            value={reportType}
             onChange={(e) => setReportType(e.target.value)}
-            style={{ width: '100%', padding: '10px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+            className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-450 transition-colors duration-200"
+            style={{ width: '100%', padding: '10px', borderRadius: '8px', fontSize: '14px' }}
           >
             <option value="SPAM">Spam / Junk</option>
             <option value="COPYRIGHT">Copyright Infringement</option>
@@ -112,20 +128,21 @@ export function ReportModal({ onClose, documentId }) {
           </select>
         </label>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+        <label className="text-slate-600 dark:text-slate-400 transition-colors duration-300" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
           Detailed Description *
-          <textarea 
-            placeholder="Please describe in detail the issue you encountered with this document..." 
+          <textarea
+            placeholder="Please describe in detail the issue you encountered with this document..."
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            style={{ width: '100%', minHeight: '100px', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13.5px', resize: 'vertical', outline: 'none' }}
+            className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-450 transition-colors duration-200"
+            style={{ width: '100%', minHeight: '100px', padding: '12px', borderRadius: '8px', fontSize: '13.5px', resize: 'vertical' }}
           />
         </label>
-        
-        <div className="warning-box">Note: False reporting may lead to account suspension.</div>
-        <footer>
-          <button onClick={onClose} disabled={loading} type="button">Cancel</button>
-          <button className="danger-button" disabled={loading} onClick={handleSubmit} type="button">
+
+        <div className="warning-box bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 transition-colors duration-300">Note: False reporting may lead to account suspension.</div>
+        <footer className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 transition-colors duration-300">
+          <button onClick={onClose} disabled={loading} className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200" style={{ minHeight: '40px', padding: '0 18px', background: 'transparent', borderRadius: '8px', cursor: 'pointer' }} type="button">Cancel</button>
+          <button className="bg-red-500 hover:bg-red-600 text-white font-semibold transition-colors duration-200" disabled={loading} onClick={handleSubmit} style={{ minHeight: '40px', padding: '0 18px', border: 'none', borderRadius: '8px', cursor: 'pointer' }} type="button">
             {loading ? 'Submitting...' : 'Submit Report'}
           </button>
         </footer>
@@ -154,12 +171,14 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0]
     if (!file) return
-    
+
     setLoading(true)
     setSuccessMsg('')
     setErrorMsg('')
     try {
-      const res = await uploadAvatar(file)
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await uploadAvatar(formData)
       if (res?.success && res?.data) {
         const updatedUser = { ...user, avatarUrl: res.data }
         onUserUpdate(updatedUser)
@@ -180,7 +199,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
       setErrorMsg('New password and confirm password do not match.')
       return
     }
-    
+
     setLoading(true)
     setSuccessMsg('')
     setErrorMsg('')
@@ -208,7 +227,9 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
     setSuccessMsg('')
     setErrorMsg('')
     try {
-      await verifyStudent(verificationFile)
+      const formData = new FormData()
+      formData.append('file', verificationFile)
+      await verifyStudent(formData)
       setVerificationStatus('pending')
       localStorage.setItem('verificationStatus', 'pending')
       setSuccessMsg('Verification request submitted successfully! Please wait for admin approval.')
@@ -222,15 +243,15 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
 
   return (
     <div className="modal-backdrop">
-      <section className="settings-modal">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <section className="settings-modal bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors duration-300 ease-in-out">
+        <header className="border-b border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
+          <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <StudyHubIcon name="settings" size={20} /> Account Settings
           </h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-muted, #94a3b8)' }} type="button">×</button>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} type="button">×</button>
         </header>
 
-        <nav className="settings-modal-tabs">
+        <nav className="settings-modal-tabs bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 transition-colors duration-300">
           <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => { setActiveTab('profile'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Profile</button>
           <button className={activeTab === 'password' ? 'active' : ''} onClick={() => { setActiveTab('password'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Security</button>
           <button className={activeTab === 'verification' ? 'active' : ''} onClick={() => { setActiveTab('verification'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Verification</button>
@@ -242,35 +263,35 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
 
           {activeTab === 'profile' && (
             <>
-              <div className="avatar-upload-container">
-                <img 
-                  src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&h=100"} 
-                  alt="Avatar" 
+              <div className="avatar-upload-container bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+                <img
+                  src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&h=100"}
+                  alt="Avatar"
                   className="avatar-upload-preview"
                 />
                 <div className="avatar-upload-btn-container">
-                  <label className="avatar-upload-btn">
+                  <label className="avatar-upload-btn bg-[#6366f1] hover:bg-indigo-700 transition-colors duration-250">
                     Change Avatar
                     <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} disabled={loading} />
                   </label>
-                  <span className="avatar-upload-info">Supports JPG, PNG max 5MB.</span>
+                  <span className="avatar-upload-info text-slate-400 dark:text-slate-500">Supports JPG, PNG max 5MB.</span>
                 </div>
               </div>
 
               <div className="settings-input-group">
-                <label>Full Name</label>
-                <input value={user?.fullName || ''} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
+                <label className="text-slate-600 dark:text-slate-400">Full Name</label>
+                <input value={user?.fullName || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
               </div>
 
               <div className="settings-input-group">
-                <label>Registered Email</label>
-                <input value={user?.email || ''} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
+                <label className="text-slate-600 dark:text-slate-400">Registered Email</label>
+                <input value={user?.email || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
               </div>
 
               {user?.studentCode && (
                 <div className="settings-input-group">
-                  <label>Student ID</label>
-                  <input value={user.studentCode} readOnly style={{ backgroundColor: 'var(--bg-tertiary, #f1f5f9)', color: 'var(--text-muted, #64748b)' }} />
+                  <label className="text-slate-600 dark:text-slate-400">Student ID</label>
+                  <input value={user.studentCode} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
                 </div>
               )}
             </>
@@ -279,18 +300,18 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
           {activeTab === 'password' && (
             <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="settings-input-group">
-                <label>Current Password *</label>
-                <input type="password" required value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} disabled={loading} placeholder="Enter current password" />
+                <label className="text-slate-600 dark:text-slate-400">Current Password *</label>
+                <input type="password" required value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} disabled={loading} placeholder="Enter current password" className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" />
               </div>
               <div className="settings-input-group">
-                <label>New Password *</label>
-                <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={loading} placeholder="At least 6 characters" />
+                <label className="text-slate-600 dark:text-slate-400">New Password *</label>
+                <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={loading} placeholder="At least 6 characters" className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" />
               </div>
               <div className="settings-input-group">
-                <label>Confirm New Password *</label>
-                <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading} placeholder="Enter new password again" />
+                <label className="text-slate-600 dark:text-slate-400">Confirm New Password *</label>
+                <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading} placeholder="Enter new password again" className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" />
               </div>
-              <button className="purple-button" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', marginTop: '8px', padding: '10px 18px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600 }}>
+              <button className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', marginTop: '8px', padding: '10px 18px', border: 'none', borderRadius: '8px' }}>
                 {loading ? 'Saving...' : 'Change Password'}
               </button>
             </form>
@@ -298,8 +319,8 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
 
           {activeTab === 'verification' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '10px', backgroundColor: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)' }}>
-                <span style={{ fontSize: '14px', fontWeight: 500 }}>Verification Status:</span>
+              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '10px' }}>
+                <span className="text-slate-800 dark:text-slate-200" style={{ fontSize: '14px', fontWeight: 500 }}>Verification Status:</span>
                 {verificationStatus === 'verified' && <span className="settings-status-badge verified">Verified</span>}
                 {verificationStatus === 'pending' && <span className="settings-status-badge pending">Pending</span>}
                 {verificationStatus === 'unverified' && <span className="settings-status-badge unverified">Unverified</span>}
@@ -308,30 +329,30 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
               {verificationStatus === 'unverified' && (
                 <form onSubmit={handleVerificationSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div className="settings-input-group">
-                    <label>Upload Student ID Card image (Front) *</label>
-                    <div className="avatar-upload-container">
+                    <label className="text-slate-600 dark:text-slate-400">Upload Student ID Card image (Front) *</label>
+                    <div className="avatar-upload-container bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300">
                       <div className="avatar-upload-btn-container" style={{ flex: 1 }}>
-                        <input type="file" accept="image/*" onChange={(e) => setVerificationFile(e.target.files[0])} disabled={loading} required />
+                        <input type="file" accept="image/*" onChange={(e) => setVerificationFile(e.target.files[0])} disabled={loading} required className="text-slate-700 dark:text-slate-300" />
                         <span className="avatar-upload-info" style={{ marginTop: '4px' }}>
                           {verificationFile ? `Selected: ${verificationFile.name}` : 'Please select your student ID Card image.'}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <button className="purple-button" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', padding: '10px 18px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600 }}>
+                  <button className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', padding: '10px 18px', border: 'none', borderRadius: '8px' }}>
                     {loading ? 'Submitting...' : 'Submit Verification Request'}
                   </button>
                 </form>
               )}
 
               {verificationStatus === 'pending' && (
-                <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', color: '#b45309', fontSize: '13px', lineHeight: '18px' }}>
+                <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', color: '#b45309', fontSize: '13px', lineHeight: '18px' }} className="dark:bg-amber-950/20 dark:border-amber-900/50 dark:text-amber-300 transition-colors duration-300">
                   Your verification request has been submitted successfully. Admin will review and approve your student ID card within the next 24-48 hours.
                 </div>
               )}
 
               {verificationStatus === 'verified' && (
-                <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', fontSize: '13px', lineHeight: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', fontSize: '13px', lineHeight: '18px', display: 'flex', alignItems: 'center', gap: '8px' }} className="dark:bg-emerald-950/20 dark:border-emerald-900/50 dark:text-emerald-450 transition-colors duration-300">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
@@ -342,8 +363,8 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
           )}
         </div>
 
-        <footer style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', borderTop: '1px solid var(--border-color, #e2e8f0)', gap: '12px' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Close</button>
+        <footer className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', gap: '12px' }}>
+          <button onClick={onClose} className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200" style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Close</button>
         </footer>
       </section>
     </div>
@@ -369,10 +390,10 @@ export function FeatureRequestModal({ onClose }) {
 
   return (
     <div className="modal-backdrop">
-      <section className="feedback-modal">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <section className="feedback-modal bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors duration-300 ease-in-out">
+        <header className="border-b border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
+          <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#6366f1] dark:text-indigo-400">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
               <line x1="9" y1="9" x2="15" y2="9" />
               <line x1="9" y1="13" x2="15" y2="13" />
@@ -381,44 +402,44 @@ export function FeatureRequestModal({ onClose }) {
             </svg>
             Request New Feature
           </h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-muted, #94a3b8)' }} type="button">×</button>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} type="button">×</button>
         </header>
 
         <div className="settings-modal-content">
           {success ? (
             <div style={{ padding: '24px 12px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justify: 'center' }}>
+              <div className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 dark:text-emerald-450 transition-colors duration-300" style={{ width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               </div>
-              <strong style={{ fontSize: '16px', color: 'var(--text-primary, #0f172a)' }}>Request Submitted Successfully!</strong>
-              <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary, #475569)', lineHeight: '20px' }}>
+              <strong className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '16px' }}>Request Submitted Successfully!</strong>
+              <p className="text-slate-600 dark:text-slate-300 transition-colors duration-300" style={{ margin: 0, fontSize: '14px', lineHeight: '20px' }}>
                 Thank you for your valuable contribution. We will research this feature to improve AI Study Hub in the future.
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="settings-input-group">
-                <label>Proposed Feature Name *</label>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g. Online quiz mock exam feature" />
+                <label className="text-slate-600 dark:text-slate-400">Proposed Feature Name *</label>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="e.g. Online quiz mock exam feature" className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" />
               </div>
               <div className="settings-input-group">
-                <label>Detailed Description *</label>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} required rows={4} placeholder="Please describe how this feature will work and its benefits..." />
+                <label className="text-slate-600 dark:text-slate-400">Detailed Description *</label>
+                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} required rows={4} placeholder="Please describe how this feature will work and its benefits..." className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" />
               </div>
-              <button className="purple-button" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', padding: '10px 18px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600 }}>
+              <button className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', padding: '10px 18px', border: 'none', borderRadius: '8px' }}>
                 {loading ? 'Submitting...' : 'Submit Request'}
               </button>
             </form>
           )}
         </div>
 
-        <footer style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', borderTop: '1px solid var(--border-color, #e2e8f0)', gap: '12px' }}>
+        <footer className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', gap: '12px' }}>
           {success ? (
-            <button onClick={onClose} className="purple-button" style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', fontWeight: 600 }} type="button">Done</button>
+            <button onClick={onClose} className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200" style={{ padding: '8px 16px', borderRadius: '8px', border: 'none' }} type="button">Done</button>
           ) : (
-            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Cancel</button>
+            <button onClick={onClose} className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200" style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Cancel</button>
           )}
         </footer>
       </section>
@@ -445,20 +466,20 @@ export function SupportModal({ onClose }) {
 
   return (
     <div className="modal-backdrop">
-      <section className="support-modal">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <section className="support-modal bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors duration-300 ease-in-out">
+        <header className="border-b border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
+          <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#6366f1] dark:text-indigo-400">
               <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
               <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
             </svg>
             Support Center
           </h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-muted, #94a3b8)' }} type="button">×</button>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} type="button">×</button>
         </header>
 
         <div className="settings-modal-content">
-          <div style={{ padding: '12px', borderRadius: '10px', backgroundColor: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-250 transition-colors duration-300" style={{ padding: '12px', borderRadius: '10px', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <div><strong>Official Channels:</strong></div>
             <div>📧 Email: support@aistudyhub.vn</div>
             <div>📞 Hotline: 1900 8198 (8:00 AM - 10:00 PM)</div>
@@ -466,38 +487,38 @@ export function SupportModal({ onClose }) {
 
           {success ? (
             <div style={{ padding: '12px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justify: 'center' }}>
+              <div className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500 dark:text-emerald-400 transition-colors duration-300" style={{ width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               </div>
-              <strong style={{ fontSize: '16px', color: 'var(--text-primary, #0f172a)' }}>Submitted Successfully!</strong>
-              <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary, #475569)', lineHeight: '20px' }}>
+              <strong className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '16px' }}>Submitted Successfully!</strong>
+              <p className="text-slate-600 dark:text-slate-300 transition-colors duration-300" style={{ margin: 0, fontSize: '14px', lineHeight: '20px' }}>
                 Your support ticket has been received. Our technical team will reach back to you via email as soon as possible.
               </p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="settings-input-group">
-                <label>Contact Email *</label>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="Enter your email for our response" />
+                <label className="text-slate-600 dark:text-slate-400">Contact Email *</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="Enter your email for our response" className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" />
               </div>
               <div className="settings-input-group">
-                <label>Describe the issue you need help with *</label>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} required rows={4} placeholder="e.g. I cannot download documents despite having paid..." />
+                <label className="text-slate-600 dark:text-slate-400">Describe the issue you need help with *</label>
+                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} required rows={4} placeholder="e.g. I cannot download documents despite having paid..." className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" />
               </div>
-              <button className="purple-button" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', padding: '10px 18px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600 }}>
+              <button className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', padding: '10px 18px', border: 'none', borderRadius: '8px' }}>
                 {loading ? 'Submitting...' : 'Submit Support Ticket'}
               </button>
             </form>
           )}
         </div>
 
-        <footer style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', borderTop: '1px solid var(--border-color, #e2e8f0)', gap: '12px' }}>
+        <footer className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', gap: '12px' }}>
           {success ? (
-            <button onClick={onClose} className="purple-button" style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', fontWeight: 600 }} type="button">Done</button>
+            <button onClick={onClose} className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200" style={{ padding: '8px 16px', borderRadius: '8px', border: 'none' }} type="button">Done</button>
           ) : (
-            <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Cancel</button>
+            <button onClick={onClose} className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200" style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Cancel</button>
           )}
         </footer>
       </section>
@@ -517,10 +538,10 @@ export function ChromeExtensionModal({ onClose }) {
 
   return (
     <div className="modal-backdrop">
-      <section className="extension-modal">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <section className="extension-modal bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors duration-300 ease-in-out">
+        <header className="border-b border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
+          <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#6366f1] dark:text-indigo-400">
               <circle cx="12" cy="12" r="10" />
               <circle cx="12" cy="12" r="4" />
               <line x1="12" y1="8" x2="20.75" y2="8" />
@@ -529,17 +550,17 @@ export function ChromeExtensionModal({ onClose }) {
             </svg>
             Chrome Extension Beta
           </h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--text-muted, #94a3b8)' }} type="button">×</button>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} type="button">×</button>
         </header>
 
         <div className="settings-modal-content" style={{ gap: '14px' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary, #475569)', lineHeight: '20px' }}>
+          <p className="text-slate-600 dark:text-slate-300 transition-colors duration-300" style={{ margin: 0, fontSize: '14px', lineHeight: '20px' }}>
             AI Study Hub Chrome Extension helps you analyze, summarize, and ask questions about any document or website directly while browsing and studying on Chrome.
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '14px', borderRadius: '12px', backgroundColor: 'var(--bg-secondary, #f8fafc)', border: '1px solid var(--border-color, #e2e8f0)' }}>
-            <span style={{ fontSize: '14px', fontWeight: 600 }}>Extension Installation Guide:</span>
-            <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', lineHeight: '20px', color: 'var(--text-secondary, #475569)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '14px', borderRadius: '12px' }}>
+            <span className="text-slate-800 dark:text-white font-semibold transition-colors duration-300" style={{ fontSize: '14px' }}>Extension Installation Guide:</span>
+            <ol className="text-slate-600 dark:text-slate-300 transition-colors duration-300" style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', lineHeight: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <li>Click the <strong>Download Extension (Beta)</strong> button below to download the <code>ai-studyhub-extension.zip</code> file.</li>
               <li>Extract the downloaded zip file into a folder on your computer.</li>
               <li>Open Google Chrome and navigate to: <code>chrome://extensions/</code></li>
@@ -548,7 +569,7 @@ export function ChromeExtensionModal({ onClose }) {
             </ol>
           </div>
 
-          <button onClick={handleDownload} className="purple-button" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: 600, width: '100%' }}>
+          <button onClick={handleDownload} className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', border: 'none', borderRadius: '8px', width: '100%' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
@@ -558,8 +579,8 @@ export function ChromeExtensionModal({ onClose }) {
           </button>
         </div>
 
-        <footer style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', borderTop: '1px solid var(--border-color, #e2e8f0)', gap: '12px' }}>
-          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border-color, #cbd5e1)', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Close</button>
+        <footer className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', gap: '12px' }}>
+          <button onClick={onClose} className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200" style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Close</button>
         </footer>
       </section>
     </div>

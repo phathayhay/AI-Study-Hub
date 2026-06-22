@@ -12,9 +12,29 @@ export default function Sidebar({
 
   const isItemActive = (item) => {
     const { route, studyFileId, selectedDocId, selectedFolderId } = activeItemContext
-    if (item.target === 'study' && route === 'study' && studyFileId === item.id) return true
-    if (item.target === 'folder-detail' && route === 'folder-detail' && selectedFolderId === item.id) return true
-    if (item.target === 'doc-detail' && route === 'doc-detail' && selectedDocId === item.id) return true
+    
+    const itemIdStr = item.id ? String(item.id) : ''
+    const studyFileIdStr = studyFileId ? String(studyFileId) : ''
+    const selectedDocIdStr = selectedDocId ? String(selectedDocId) : ''
+    const selectedFolderIdStr = selectedFolderId ? String(selectedFolderId) : ''
+
+    if (!itemIdStr) return false
+
+    // Folder matching
+    if (item.target === 'folder-detail' && route === 'folder-detail' && selectedFolderIdStr === itemIdStr) {
+      return true
+    }
+
+    // Document/File matching (both study and doc-detail correspond to the document)
+    const isDocRoute = route === 'study' || route === 'doc-detail'
+    const isDocItem = item.target === 'study' || item.target === 'doc-detail'
+    if (isDocRoute && isDocItem) {
+      const activeDocIdStr = route === 'study' ? studyFileIdStr : selectedDocIdStr
+      if (activeDocIdStr && activeDocIdStr === itemIdStr) {
+        return true
+      }
+    }
+
     return false
   }
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark')
@@ -32,9 +52,11 @@ export default function Sidebar({
     setIsDark(newDark)
     if (newDark) {
       document.body.classList.add('dark-theme')
+      document.documentElement.classList.add('dark')
       localStorage.setItem('theme', 'dark')
     } else {
       document.body.classList.remove('dark-theme')
+      document.documentElement.classList.remove('dark')
       localStorage.setItem('theme', 'light')
     }
   }
@@ -45,23 +67,31 @@ export default function Sidebar({
 
   const renderNavButton = (routeKey, icon, label) => {
     const isActive = active === routeKey
+    const handleClick = () => {
+      if (routeKey === 'library-recent' && collapsed) {
+        onToggleCollapse?.()
+        setRecentExpanded(true)
+      } else {
+        onNavigate?.(routeKey)
+      }
+    }
     return (
-      <button 
-        onClick={() => onNavigate?.(routeKey)} 
-        style={{ 
-          width: '100%', 
-          padding: '8px', 
-          background: 'transparent', 
-          color: isActive ? '#6366f1' : '#475569', 
-          border: 'none', 
-          borderRadius: '6px', 
-          fontSize: '14px', 
-          fontWeight: isActive ? 600 : 500, 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: collapsed ? 'center' : 'flex-start', 
-          gap: '12px', 
-          cursor: 'pointer', 
+      <button
+        onClick={handleClick}
+        style={{
+          width: '100%',
+          padding: '8px',
+          background: 'transparent',
+          color: isActive ? '#6366f1' : (isDark ? '#cbd5e1' : '#475569'),
+          border: 'none',
+          borderRadius: '6px',
+          fontSize: '14px',
+          fontWeight: isActive ? 600 : 500,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          gap: '12px',
+          cursor: 'pointer',
           textAlign: 'left',
           transition: 'all 0.2s'
         }}
@@ -77,50 +107,45 @@ export default function Sidebar({
   }
 
   return (
-    <aside 
-      className="sidebar" 
-      style={{ 
-        width: collapsed ? '72px' : '256px', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        height: '100vh', 
-        borderRight: isDark ? '1px solid #1e293b' : '1px solid #e2e8f0', 
-        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-        transition: 'width 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    <aside
+      className="sidebar bg-white dark:bg-[#1e293b] border-r border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out"
+      style={{
+        width: collapsed ? '72px' : '256px',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
         overflow: 'visible'
       }}
     >
-      <div 
-        style={{ 
-          display: 'flex', 
+      <div
+        className="border-b border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out"
+        style={{
+          display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center', 
+          alignItems: 'center',
           justifyContent: 'center',
-          gap: '12px',
-          padding: collapsed ? '16px 8px 12px' : '16px 16px 12px', 
-          borderBottom: isDark ? '1px solid #1e293b' : '1px solid #e2e8f0',
+          gap: '8px',
+          padding: collapsed ? '12px 8px 10px' : '14px 16px',
           position: 'relative'
         }}
       >
         {collapsed ? (
           <>
             <Brand onClick={onToggleCollapse} compact={true} />
-            <button 
+            <button
               onClick={onToggleCollapse}
-              style={{ 
-                background: isDark ? '#1e293b' : '#ffffff', 
-                border: isDark ? '1px solid #334155' : '1px solid #e2e8f0', 
-                borderRadius: '8px', 
-                color: '#6366f1', 
-                width: '36px', 
-                height: '36px', 
-                cursor: 'pointer', 
-                display: 'flex', 
-                alignItems: 'center', 
+              style={{
+                borderRadius: '8px',
+                color: '#6366f1',
+                width: '36px',
+                height: '36px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
                 padding: 0
-              }} 
-              className="sidebar-toggle-btn"
+              }}
+              className="sidebar-toggle-btn bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out"
               aria-label="Expand sidebar"
               title="Expand sidebar"
             >
@@ -133,26 +158,24 @@ export default function Sidebar({
           </>
         ) : (
           <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Brand 
-              onClick={() => onNavigate?.(guest ? 'explore' : 'library')} 
-              compact={false} 
+            <Brand
+              onClick={() => onNavigate?.(guest ? 'explore' : 'library')}
+              compact={false}
             />
-            <button 
+            <button
               onClick={onToggleCollapse}
-              style={{ 
-                background: isDark ? '#1e293b' : '#ffffff', 
-                border: isDark ? '1px solid #334155' : '1px solid #e2e8f0', 
-                borderRadius: '6px', 
-                color: isDark ? '#94a3b8' : '#64748b', 
-                width: '32px', 
-                height: '32px', 
-                cursor: 'pointer', 
-                display: 'flex', 
-                alignItems: 'center', 
+              style={{
+                borderRadius: '6px',
+                color: isDark ? '#94a3b8' : '#64748b',
+                width: '32px',
+                height: '32px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
                 padding: 0
-              }} 
-              className="sidebar-toggle-btn"
+              }}
+              className="sidebar-toggle-btn bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out"
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
             >
@@ -166,23 +189,23 @@ export default function Sidebar({
         )}
       </div>
 
-      <div style={{ padding: collapsed ? '12px 8px' : '16px', display: 'flex', justifyContent: 'center' }}>
-        <button 
-          onClick={() => onNavigate?.('new-study-session')} 
-          style={{ 
-            width: collapsed ? '44px' : '100%', 
-            height: '44px',
-            padding: 0, 
-            backgroundColor: '#6366f1', 
-            color: '#fff', 
-            border: 'none', 
-            borderRadius: '8px', 
-            fontSize: '14px', 
-            fontWeight: 600, 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            gap: collapsed ? '0' : '8px', 
+      <div style={{ padding: collapsed ? '10px 8px' : '12px 16px', display: 'flex', justifyContent: 'center' }}>
+        <button
+          onClick={() => onNavigate?.('new-study-session')}
+          style={{
+            width: collapsed ? '38px' : '100%',
+            height: '38px',
+            padding: 0,
+            backgroundColor: '#6366f1',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '13.5px',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: collapsed ? '0' : '8px',
             cursor: 'pointer',
             transition: 'all 0.2s',
             boxShadow: '0 4px 6px -1px rgba(99, 102, 241, 0.2), 0 2px 4px -1px rgba(99, 102, 241, 0.1)'
@@ -194,7 +217,7 @@ export default function Sidebar({
         </button>
       </div>
 
-      <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '0 8px' : '0 16px', display: 'flex', flexDirection: 'column', gap: collapsed ? '12px' : '20px' }}>
+      <div className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '0 8px' : '0 16px', display: 'flex', flexDirection: 'column', gap: collapsed ? '10px' : '14px' }}>
         {collapsed ? (
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
             {renderNavButton('explore', (
@@ -252,7 +275,7 @@ export default function Sidebar({
             </nav>
 
             <div>
-              <h4 style={{ fontSize: '14px', color: isDark ? '#94a3b8' : '#64748b', fontWeight: 500, paddingLeft: '8px', marginBottom: '8px' }}>Library</h4>
+              <h4 style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8', fontWeight: 600, paddingLeft: '8px', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Library</h4>
               <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {renderNavButton('library', (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -286,33 +309,30 @@ export default function Sidebar({
             </div>
 
             <div>
-              <div 
+              <div
                 onClick={() => setRecentExpanded(!recentExpanded)}
-                style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
-                  padding: '12px 16px', 
-                  backgroundColor: isDark ? '#1e293b' : '#f3f4f6', 
-                  borderRadius: '8px',
-                  marginBottom: '8px', 
-                  cursor: 'pointer', 
-                  userSelect: 'none',
-                  transition: 'background-color 0.2s'
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '4px 8px',
+                  marginBottom: '6px',
+                  cursor: 'pointer',
+                  userSelect: 'none'
                 }}
                 className="sidebar-recent-header"
               >
-                <h4 style={{ fontSize: '14px', color: isDark ? '#f1f5f9' : '#4b5563', fontWeight: 600, margin: 0 }}>Recent</h4>
-                <svg 
-                  width="16" 
-                  height="16" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  style={{ color: isDark ? '#94a3b8' : '#4b5563', transform: recentExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}
+                <h4 style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8', fontWeight: 600, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recent</h4>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ color: isDark ? '#64748b' : '#94a3b8', transform: recentExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}
                 >
                   <path d="m6 9 6 6 6-6" />
                 </svg>
@@ -320,13 +340,13 @@ export default function Sidebar({
               {recentExpanded && (
                 <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   {recentItems.length === 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px 24px', textAlign: 'center' }}>
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={isDark ? '#4b5563' : '#94a3b8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px 16px', textAlign: 'center' }}>
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={isDark ? '#4b5563' : '#94a3b8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '12px' }}>
                         <circle cx="12" cy="12" r="9" />
                         <polyline points="12 7 12 12 15 15" />
                       </svg>
-                      <h5 style={{ fontSize: '16px', fontWeight: 600, color: isDark ? '#e2e8f0' : '#475569', margin: '0 0 8px' }}>No recent sessions</h5>
-                      <p style={{ fontSize: '13px', color: isDark ? '#64748b' : '#94a3b8', margin: '0 auto', lineHeight: 1.5, maxWidth: '200px' }}>Start studying to see your recent sessions here</p>
+                      <h5 style={{ fontSize: '14px', fontWeight: 600, color: isDark ? '#cbd5e1' : '#475569', margin: '0 0 4px' }}>No recent sessions</h5>
+                      <p style={{ fontSize: '12px', color: isDark ? '#64748b' : '#94a3b8', margin: '0 auto', lineHeight: 1.5, maxWidth: '200px' }}>Start studying to see your recent sessions here</p>
                     </div>
                   ) : (
                     recentItems.map((item) => {
@@ -337,12 +357,12 @@ export default function Sidebar({
                           onClick={() => onOpenRecentItem?.(item)}
                           style={{
                             width: '100%',
-                            padding: '8px',
+                            padding: '6px 8px',
                             background: 'transparent',
-                            color: isActive ? '#6366f1' : '#475569',
+                            color: isActive ? '#6366f1' : (isDark ? '#cbd5e1' : '#475569'),
                             border: 'none',
                             borderRadius: '6px',
-                            fontSize: '14px',
+                            fontSize: '13.5px',
                             fontWeight: isActive ? 600 : 500,
                             display: 'flex',
                             alignItems: 'center',
@@ -355,13 +375,27 @@ export default function Sidebar({
                           title={item.name}
                         >
                           <span style={{
-                            width: '8px',
-                            height: '8px',
+                            width: '6px',
+                            height: '6px',
                             borderRadius: '50%',
                             backgroundColor: isActive ? '#22c55e' : 'transparent',
                             display: 'inline-block',
                             flexShrink: 0,
                           }} />
+                          <span style={{ display: 'flex', alignItems: 'center', color: isActive ? '#6366f1' : (isDark ? '#64748b' : '#94a3b8'), flexShrink: 0 }}>
+                            {item.type === 'folder' ? (
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" />
+                              </svg>
+                            ) : (
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                                <line x1="16" y1="13" x2="8" y2="13" />
+                                <line x1="16" y1="17" x2="8" y2="17" />
+                              </svg>
+                            )}
+                          </span>
                           <span style={{
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -382,57 +416,63 @@ export default function Sidebar({
       </div>
 
       {guest ? (
-        <div style={{ padding: collapsed ? '12px 8px' : '24px 16px 16px', borderTop: isDark ? '1px solid #1e293b' : '1px solid #e5e7eb' }}>
-          <button 
-            onClick={() => onNavigate?.('login')} 
-            style={{ 
-              width: '100%', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: collapsed ? 'center' : 'flex-start', 
-              gap: collapsed ? '0' : '16px', 
-              background: 'transparent', 
-              border: 'none', 
-              cursor: 'pointer', 
-              padding: '8px',
+        <div
+          className="border-t border-[#e5e7eb] dark:border-slate-800 transition-colors duration-300 ease-in-out"
+          style={{ padding: collapsed ? '12px 8px' : '14px 16px' }}
+        >
+          <button
+            onClick={() => onNavigate?.('login')}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              gap: collapsed ? '0' : '10px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '6px',
               borderRadius: '8px',
               transition: 'background-color 0.2s'
             }}
             className="sidebar-guest-signup-btn"
             title={collapsed ? "Sign up" : undefined}
           >
-            <div style={{ width: '44px', height: '44px', borderRadius: '50%', backgroundColor: '#6366f1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'transform 0.2s' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', backgroundColor: '#6366f1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'transform 0.2s' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
                 <line x1="19" y1="8" x2="19" y2="14" />
                 <line x1="22" y1="11" x2="16" y2="11" />
               </svg>
             </div>
-            {!collapsed && <span style={{ fontSize: '18px', fontWeight: 700, color: isDark ? '#f1f5f9' : '#0f172a' }}>Sign up</span>}
+            {!collapsed && <span style={{ fontSize: '13.5px', fontWeight: 600, color: isDark ? '#f1f5f9' : '#0f172a' }}>Sign up</span>}
           </button>
         </div>
       ) : (
-        <div style={{ padding: collapsed ? '12px 8px' : '16px', borderTop: '1px solid var(--border-color, #e2e8f0)', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
+        <div
+          className="border-t border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out"
+          style={{ padding: collapsed ? '10px 8px' : '12px 14px', display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}
+        >
           {!collapsed ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-7.88 2.5 2.5 0 0 1 2.46-6.06z" />
                     <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-7.88 2.5 2.5 0 0 0-2.46-6.06z" />
                   </svg>
                 </div>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary, #0f172a)' }} className="upgrade-title-text">Upgrade for more features</span>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary, #0f172a)' }} className="upgrade-title-text">Upgrade for more features</span>
               </div>
-              <button onClick={() => onNavigate?.('pricing')} style={{ width: '100%', padding: '10px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', transition: 'background-color 0.2s' }}>
+              <button onClick={() => onNavigate?.('pricing')} style={{ width: '100%', padding: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'background-color 0.2s' }}>
                 Upgrade
               </button>
             </div>
           ) : (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate?.('pricing')} title="Upgrade">
-              <div className="sidebar-upgrade-btn" style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <div className="sidebar-upgrade-btn" style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-7.88 2.5 2.5 0 0 1 2.46-6.06z" />
                   <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-7.88 2.5 2.5 0 0 0-2.46-6.06z" />
                 </svg>
@@ -443,39 +483,37 @@ export default function Sidebar({
           <div style={{ position: 'relative' }}>
             {showProfileMenu && (
               <>
-                <div 
-                  onClick={() => setShowProfileMenu(false)} 
-                  style={{ 
-                    position: 'fixed', 
-                    top: 0, 
-                    left: 0, 
-                    right: 0, 
-                    bottom: 0, 
-                    zIndex: 998, 
-                    background: 'transparent' 
-                  }} 
-                />
-                
-                <div 
-                  style={{ 
-                    position: 'absolute', 
-                    bottom: '100%', 
-                    left: collapsed ? '60px' : '0', 
-                    width: '224px', 
-                    backgroundColor: 'var(--popover-bg, #ffffff)', 
-                    borderRadius: '16px', 
-                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', 
-                    border: '1px solid var(--border-color, #e2e8f0)', 
-                    padding: '8px', 
-                    marginBottom: '12px', 
-                    zIndex: 999, 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    gap: '2px' 
+                <div
+                  onClick={() => setShowProfileMenu(false)}
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 998,
+                    background: 'transparent'
                   }}
-                  className="profile-popover-menu"
+                />
+
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '100%',
+                    left: collapsed ? '60px' : '0',
+                    width: '224px',
+                    borderRadius: '16px',
+                    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                    padding: '8px',
+                    marginBottom: '12px',
+                    zIndex: 999,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px'
+                  }}
+                  className="profile-popover-menu bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out"
                 >
-                  <button 
+                  <button
                     onClick={() => { setShowProfileMenu(false); onNavigate?.('settings'); }}
                     className="profile-popover-item"
                   >
@@ -488,7 +526,7 @@ export default function Sidebar({
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>Settings</span>
                   </button>
 
-                  <button 
+                  <button
                     onClick={() => { setShowProfileMenu(false); onNavigate?.('feature-request'); }}
                     className="profile-popover-item"
                   >
@@ -506,7 +544,7 @@ export default function Sidebar({
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>Feature Request</span>
                   </button>
 
-                  <button 
+                  <button
                     onClick={() => { setShowProfileMenu(false); onNavigate?.('support'); }}
                     className="profile-popover-item"
                   >
@@ -519,7 +557,7 @@ export default function Sidebar({
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>Support</span>
                   </button>
 
-                  <button 
+                  <button
                     onClick={() => { setShowProfileMenu(false); onNavigate?.('chrome-extension'); }}
                     className="profile-popover-item"
                   >
@@ -545,16 +583,16 @@ export default function Sidebar({
                       </span>
                       <span style={{ fontSize: '14px', fontWeight: 500 }}>Mode</span>
                     </div>
-                    
-                    <div 
-                      onClick={(e) => { e.stopPropagation(); toggleDark(); }} 
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
+
+                    <div
+                      onClick={(e) => { e.stopPropagation(); toggleDark(); }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'space-between',
-                        backgroundColor: isDark ? '#334155' : '#f1f5f9', 
-                        borderRadius: '999px', 
-                        padding: '3px', 
+                        backgroundColor: isDark ? '#334155' : '#f1f5f9',
+                        borderRadius: '999px',
+                        padding: '3px',
                         cursor: 'pointer',
                         position: 'relative',
                         width: '64px',
@@ -582,8 +620,8 @@ export default function Sidebar({
                           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                         </svg>
                       </div>
-                      <div 
-                        style={{ 
+                      <div
+                        style={{
                           position: 'absolute',
                           top: '3px',
                           left: isDark ? '35px' : '3px',
@@ -600,7 +638,7 @@ export default function Sidebar({
 
                   <hr style={{ border: 'none', borderTop: '1px solid var(--border-color, #e2e8f0)', margin: '6px 4px' }} />
 
-                  <button 
+                  <button
                     onClick={() => { setShowProfileMenu(false); onNavigate?.('logout'); }}
                     className="profile-popover-item"
                     style={{ color: '#ef4444' }}
@@ -618,18 +656,19 @@ export default function Sidebar({
               </>
             )}
 
-            <div 
-              onClick={() => setShowProfileMenu(!showProfileMenu)} 
+            <div
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="profile-mini-clickable"
-              style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: '12px', padding: '6px 8px', borderRadius: '8px', cursor: 'pointer', transition: 'background-color 0.2s' }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: '10px', padding: '6px', borderRadius: '8px', cursor: 'pointer', transition: 'background-color 0.2s' }}
+              title={collapsed ? (user?.fullName || 'Profile Menu') : undefined}
             >
-              <img 
-                src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&h=100"} 
-                alt="Avatar" 
-                style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} 
+              <img
+                src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&h=100"}
+                alt="Avatar"
+                style={{ width: '30px', height: '30px', borderRadius: '50%', objectFit: 'cover' }}
               />
               {!collapsed && (
-                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary, #0f172a)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary, #0f172a)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {user?.fullName || 'Student'}
                 </div>
               )}

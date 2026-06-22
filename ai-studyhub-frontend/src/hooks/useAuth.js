@@ -10,7 +10,16 @@ export default function useAuth() {
     const accessToken = localStorage.getItem('accessToken')
     const savedUser = localStorage.getItem('user')
     if (accessToken && savedUser) {
-      setUser(JSON.parse(savedUser))
+      try {
+        const u = JSON.parse(savedUser)
+        const cachedAvatar = localStorage.getItem(`avatarUrl_${u.email}`)
+        if (cachedAvatar) {
+          u.avatarUrl = cachedAvatar
+        }
+        setUser(u)
+      } catch (e) {
+        console.error('Error parsing cached user:', e)
+      }
     }
     setLoading(false)
   }, [])
@@ -22,6 +31,13 @@ export default function useAuth() {
       if (u.refreshToken) {
         localStorage.setItem('refreshToken', u.refreshToken)
       }
+      
+      // Merge cached avatar if it exists
+      const cachedAvatar = localStorage.getItem(`avatarUrl_${u.email}`)
+      if (cachedAvatar) {
+        u.avatarUrl = cachedAvatar
+      }
+
       localStorage.setItem('user', JSON.stringify(u))
       setUser(u)
       return u
@@ -52,5 +68,32 @@ export default function useAuth() {
     setUser(null)
   }
 
-  return { user, loading, login, register, logout, setUser }
+  const updateAndSetUser = (newUser) => {
+    if (typeof newUser === 'function') {
+      setUser((prev) => {
+        const next = newUser(prev)
+        if (next) {
+          if (next.avatarUrl) {
+            localStorage.setItem(`avatarUrl_${next.email}`, next.avatarUrl)
+          }
+          localStorage.setItem('user', JSON.stringify(next))
+        } else {
+          localStorage.removeItem('user')
+        }
+        return next
+      })
+    } else {
+      setUser(newUser)
+      if (newUser) {
+        if (newUser.avatarUrl) {
+          localStorage.setItem(`avatarUrl_${newUser.email}`, newUser.avatarUrl)
+        }
+        localStorage.setItem('user', JSON.stringify(newUser))
+      } else {
+        localStorage.removeItem('user')
+      }
+    }
+  }
+
+  return { user, loading, login, register, logout, setUser: updateAndSetUser }
 }
