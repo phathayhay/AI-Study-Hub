@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Brand from '../../components/layout/Brand'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
-import { login, register, verifyEmail } from '../../features/auth/authService'
+import { login, register, verifyEmail, forgotPassword, resetPassword } from '../../features/auth/authService'
 
 export function LoginPage({ onLogin, onNavigate }) {
   const [email, setEmail] = useState('')
@@ -10,6 +10,12 @@ export function LoginPage({ onLogin, onNavigate }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const transition = useAuthTransition(onNavigate)
+
+  const [forgotMode, setForgotMode] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotSuccess, setForgotSuccess] = useState('')
+  const [forgotError, setForgotError] = useState('')
+  const [forgotLoading, setForgotLoading] = useState(false)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -22,6 +28,73 @@ export function LoginPage({ onLogin, onNavigate }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleForgotSubmit = async (event) => {
+    event.preventDefault()
+    setForgotLoading(true)
+    setForgotError('')
+    setForgotSuccess('')
+    try {
+      await forgotPassword(forgotEmail.trim())
+      setForgotSuccess('Đã gửi liên kết đặt lại mật khẩu! Vui lòng kiểm tra email của bạn.')
+      setForgotEmail('')
+    } catch (err) {
+      setForgotError(err.message || 'Gửi yêu cầu thất bại. Vui lòng kiểm tra lại email.')
+    } finally {
+      setForgotLoading(false)
+    }
+  }
+
+  if (forgotMode) {
+    return (
+      <AuthShell
+        description="Nhập email của bạn để nhận liên kết khôi phục mật khẩu tài khoản."
+        leaving={transition.leaving}
+        onBack={() => setForgotMode(false)}
+        subtitle="Khôi phục tài khoản của bạn"
+        title="Quên mật khẩu"
+      >
+        <AuthCard onSubmit={handleForgotSubmit}>
+          <Field
+            autoComplete="email"
+            icon="mail"
+            label="Email đăng ký"
+            onChange={setForgotEmail}
+            placeholder="name@fpt.edu.vn"
+            type="email"
+            value={forgotEmail}
+          />
+          {forgotError && (
+            <p className="auth-error" role="alert">
+              <StudyHubIcon name="help" size={16} /> {forgotError}
+            </p>
+          )}
+          {forgotSuccess && (
+            <p style={{ color: '#15803d', backgroundColor: '#dcfce7', padding: '10px 12px', borderRadius: '8px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', width: '100%', margin: '8px 0' }}>
+              ✓ {forgotSuccess}
+            </p>
+          )}
+          <button className="auth-submit" disabled={forgotLoading} type="submit">
+            {forgotLoading ? (
+              <>
+                <span className="auth-spinner" /> Đang gửi yêu cầu...
+              </>
+            ) : (
+              <>
+                Gửi liên kết khôi phục <span aria-hidden="true">→</span>
+              </>
+            )}
+          </button>
+          <p className="auth-switch">
+            Nhớ mật khẩu?
+            <button onClick={() => setForgotMode(false)} type="button">
+              Đăng nhập ngay
+            </button>
+          </p>
+        </AuthCard>
+      </AuthShell>
+    )
   }
 
   return (
@@ -52,8 +125,8 @@ export function LoginPage({ onLogin, onNavigate }) {
           type="password"
           value={password}
         />
-        <div className="auth-row">
-          <label className="auth-checkbox">
+        <div className="auth-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', fontSize: '13px' }}>
+          <label className="auth-checkbox" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
             <input
               id="remember"
               name="remember"
@@ -63,6 +136,13 @@ export function LoginPage({ onLogin, onNavigate }) {
             />
             <span>Ghi nhớ đăng nhập</span>
           </label>
+          <button 
+            onClick={() => setForgotMode(true)} 
+            type="button" 
+            style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer', fontWeight: 600, fontSize: '13.5px' }}
+          >
+            Quên mật khẩu?
+          </button>
         </div>
         {error && (
           <p className="auth-error" role="alert">
@@ -458,3 +538,116 @@ export function VerifyEmailPage({ onNavigate }) {
     </AuthShell>
   )
 }
+
+export function ResetPasswordPage({ onNavigate }) {
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [status, setStatus] = useState('input') // 'input', 'loading', 'success', 'error'
+  const [message, setMessage] = useState('')
+  const transition = useAuthTransition(onNavigate)
+  
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    if (password !== confirmPassword) {
+      setStatus('input')
+      setMessage('Mật khẩu xác nhận không khớp.')
+      return
+    }
+    
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('token')
+    if (!token) {
+      setStatus('error')
+      setMessage('Mã khôi phục không hợp lệ hoặc đã hết hạn.')
+      return
+    }
+    
+    setStatus('loading')
+    try {
+      await resetPassword({ token, newPassword: password })
+      setStatus('success')
+      setMessage('Đặt lại mật khẩu thành công! Bạn có thể sử dụng mật khẩu mới để đăng nhập.')
+    } catch (err) {
+      setStatus('input')
+      setMessage(err.message || 'Đặt lại mật khẩu thất bại. Vui lòng kiểm tra lại liên kết.')
+    }
+  }
+  
+  return (
+    <AuthShell
+      description="Nhập mật khẩu mới cho tài khoản AI Study Hub FPT của bạn."
+      leaving={transition.leaving}
+      onBack={() => transition.to('explore')}
+      subtitle="Đặt lại mật khẩu mới"
+      title="Khôi phục mật khẩu"
+    >
+      {status === 'success' ? (
+        <div className="auth-card" style={{ textAlign: 'center', padding: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            backgroundColor: '#dcfce7',
+            color: '#15803d',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '32px'
+          }}>
+            ✓
+          </div>
+          <p style={{ color: 'var(--text-secondary, #475569)', fontSize: '14px', lineHeight: 1.5 }}>
+            {message}
+          </p>
+          <button
+            className="auth-submit"
+            onClick={() => transition.to('login')}
+            type="button"
+            style={{ width: '100%' }}
+          >
+            Đăng nhập ngay <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      ) : (
+        <AuthCard onSubmit={handleSubmit}>
+          <Field
+            autoComplete="new-password"
+            icon="lock"
+            label="Mật khẩu mới"
+            onChange={setPassword}
+            placeholder="Nhập mật khẩu mới"
+            revealable
+            type="password"
+            value={password}
+          />
+          <Field
+            autoComplete="new-password"
+            icon="lock"
+            label="Xác nhận mật khẩu mới"
+            onChange={setConfirmPassword}
+            placeholder="Nhập lại mật khẩu mới"
+            revealable
+            type="password"
+            value={confirmPassword}
+          />
+          {message && (
+            <p className="auth-error" role="alert">
+              <StudyHubIcon name="help" size={16} /> {message}
+            </p>
+          )}
+          <button className="auth-submit" disabled={status === 'loading'} type="submit">
+            {status === 'loading' ? (
+              <>
+                <span className="auth-spinner" /> Đang cập nhật mật khẩu...
+              </>
+            ) : (
+              <>
+                Đặt lại mật khẩu <span aria-hidden="true">→</span>
+              </>
+            )}
+          </button>
+        </AuthCard>
+      )}
+    </AuthShell>
+  )
+}

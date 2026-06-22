@@ -5294,3 +5294,294 @@ body.dark-theme .sidebar-guest-signup-btn span {
   color: #f1f5f9 !important;
 }
 
+/* --- Dark Theme Styling Overrides for explore/home page and main layout cards --- */
+body.dark-theme .home-main {
+  background: linear-gradient(180deg, #0f172a 0%, #0b0f19 54%) !important;
+}
+
+body.dark-theme .hero-section p {
+  color: var(--text-secondary) !important;
+}
+
+body.dark-theme .hero-search {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+body.dark-theme .hero-search input::placeholder {
+  color: var(--text-muted) !important;
+}
+
+body.dark-theme .chip {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+body.dark-theme .chip:hover {
+  background: var(--bg-tertiary) !important;
+}
+
+body.dark-theme .chip--accent {
+  color: #a5b4fc !important;
+  background: rgba(99, 102, 241, 0.2) !important;
+  border-color: #818cf8 !important;
+}
+
+body.dark-theme .stat-card {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 0 2px 4px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+body.dark-theme .stat-card strong {
+  color: var(--color-strong) !important;
+}
+
+body.dark-theme .stat-card small {
+  color: var(--text-muted) !important;
+}
+
+body.dark-theme .stat-card__icon--blue {
+  color: #60a5fa !important;
+  background: rgba(96, 165, 250, 0.15) !important;
+}
+
+body.dark-theme .stat-card__icon--green {
+  color: #34d399 !important;
+  background: rgba(52, 211, 153, 0.15) !important;
+}
+
+body.dark-theme .stat-card__icon--purple {
+  color: #c084fc !important;
+  background: rgba(192, 132, 252, 0.15) !important;
+}
+
+body.dark-theme .folder-card {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+
+body.dark-theme .folder-card.is-highlighted {
+  border-color: #818cf8 !important;
+}
+
+body.dark-theme .folder-card__icon {
+  color: #60a5fa !important;
+  background: rgba(96, 165, 250, 0.15) !important;
+}
+
+body.dark-theme .folder-card h3 {
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .folder-card p {
+  color: var(--text-secondary) !important;
+}
+
+body.dark-theme .explore-folder-card {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .explore-folder-card p {
+  color: var(--text-secondary) !important;
+}
+
+body.dark-theme .explore-folder-card .folder-card__icon {
+  color: #60a5fa !important;
+  background: rgba(96, 165, 250, 0.15) !important;
+}
+
+body.dark-theme .explore-folder-card > small {
+  color: var(--text-muted) !important;
+}
+
+body.dark-theme .document-card {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .document-card h3 {
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .document-card p {
+  color: var(--text-secondary) !important;
+}
+
+body.dark-theme .document-card__footer {
+  border-top-color: var(--border-color) !important;
+}
+
+body.dark-theme .badge {
+  color: var(--text-secondary) !important;
+  background: var(--bg-tertiary) !important;
+}
+
+body.dark-theme .badge--blue {
+  color: #60a5fa !important;
+  background: rgba(96, 165, 250, 0.15) !important;
+}
+
+body.dark-theme .badge--green {
+  color: #34d399 !important;
+  background: rgba(52, 211, 153, 0.15) !important;
+}
+
+body.dark-theme .badge--purple {
+  color: #c084fc !important;
+  background: rgba(192, 132, 252, 0.15) !important;
+}
+
+body.dark-theme .badge--orange {
+  color: #fb923c !important;
+  background: rgba(251, 146, 60, 0.15) !important;
+}
+
+body.dark-theme .icon-button {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-muted) !important;
+}
+
+body.dark-theme .icon-button:hover {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .icon-button.is-active,
+body.dark-theme .file-favorite-button.is-active {
+  color: #f87171 !important;
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+
+body.dark-theme .card-stats {
+  color: var(--text-muted) !important;
+}
+
+body.dark-theme .inline-section-title {
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .inline-section-title small {
+  color: var(--text-muted) !important;
+}
+
+body.dark-theme .filter-panel,
+body.dark-theme .profile-card,
+body.dark-theme .activity-card,
+body.dark-theme .upload-card,
+body.dark-theme .folder-hero-card,
+body.dark-theme .doc-main-card,
+body.dark-theme .doc-info-card,
+body.dark-theme .comments-card,
+body.dark-theme .faq-card {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .comments-card textarea {
+  background: var(--bg-primary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .comment-row {
+  border-top-color: var(--border-color) !important;
+}
+
+body.dark-theme .rating-row {
+  border-top-color: var(--border-color) !important;
+}
+
+body.dark-theme .pricing-page {
+  background: linear-gradient(135deg, #0f172a, #0b0f19 45%, #1e1b4b) !important;
+}
+
+/* --- Dark Theme Styling Overrides for Upload Page, Forms, Inputs, Headings, and Selected Files --- */
+body.dark-theme .page-title h1,
+body.dark-theme .library-header h1,
+body.dark-theme .folder-detail-page h1,
+body.dark-theme .doc-main-card h1 {
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .page-title p,
+body.dark-theme .folder-detail-page > p,
+body.dark-theme .doc-main-card > p {
+  color: var(--text-secondary) !important;
+}
+
+body.dark-theme .upload-form label,
+body.dark-theme .filter-grid label,
+body.dark-theme .field label,
+body.dark-theme .report-modal label,
+body.dark-theme .quiz-create label,
+body.dark-theme .card-editor label {
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .upload-form label small,
+body.dark-theme .filter-grid label small {
+  color: var(--text-muted) !important;
+}
+
+body.dark-theme .upload-form input,
+body.dark-theme .upload-form select,
+body.dark-theme .upload-form textarea,
+body.dark-theme .field input,
+body.dark-theme .report-modal input,
+body.dark-theme .report-modal textarea,
+body.dark-theme .quiz-create select,
+body.dark-theme .card-editor input,
+body.dark-theme .filter-grid select {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+body.dark-theme select option {
+  background-color: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .drop-zone {
+  border-color: var(--border-color) !important;
+  color: var(--text-muted) !important;
+}
+
+body.dark-theme .drop-zone h3 {
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .selected-file {
+  background-color: var(--bg-primary) !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+body.dark-theme .selected-file strong {
+  color: var(--text-primary) !important;
+}
+
+body.dark-theme .selected-file small {
+  color: var(--text-muted) !important;
+}
+
+body.dark-theme .selected-file button {
+  color: #f87171 !important;
+}
+
+body.dark-theme .upload-read-status {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  color: #a5b4fc !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+
+

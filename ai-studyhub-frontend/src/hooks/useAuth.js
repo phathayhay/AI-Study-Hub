@@ -52,5 +52,14 @@ export default function useAuth() {
     setUser(null)
   }
 
-  return { user, loading, login, register, logout, setUser }
+  const updateUser = (u) => {
+    setUser(u)
+    if (u) {
+      localStorage.setItem('user', JSON.stringify(u))
+    } else {
+      localStorage.removeItem('user')
+    }
+  }
+
+  return { user, loading, login, register, logout, setUser: updateUser }
 }

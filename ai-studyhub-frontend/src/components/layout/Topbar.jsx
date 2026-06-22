@@ -48,7 +48,7 @@ export default function Topbar({
                      : 'Home'
 
   return (
-    <header className="topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', height: '64px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+    <header className="topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', height: '64px', backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
       <div style={{ fontSize: '15px', fontWeight: 600, color: '#4f46e5', display: 'flex', alignItems: 'center', gap: '8px' }}>
         {title && active === 'study' ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -102,8 +102,8 @@ export default function Topbar({
                   style={{
                     fontSize: '15px',
                     fontWeight: 600,
-                    color: '#0f172a',
-                    backgroundColor: '#fff',
+                    color: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-primary)',
                     border: '1.5px solid #4f46e5',
                     borderRadius: '8px',
                     padding: '4px 12px',
@@ -122,7 +122,7 @@ export default function Topbar({
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span 
                   onClick={() => setIsEditing(true)}
-                  style={{ color: '#0f172a', borderBottom: '1px dashed #4f46e5', paddingBottom: '2px', cursor: 'pointer' }}
+                  style={{ color: 'var(--text-primary)', borderBottom: '1px dashed #4f46e5', paddingBottom: '2px', cursor: 'pointer' }}
                 >
                   {title}
                 </span>
@@ -143,12 +143,12 @@ export default function Topbar({
       {guest ? null : (
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           {(active === 'study' || active === 'doc-detail' || !!title) && (
-            <button style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#fff', color: '#6366f1', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} title="Share">
+            <button style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} title="Share">
               <StudyHubIcon name="upload" size={16} />
             </button>
           )}
           
-          <button onClick={onNotifications} style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#fff', color: '#6366f1', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}>
+          <button onClick={onNotifications} style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}>
             <StudyHubIcon name="bell" size={16} />
             <span style={{ position: 'absolute', top: '-4px', right: '-4px', backgroundColor: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px' }}>0</span>
           </button>

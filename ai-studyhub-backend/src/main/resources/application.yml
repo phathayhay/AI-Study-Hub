@@ -24,8 +24,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    username: ${MAIL_USERNAME:mock@gmail.com}
+    password: ${MAIL_PASSWORD:mock-password}
     properties:
       mail:
         smtp:
@@ -55,17 +55,17 @@ firebase:
 
 # ── Cloudinary ───────────────────────────────────────────────
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME}
-  api-key: ${CLOUDINARY_API_KEY}
-  api-secret: ${CLOUDINARY_API_SECRET}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:mock}
+  api-key: ${CLOUDINARY_API_KEY:mock}
+  api-secret: ${CLOUDINARY_API_SECRET:mock}
 
 # ── Gemini AI ────────────────────────────────────────────────
 gemini:
   api-key: ${GEMINI_API_KEY}
-  model: gemini-2.5-flash-lite
+  model: ${GEMINI_MODEL:gemini-2.5-flash}
   project-id: ${GOOGLE_CLOUD_PROJECT_ID}
   location: us-central1
-  max-tokens: 2048
+  max-tokens: ${GEMINI_MAX_TOKENS:8192}
   temperature: 0.7
 
 # ── Swagger / OpenAPI ────────────────────────────────────────

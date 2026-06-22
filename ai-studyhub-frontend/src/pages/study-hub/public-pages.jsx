@@ -64,6 +64,109 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
   const [error, setError] = useState('')
   const [favoriteIds, setFavoriteIds] = useState(new Set())
 
+  // Autocomplete states
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
+  const [suggestions, setSuggestions] = useState([])
+  const searchRef = useRef(null)
+
+  const SUBJECT_SUGGESTIONS = [
+    { code: 'PRF192', name: 'Programming Fundamentals', type: 'course' },
+    { code: 'PRO192', name: 'Object-Oriented Programming', type: 'course' },
+    { code: 'CSD201', name: 'Data Structures & Algorithms', type: 'course' },
+    { code: 'DBI202', name: 'Introduction to Databases', type: 'course' },
+    { code: 'SWP391', name: 'Software Development Project', type: 'course' },
+    { code: 'CEA201', name: 'Computer Architecture', type: 'course' },
+    { code: 'JPD316', name: 'Japanese Elementary 3', type: 'course' },
+    { code: 'MAS291', name: 'Mathematics for Software Engineering', type: 'course' },
+    { code: 'SWE102', name: 'Introduction to Software Engineering', type: 'course' },
+    { code: 'MAD101', name: 'Discrete Mathematics', type: 'course' },
+    { code: 'OSG202', name: 'Operating Systems', type: 'course' },
+    { code: 'NWC203', name: 'Computer Networks', type: 'course' },
+  ]
+
+  // Detect click outside to close suggestions dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Filter and show suggestions based on searchQuery
+  useEffect(() => {
+    const trimmed = searchQuery.trim().toLowerCase()
+    if (!trimmed) {
+      const defaultSuggestions = SUBJECT_SUGGESTIONS.slice(0, 5).map(item => ({
+        type: 'course',
+        label: `${item.code} - ${item.name}`,
+        value: item.code,
+      }))
+      setSuggestions(defaultSuggestions)
+      return
+    }
+
+    const filteredCourses = SUBJECT_SUGGESTIONS.filter(item => 
+      item.code.toLowerCase().includes(trimmed) || 
+      item.name.toLowerCase().includes(trimmed)
+    ).map(item => ({
+      type: 'course',
+      label: `${item.code} - ${item.name}`,
+      value: item.code,
+    }))
+
+    const filteredDocs = documents.filter(doc => 
+      (doc.title || '').toLowerCase().includes(trimmed)
+    ).slice(0, 5).map(doc => ({
+      type: 'document',
+      label: doc.title,
+      value: doc.title,
+      id: doc.id,
+    }))
+
+    setSuggestions([...filteredCourses, ...filteredDocs])
+    setActiveSuggestionIndex(-1)
+  }, [searchQuery, documents])
+
+  const handleSelectSuggestion = (suggestion) => {
+    if (suggestion.type === 'document') {
+      onOpenDocument?.(suggestion.id)
+    } else {
+      setSearchQuery(suggestion.value)
+    }
+    setShowSuggestions(false)
+    setActiveSuggestionIndex(-1)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setShowSuggestions(true)
+      setActiveSuggestionIndex((prev) => 
+        prev < suggestions.length - 1 ? prev + 1 : 0
+      )
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setShowSuggestions(true)
+      setActiveSuggestionIndex((prev) => 
+        prev > 0 ? prev - 1 : suggestions.length - 1
+      )
+    } else if (e.key === 'Enter') {
+      if (showSuggestions && activeSuggestionIndex >= 0 && activeSuggestionIndex < suggestions.length) {
+        e.preventDefault()
+        handleSelectSuggestion(suggestions[activeSuggestionIndex])
+      } else {
+        setShowSuggestions(false)
+      }
+      e.target.blur()
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false)
+    }
+  }
+
   useEffect(() => {
     if (guest) return
     getFavoriteDocuments()
@@ -152,27 +255,109 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
           <h1 id="home-title">{guest ? 'Tài liệu học tập cho sinh viên FPTU' : 'Tài liệu học tập FPTU'}</h1>
           <p>Tìm kiếm, chia sẻ và quản lý tài liệu học tập với sức mạnh AI</p>
 
-          <div className="hero-search" role="search" style={{ margin: '28px auto 0', background: '#fff' }}>
+          <div className="hero-search" role="search" style={{ margin: '28px auto 0', position: 'relative' }} ref={searchRef}>
             <StudyHubIcon name="search" size={20} />
             <input 
               placeholder="Tìm kiếm theo mã môn học hoặc tiêu đề (VD: CEA201, PRF192, SWP391...)" 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setShowSuggestions(true)}
+              onKeyDown={handleKeyDown}
             />
             {searchQuery && (
               <button 
                 type="button" 
-                onClick={() => setSearchQuery('')}
+                onClick={() => { setSearchQuery(''); setShowSuggestions(false); }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#94a3b8', padding: '0 8px' }}
               >
                 ×
               </button>
             )}
+
+            {/* Google-like Autocomplete Dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div 
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: 0,
+                  marginTop: '8px',
+                  backgroundColor: 'var(--popover-bg, #ffffff)',
+                  border: '1px solid var(--border-color, #e2e8f0)',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)',
+                  zIndex: 1000,
+                  overflow: 'hidden',
+                  padding: '6px 0',
+                  textAlign: 'left'
+                }}
+                className="search-suggestions-dropdown"
+              >
+                {suggestions.map((item, index) => {
+                  const isHighlighted = index === activeSuggestionIndex
+                  return (
+                    <div
+                      key={index}
+                      onClick={() => handleSelectSuggestion(item)}
+                      onMouseEnter={() => setActiveSuggestionIndex(index)}
+                      style={{
+                        padding: '10px 16px',
+                        cursor: 'pointer',
+                        backgroundColor: isHighlighted ? 'var(--bg-secondary, #f1f5f9)' : 'transparent',
+                        color: 'var(--text-primary, #0f172a)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                    >
+                      <span style={{ color: '#6366f1', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                        {item.type === 'course' ? (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+                            <path d="M6 6h10" />
+                            <path d="M6 10h10" />
+                          </svg>
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                        )}
+                      </span>
+                      <span style={{
+                        fontSize: '14px',
+                        fontWeight: item.type === 'course' ? 600 : 500,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        flex: 1
+                      }}>
+                        {item.label}
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        color: 'var(--text-muted, #94a3b8)',
+                        backgroundColor: 'var(--bg-tertiary, #f8fafc)',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        textTransform: 'uppercase',
+                        fontWeight: 600,
+                        letterSpacing: '0.5px'
+                      }}>
+                        {item.type === 'course' ? 'Môn học' : 'Tài liệu'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           <div className="hero-filters" aria-label="Bộ lọc nhanh" style={{ width: '100%', maxWidth: '768px', margin: '24px auto 0' }}>
             <div className="filter-row" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 500 }}>Môn học phổ biến:</span>
+              <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 500 }}>Môn học phổ biến:</span>
               {popularCourses.map((course) => (
                 <button 
                   className={searchQuery.toUpperCase() === course ? 'chip chip--accent' : 'chip'} 
@@ -185,7 +370,7 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
               ))}
             </div>
             <div className="filter-row" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', marginTop: '12px' }}>
-              <span style={{ fontSize: '14px', color: '#64748b', fontWeight: 500 }}>Ngành học:</span>
+              <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 500 }}>Ngành học:</span>
               {['ALL', 'SE', 'AI', 'GD'].map((major) => (
                 <button 
                   className={selectedMajor === major ? 'chip chip--accent' : 'chip'} 
