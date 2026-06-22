@@ -78,6 +78,51 @@ const formatBytes = (value = 0) => {
 
 const normalizeStatus = (value) => String(value || 'pending').toLowerCase()
 const getInitial = (value = 'A') => value.trim().charAt(0).toUpperCase() || 'A'
+const getDocumentName = (doc = {}) => doc.title || doc.fileName || 'Untitled'
+const STATUS_LABELS = {
+  active: 'Active',
+  banned: 'Banned',
+  blocked: 'Banned',
+  suspended: 'Suspended',
+  inactive: 'Inactive',
+  pending: 'Pending',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  resolved: 'Resolved',
+}
+
+const normalizeText = (value) => String(value || '').toLowerCase()
+const matchesSearch = (query, values) => {
+  const term = normalizeText(query).trim()
+  if (!term) return true
+  return values.some((value) => normalizeText(value).includes(term))
+}
+const matchesStatus = (selected, status) => !selected || normalizeStatus(status) === selected
+const compareText = (left, right) => String(left || '').localeCompare(String(right || ''), 'vi', { sensitivity: 'base' })
+const compareDate = (left, right) => {
+  const leftTime = left ? new Date(left).getTime() : 0
+  const rightTime = right ? new Date(right).getTime() : 0
+  return (Number.isNaN(leftTime) ? 0 : leftTime) - (Number.isNaN(rightTime) ? 0 : rightTime)
+}
+
+function getStatusOptions(items, readStatus, defaults = []) {
+  const options = new Set(defaults)
+  items.forEach((item) => {
+    const status = readStatus(item)
+    if (status) options.add(normalizeStatus(status))
+  })
+  return [...options]
+}
+
+function sortItems(items, sortValue, readers) {
+  const [field, direction = 'asc'] = sortValue.split(':')
+  const multiplier = direction === 'desc' ? -1 : 1
+  return [...items].sort((left, right) => {
+    if (field === 'date') return compareDate(readers.date(left), readers.date(right)) * multiplier
+    if (field === 'status') return compareText(normalizeStatus(readers.status(left)), normalizeStatus(readers.status(right))) * multiplier
+    return compareText(readers.name(left), readers.name(right)) * multiplier
+  })
+}
 
 function useAdminList(loader) {
   const [state, setState] = useState({ data: [], error: '', loading: true })
@@ -291,18 +336,47 @@ function AdminOverview({ onOpenUser }) {
 
 function AdminUsers({ onOpenUser }) {
   const { data: users, error, loading, reload } = useAdminList(getAdminUsers)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('date:desc')
+  const statusOptions = useMemo(() => getStatusOptions(users, (user) => user.status, ['active', 'inactive', 'banned']), [users])
+  const visibleUsers = useMemo(() => {
+    const filtered = users.filter((user) => {
+      return matchesStatus(statusFilter, user.status) && matchesSearch(query, [
+        user.fullName,
+        user.email,
+        user.planName,
+        formatDate(user.createdAt),
+      ])
+    })
+    return sortItems(filtered, sortBy, {
+      date: (user) => user.createdAt,
+      name: (user) => user.fullName || user.email,
+      status: (user) => user.status,
+    })
+  }, [query, sortBy, statusFilter, users])
 
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
         <AdminSectionHeader icon="users" title="User Management">
-          <AdminSearch placeholder="Search users..." />
+          <AdminStatusFilter onChange={setStatusFilter} options={statusOptions} value={statusFilter} />
+          <AdminSearch onChange={setQuery} placeholder="Search users..." value={query} />
         </AdminSectionHeader>
         <AdminTableState error={error} loading={loading} />
         <table className="admin-table">
-          <thead><tr><th>User</th><th>Email</th><th>Joined</th><th>Plan</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead>
+            <tr>
+              <AdminSortableTh field="name" sortBy={sortBy} onSort={setSortBy}>User</AdminSortableTh>
+              <th>Email</th>
+              <AdminSortableTh defaultDirection="desc" field="date" sortBy={sortBy} onSort={setSortBy}>Joined</AdminSortableTh>
+              <th>Plan</th>
+              <AdminSortableTh field="status" sortBy={sortBy} onSort={setSortBy}>Status</AdminSortableTh>
+              <th>Actions</th>
+            </tr>
+          </thead>
           <tbody>
-            {users.map((user) => {
+            {visibleUsers.map((user) => {
               const banned = normalizeStatus(user.status) === 'banned'
               return (
                 <tr key={user.id || user.email}>
@@ -327,6 +401,7 @@ function AdminUsers({ onOpenUser }) {
                 </tr>
               )
             })}
+            {!loading && !error && visibleUsers.length === 0 && <AdminNoResults colSpan={6} />}
           </tbody>
         </table>
       </section>
@@ -336,21 +411,50 @@ function AdminUsers({ onOpenUser }) {
 
 function AdminDocuments() {
   const { data: documents, error, loading, reload } = useAdminList(getAdminDocuments)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('date:desc')
+  const statusOptions = useMemo(() => getStatusOptions(documents, (doc) => doc.moderationStatus, ['pending', 'approved', 'rejected']), [documents])
+  const visibleDocuments = useMemo(() => {
+    const filtered = documents.filter((doc) => {
+      return matchesStatus(statusFilter, doc.moderationStatus) && matchesSearch(query, [
+        getDocumentName(doc),
+        doc.ownerEmail,
+        doc.visibility,
+        formatDate(doc.createdAt),
+        formatBytes(doc.fileSize),
+      ])
+    })
+    return sortItems(filtered, sortBy, {
+      date: (doc) => doc.createdAt,
+      name: (doc) => getDocumentName(doc),
+      status: (doc) => doc.moderationStatus,
+    })
+  }, [documents, query, sortBy, statusFilter])
 
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
         <AdminSectionHeader icon="file" title="Document Management">
-          <input className="admin-filter-input" placeholder="Status" />
-          <AdminSearch placeholder="Search documents..." />
+          <AdminStatusFilter onChange={setStatusFilter} options={statusOptions} value={statusFilter} />
+          <AdminSearch onChange={setQuery} placeholder="Search documents..." value={query} />
         </AdminSectionHeader>
         <AdminTableState error={error} loading={loading} />
         <table className="admin-table">
-          <thead><tr><th>Title</th><th>Uploader</th><th>Upload Date</th><th>Size</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead>
+            <tr>
+              <AdminSortableTh field="name" sortBy={sortBy} onSort={setSortBy}>Title</AdminSortableTh>
+              <th>Uploader</th>
+              <AdminSortableTh defaultDirection="desc" field="date" sortBy={sortBy} onSort={setSortBy}>Upload Date</AdminSortableTh>
+              <th>Size</th>
+              <AdminSortableTh field="status" sortBy={sortBy} onSort={setSortBy}>Status</AdminSortableTh>
+              <th>Actions</th>
+            </tr>
+          </thead>
           <tbody>
-            {documents.map((doc) => (
+            {visibleDocuments.map((doc) => (
               <tr key={doc.id || doc.title}>
-                <td>{doc.title || doc.fileName}</td>
+                <td>{getDocumentName(doc)}</td>
                 <td>{doc.ownerEmail || '-'}</td>
                 <td>{formatDate(doc.createdAt)}</td>
                 <td>{formatBytes(doc.fileSize)}</td>
@@ -365,6 +469,7 @@ function AdminDocuments() {
                 </td>
               </tr>
             ))}
+            {!loading && !error && visibleDocuments.length === 0 && <AdminNoResults colSpan={6} />}
           </tbody>
         </table>
       </section>
@@ -431,7 +536,7 @@ function AdminStorage() {
           <h2>Storage Allocation</h2>
           {largest.map((doc) => (
             <div className="storage-row" key={doc.id || doc.fileName}>
-              <span>{doc.fileName || doc.title}</span>
+              <span>{getDocumentName(doc)}</span>
               <small>{formatBytes(doc.fileSize)}</small>
               <i className="blue" style={{ width: `${Math.max(8, Math.min(100, (Number(doc.fileSize || 0) / Math.max(totalBytes, 1)) * 100))}%` }} />
             </div>
@@ -446,7 +551,7 @@ function AdminStorage() {
           <tbody>
             {largest.map((doc) => (
               <tr key={doc.id || doc.fileName}>
-                <td>{doc.fileName || doc.title}</td><td>{doc.ownerEmail}</td><td>{formatBytes(doc.fileSize)}</td><td><Badge tone="blue">{doc.visibility || '-'}</Badge></td>
+                <td>{getDocumentName(doc)}</td><td>{doc.ownerEmail}</td><td>{formatBytes(doc.fileSize)}</td><td><Badge tone="blue">{doc.visibility || '-'}</Badge></td>
               </tr>
             ))}
           </tbody>
@@ -458,30 +563,64 @@ function AdminStorage() {
 
 function AdminReports() {
   const { data: reports, error, loading, reload } = useAdminList(getAdminReports)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('date:desc')
+  const statusOptions = useMemo(() => getStatusOptions(reports, (report) => report.status, ['pending', 'resolved']), [reports])
+  const visibleReports = useMemo(() => {
+    const filtered = reports.filter((report) => {
+      return matchesStatus(statusFilter, report.status) && matchesSearch(query, [
+        report.reporterEmail,
+        report.documentTitle,
+        report.documentId,
+        report.reportType,
+        report.reportReason,
+        formatDate(report.createdAt),
+      ])
+    })
+    return sortItems(filtered, sortBy, {
+      date: (report) => report.createdAt,
+      name: (report) => report.documentTitle || `Document #${report.documentId}`,
+      status: (report) => report.status,
+    })
+  }, [query, reports, sortBy, statusFilter])
+
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
         <AdminSectionHeader icon="flag" title="Reports">
-          <input className="admin-filter-input" placeholder="Status" />
-          <AdminSearch placeholder="Search reports..." />
+          <AdminStatusFilter onChange={setStatusFilter} options={statusOptions} value={statusFilter} />
+          <AdminSearch onChange={setQuery} placeholder="Search reports..." value={query} />
         </AdminSectionHeader>
         <AdminTableState error={error} loading={loading} />
         <table className="admin-table">
-          <thead><tr><th>Reporter</th><th>Document</th><th>Violation Type</th><th>Report Date</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>{reports.map((report) => (
-            <tr key={report.id}>
-              <td><AdminNameCell name={report.reporterEmail || '-'} /></td>
-              <td>{report.documentTitle || `Document #${report.documentId}`}</td>
-              <td><Badge tone="orange">{report.reportType || '-'}</Badge></td>
-              <td>{formatDate(report.createdAt)}</td>
-              <td><AdminStatus status={report.status} /></td>
-              <td className="admin-actions">
-                <button onClick={() => callToast(report.reportReason || 'No reason provided', 'info')} type="button"><StudyHubIcon name="eye" size={15} /></button>
-                <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', false), reload, 'Report resolved')} type="button"><StudyHubIcon name="check" size={15} /></button>
-                <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', true), reload, 'Report resolved and document rejected')} type="button"><StudyHubIcon name="x" size={15} /></button>
-              </td>
+          <thead>
+            <tr>
+              <th>Reporter</th>
+              <AdminSortableTh field="name" sortBy={sortBy} onSort={setSortBy}>Document</AdminSortableTh>
+              <th>Violation Type</th>
+              <AdminSortableTh defaultDirection="desc" field="date" sortBy={sortBy} onSort={setSortBy}>Report Date</AdminSortableTh>
+              <AdminSortableTh field="status" sortBy={sortBy} onSort={setSortBy}>Status</AdminSortableTh>
+              <th>Actions</th>
             </tr>
-          ))}</tbody>
+          </thead>
+          <tbody>
+            {visibleReports.map((report) => (
+              <tr key={report.id}>
+                <td><AdminNameCell name={report.reporterEmail || '-'} /></td>
+                <td>{report.documentTitle || `Document #${report.documentId}`}</td>
+                <td><Badge tone="orange">{report.reportType || '-'}</Badge></td>
+                <td>{formatDate(report.createdAt)}</td>
+                <td><AdminStatus status={report.status} /></td>
+                <td className="admin-actions">
+                  <button onClick={() => callToast(report.reportReason || 'No reason provided', 'info')} type="button"><StudyHubIcon name="eye" size={15} /></button>
+                  <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', false), reload, 'Report resolved')} type="button"><StudyHubIcon name="check" size={15} /></button>
+                  <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', true), reload, 'Report resolved and document rejected')} type="button"><StudyHubIcon name="x" size={15} /></button>
+                </td>
+              </tr>
+            ))}
+            {!loading && !error && visibleReports.length === 0 && <AdminNoResults colSpan={6} />}
+          </tbody>
         </table>
       </section>
     </main>
@@ -493,7 +632,7 @@ function AdminLogs() {
   const { data: documents } = useAdminList(getAdminDocuments)
   const items = [
     ...reports.slice(0, 3).map((report) => ({ tone: 'orange', title: report.reportType || 'Report', text: report.documentTitle || report.reportReason, time: formatDate(report.createdAt) })),
-    ...documents.slice(0, 3).map((doc) => ({ tone: 'green', title: 'Document Uploaded', text: doc.title || doc.fileName, time: formatDate(doc.createdAt) })),
+    ...documents.slice(0, 3).map((doc) => ({ tone: 'green', title: 'Document Uploaded', text: getDocumentName(doc), time: formatDate(doc.createdAt) })),
   ]
 
   return (
@@ -651,8 +790,36 @@ function AdminSectionHeader({ children, icon, title }) {
   return <header className="admin-section-header"><h1><StudyHubIcon name={icon} size={28} /> {title}</h1><div>{children}</div></header>
 }
 
-function AdminSearch({ placeholder }) {
-  return <label className="admin-search"><StudyHubIcon name="search" size={18} /><input placeholder={placeholder} /></label>
+function AdminSearch({ onChange, placeholder, value }) {
+  const inputProps = {}
+  if (value !== undefined) inputProps.value = value
+  if (onChange) inputProps.onChange = (event) => onChange(event.target.value)
+  return <label className="admin-search"><StudyHubIcon name="search" size={18} /><input placeholder={placeholder} {...inputProps} /></label>
+}
+
+function AdminStatusFilter({ onChange, options, value }) {
+  return (
+    <select aria-label="Filter by status" className="admin-filter-input" onChange={(event) => onChange(event.target.value)} value={value}>
+      <option value="">All statuses</option>
+      {options.map((option) => <option key={option} value={option}>{STATUS_LABELS[option] ?? option}</option>)}
+    </select>
+  )
+}
+
+function AdminSortableTh({ children, defaultDirection = 'asc', field, onSort, sortBy }) {
+  const [activeField, direction = 'asc'] = sortBy.split(':')
+  const active = activeField === field
+  const nextDirection = active && direction === 'asc' ? 'desc' : 'asc'
+  const nextSort = active ? `${field}:${nextDirection}` : `${field}:${defaultDirection}`
+
+  return (
+    <th aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button className={`admin-sort-header${active ? ' is-active' : ''}`} onClick={() => onSort(nextSort)} type="button">
+        <span>{children}</span>
+        <span aria-hidden="true" className="admin-sort-arrows">{active ? (direction === 'asc' ? '↑' : '↓') : '↑↓'}</span>
+      </button>
+    </th>
+  )
 }
 
 function AdminTableState({ error, loading }) {
@@ -661,21 +828,14 @@ function AdminTableState({ error, loading }) {
   return null
 }
 
+function AdminNoResults({ colSpan }) {
+  return <tr><td className="admin-table-empty" colSpan={colSpan}>No matching records</td></tr>
+}
+
 function AdminStatus({ status }) {
   const normalized = normalizeStatus(status)
   const cssStatus = normalized === 'banned' ? 'blocked' : normalized === 'resolved' ? 'approved' : normalized
-  const labels = {
-    active: 'Active',
-    banned: 'Banned',
-    blocked: 'Banned',
-    suspended: 'Suspended',
-    inactive: 'Inactive',
-    pending: 'Pending',
-    approved: 'Approved',
-    rejected: 'Rejected',
-    resolved: 'Resolved',
-  }
-  return <span className={`admin-status admin-status--${cssStatus}`}>{labels[normalized] ?? status ?? '-'}</span>
+  return <span className={`admin-status admin-status--${cssStatus}`}>{STATUS_LABELS[normalized] ?? status ?? '-'}</span>
 }
 
 function AdminNameCell({ name }) {

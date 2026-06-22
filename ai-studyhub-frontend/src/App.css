@@ -4229,6 +4229,8 @@
 .admin-section-header > div {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 12px;
 }
 
@@ -4258,9 +4260,24 @@
 .admin-filter-input {
   width: 170px;
   height: 42px;
+  padding: 0 34px 0 12px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   background: #ffffff;
+  color: #475569;
+}
+
+.admin-sort-input {
+  width: 180px;
+}
+
+select.admin-filter-input {
+  appearance: none;
+  background:
+    linear-gradient(45deg, transparent 50%, #64748b 50%) right 17px center / 6px 6px no-repeat,
+    linear-gradient(135deg, #64748b 50%, transparent 50%) right 12px center / 6px 6px no-repeat,
+    #ffffff;
+  cursor: pointer;
 }
 
 .admin-table {
@@ -4992,6 +5009,10 @@
   margin-bottom: 22px;
 }
 
+.admin-section-header > div {
+  justify-content: flex-end;
+}
+
 .admin-section-header h1 {
   font-size: 24px;
 }
@@ -5028,6 +5049,35 @@
   text-transform: uppercase;
 }
 
+.admin-sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.admin-sort-header:hover,
+.admin-sort-header.is-active {
+  color: #0f172a;
+}
+
+.admin-sort-arrows {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.admin-sort-header.is-active .admin-sort-arrows {
+  color: #2563eb;
+}
+
 .admin-table td {
   padding: 15px 16px;
   border-bottom: 1px solid #edf2f7;
@@ -5035,6 +5085,12 @@
 
 .admin-table tbody tr:hover {
   background: #f8fafc;
+}
+
+.admin-table-empty {
+  height: 92px;
+  color: #64748b;
+  text-align: center;
 }
 
 .admin-actions {
