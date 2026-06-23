@@ -3,15 +3,12 @@ import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import {
   banAdminUser,
-  createAdminCategory,
   createAdminCourse,
   createAdminMajor,
   createAdminPlan,
-  deleteAdminCategory,
   deleteAdminCourse,
   deleteAdminMajor,
   deleteAdminPlan,
-  getAdminCategories,
   getAdminCourses,
   getAdminDashboardData,
   getAdminDocuments,
@@ -24,7 +21,6 @@ import {
   resolveAdminReport,
   reviewVerification,
   unbanAdminUser,
-  updateAdminCategory,
   updateAdminCourse,
   updateAdminMajor,
   updateAdminPlan,
@@ -651,7 +647,6 @@ function AdminLogs() {
 function AdminSettings() {
   const plans = useAdminList(getAdminPlans)
   const majors = useAdminList(getAdminMajors)
-  const categories = useAdminList(getAdminCategories)
   const verifications = useAdminList(getPendingVerifications)
 
   return (
@@ -667,16 +662,6 @@ function AdminSettings() {
           onDelete={(item) => runAdminAction(() => deleteAdminMajor(item.id), majors.reload, 'Major deleted')}
           onUpdate={(item) => updateLookup('major', item, majors.reload)}
           title="Majors"
-        />
-        <LookupRows
-          fields={['categoryName']}
-          items={categories.data}
-          labelKey="categoryName"
-          loading={categories.loading}
-          onCreate={() => createLookup('category', categories.reload)}
-          onDelete={(item) => runAdminAction(() => deleteAdminCategory(item.id), categories.reload, 'Category deleted')}
-          onUpdate={(item) => updateLookup('category', item, categories.reload)}
-          title="Categories"
         />
         <LookupRows
           fields={['planName', 'price', 'storageLimitMb', 'aiRequestsPerDay']}
@@ -710,7 +695,6 @@ async function createLookup(type, reload) {
   const body = promptLookup(type)
   if (!body) return
   const actions = {
-    category: () => createAdminCategory(body),
     major: () => createAdminMajor(body),
     plan: () => createAdminPlan(body),
   }
@@ -721,7 +705,6 @@ async function updateLookup(type, item, reload) {
   const body = promptLookup(type, item)
   if (!body) return
   const actions = {
-    category: () => updateAdminCategory(item.id, body),
     major: () => updateAdminMajor(item.id, body),
     plan: () => updateAdminPlan(item.id, body),
   }
@@ -729,10 +712,6 @@ async function updateLookup(type, item, reload) {
 }
 
 function promptLookup(type, item = {}) {
-  if (type === 'category') {
-    const categoryName = window.prompt('Category name', item.categoryName || '')
-    return categoryName ? { categoryName } : null
-  }
   if (type === 'major') {
     const majorCode = window.prompt('Major code', item.majorCode || '')
     if (!majorCode) return null
