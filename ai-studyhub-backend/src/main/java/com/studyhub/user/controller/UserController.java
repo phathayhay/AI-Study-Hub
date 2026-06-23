@@ -5,6 +5,7 @@ import com.studyhub.security.SecurityUtils;
 import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.UserRepository;
+import com.studyhub.user.service.StudentVerificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -28,6 +29,7 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final CloudinaryStorageService cloudinaryStorageService;
+    private final StudentVerificationService studentVerificationService;
 
     // API tải lên ảnh đại diện của người dùng
     @PostMapping(value = "/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -68,6 +70,28 @@ public class UserController {
             log.error("Failed to upload avatar for user {}: {}", email, e.getMessage());
             return ResponseEntity.internalServerError()
                     .body(ApiResponse.error("Failed to upload avatar, please try again later."));
+        }
+    }
+
+    // API gửi yêu cầu xác minh thẻ sinh viên
+    @PostMapping(value = "/verify-student", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Submit student identity verification", description = "Uploads a student card image to Cloudinary, registers/updates the student verification request, and sets the user's verification status to PENDING.")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Verification request submitted successfully", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"Verification request submitted successfully. Please wait for admin approval.\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid file or parameters", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"File cannot be empty\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"User is not logged in / Invalid access token\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Failed to submit verification request, please try again later.\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
+    })
+    public ResponseEntity<ApiResponse<Void>> verifyStudent(@RequestParam("file") MultipartFile file) {
+        String email = SecurityUtils.getCurrentUserEmail();
+        log.info("API: Submit student verification request for user {}", email);
+        try {
+            studentVerificationService.uploadVerificationCard(file, email);
+            return ResponseEntity.ok(ApiResponse.ok("Verification request submitted successfully. Please wait for admin approval."));
+        } catch (IOException e) {
+            log.error("Failed to upload student verification for user {}: {}", email, e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(ApiResponse.error("Failed to upload verification card, please try again later."));
         }
     }
 }

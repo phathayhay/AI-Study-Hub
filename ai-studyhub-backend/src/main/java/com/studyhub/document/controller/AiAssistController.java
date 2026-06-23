@@ -42,6 +42,17 @@ public class AiAssistController {
         return ResponseEntity.ok(aiAssistService.generateSummary(documentId, email));
     }
 
+    // API lấy tóm tắt của tài liệu nếu đã tồn tại
+    @GetMapping("/documents/{documentId}/summary")
+    @Operation(summary = "Get existing document summary", description = "Retrieves the pre-generated summary of a document if it exists.")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Summary retrieved successfully"),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Summary not found for this document", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Summary not found for this document\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
+    })
+    public ResponseEntity<DocumentSummary> getSummary(@PathVariable Long documentId) {
+        return ResponseEntity.ok(aiAssistService.getSummaryForDocument(documentId));
+    }
+
     // API yêu cầu AI tạo bộ câu hỏi trắc nghiệm ôn tập
     @PostMapping("/documents/{documentId}/quiz")
     @Operation(summary = "Generate learning quiz", description = "Requests Gemini to automatically generate a multiple-choice questions quiz from a document.")

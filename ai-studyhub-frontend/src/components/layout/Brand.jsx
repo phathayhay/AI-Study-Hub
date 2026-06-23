@@ -1,19 +1,15 @@
-import StudyHubIcon from '../icons/StudyHubIcons'
-
-import logo from '../../assets/logo.png'
-import logoCompact from '../../assets/logo-compact.png'
+import LogoIcon from '../icons/LogoIcon'
 
 export default function Brand({ compact = false, onClick }) {
   const content = (
     <div style={{ display: 'flex', alignItems: 'center' }}>
-      <img 
-        src={compact ? logoCompact : logo} 
-        alt="AI Study Hub" 
-        style={{ 
-          height: compact ? '32px' : '48px', 
-          width: 'auto', 
-          objectFit: 'contain'
-        }} 
+      <LogoIcon
+        compact={compact}
+        className="text-[#050a30] dark:text-white transition-colors duration-300"
+        style={{
+          height: compact ? '26px' : '34px',
+          width: 'auto'
+        }}
       />
     </div>
   )

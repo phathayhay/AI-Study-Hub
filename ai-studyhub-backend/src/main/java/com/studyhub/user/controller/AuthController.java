@@ -20,9 +20,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -36,16 +38,30 @@ public class AuthController {
 
     // API đăng ký tài khoản sinh viên mới
     @PostMapping("/register")
-    @Operation(summary = "Register a new student account", description = "Creates a new student account with default USER role and FREE subscription plan.")
+    @Operation(summary = "Register a new student account", description = "Creates a new student account with default USER role and FREE subscription plan. Account is initially INACTIVE and requires email verification.")
     @ApiResponses(value = {
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Registration successful, returns access and refresh tokens", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"User registered successfully\", \"data\": {\"accessToken\": \"eyJhbGciOiJIUzI1NiJ9...\", \"refreshToken\": \"7b47e4b9-87a4-4a41-b0e6-b63e800ebefc\", \"email\": \"student@fpt.edu.vn\", \"role\": \"USER\", \"fullName\": \"Nguyen Van A\", \"studentCode\": \"SE160000\"}, \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Registration successful, email verification link sent", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"Registration successful. Please check your email to verify your account.\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid input data or email already in use", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Email is already in use\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
     })
-    public ResponseEntity<ApiResponse<TokenResponse>> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<Void>> register(@Valid @RequestBody RegisterRequest request) {
         log.info("API: Registering user with email {}", request.getEmail());
-        TokenResponse response = authService.register(request);
-        return ResponseEntity.ok(ApiResponse.ok("User registered successfully", response));
+        authService.register(request);
+        return ResponseEntity.ok(ApiResponse.ok("Registration successful. Please check your email to verify your account."));
+    }
+
+    // API xác thực email tài khoản
+    @GetMapping("/verify-email")
+    @Operation(summary = "Verify student email", description = "Validates the verification token sent via email and activates the user account.")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Email verified successfully, account activated", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"Email verified successfully. You can now log in.\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid or expired verification token", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Verification token is invalid or has expired\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
+    })
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(@RequestParam String token) {
+        log.info("API: Verifying email using token");
+        authService.verifyEmail(token);
+        return ResponseEntity.ok(ApiResponse.ok("Email verified successfully. You can now log in."));
     }
 
     // API đăng nhập tài khoản người dùng

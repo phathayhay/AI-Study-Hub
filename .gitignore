@@ -1,3 +1,6 @@
+# Agent config
+.agents/
+
 .idea/
 **/.idea/
 .vscode/
@@ -51,3 +54,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+PROCESSING_FLOWS.md
