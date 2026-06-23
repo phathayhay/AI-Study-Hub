@@ -14,21 +14,21 @@ function FilterRow({ label, items, accent = false }) {
   )
 }
 
-export default function HeroSearch({ title = 'Tài liệu học tập FPTU' }) {
+export default function HeroSearch({ title = 'FPTU Study Materials' }) {
   return (
     <section className="hero-section" aria-labelledby="home-title">
       <h1 id="home-title">{title}</h1>
-      <p>Tìm kiếm, chia sẻ và quản lý tài liệu học tập với sức mạnh AI</p>
+      <p>Search, share, and manage study materials with AI power</p>
 
       <div className="hero-search" role="search">
         <StudyHubIcon name="search" size={20} />
-        <input placeholder="Tìm kiếm theo mã môn học (VD: CEA201, PRF192, SWP391...)" />
-        <button type="button">Tìm kiếm</button>
+        <input placeholder="Search by course code (e.g. CEA201, PRF192, SWP391...)" />
+        <button type="button">Search</button>
       </div>
 
-      <div className="hero-filters" aria-label="Bộ lọc nhanh">
-        <FilterRow label="Môn học phổ biến:" items={popularCourses} />
-        <FilterRow label="Ngành học:" items={majors} accent />
+      <div className="hero-filters" aria-label="Quick Filter">
+        <FilterRow label="Popular courses:" items={popularCourses} />
+        <FilterRow label="Majors:" items={majors} accent />
       </div>
     </section>
   )

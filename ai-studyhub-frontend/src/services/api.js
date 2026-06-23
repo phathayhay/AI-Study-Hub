@@ -27,7 +27,7 @@ async function request(method, path, body, opts = {}) {
     res = await fetch(url, { method, headers, body, ...opts })
   } catch (err) {
     console.error(`[API] Network error ${method} ${url}:`, err)
-    throw new Error(`Không thể kết nối đến server (${err.message})`)
+    throw new Error(`Unable to connect to the server (${err.message})`)
   }
   const ct = res.headers.get('content-type') || ''
   let data
@@ -35,7 +35,7 @@ async function request(method, path, body, opts = {}) {
     data = ct.includes('application/json') ? await res.json() : await res.text()
   } catch (parseErr) {
     console.error(`[API] Parse error ${method} ${url}:`, parseErr)
-    throw new Error(`Lỗi đọc phản hồi từ server`)
+    throw new Error(`Error reading response from server`)
   }
   if (!res.ok) throw new ApiError(data?.message || `HTTP ${res.status}`, res.status, data)
   return res.status === 204 ? null : data

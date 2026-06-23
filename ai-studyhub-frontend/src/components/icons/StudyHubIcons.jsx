@@ -271,6 +271,43 @@ const iconPaths = {
       <path d="M12 2v20" />
     </>
   ),
+  image: (
+    <>
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+      <line x1="16" y1="5" x2="22" y2="5" />
+      <line x1="19" y1="2" x2="19" y2="8" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </>
+  ),
+  mic: (
+    <>
+      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+      <line x1="12" y1="19" x2="12" y2="22" />
+    </>
+  ),
+  'arrow-up': (
+    <>
+      <line x1="12" y1="19" x2="12" y2="5" />
+      <polyline points="5 12 12 5 19 12" />
+    </>
+  ),
+  'arrow-down': (
+    <>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <polyline points="19 12 12 19 5 12" />
+    </>
+  ),
+  'file-text': (
+    <>
+      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+      <path d="M10 9H8" />
+      <path d="M16 13H8" />
+      <path d="M16 17H8" />
+    </>
+  ),
   x: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -278,6 +315,84 @@ const iconPaths = {
       <path d="m9 9 6 6" />
     </>
   ),
+  'file-pdf': (
+    <>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M8 12.5v6" />
+      <path d="M8 12.5h1.5a1.5 1.5 0 0 1 0 3H8" />
+      <path d="M12 12.5v6h1a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-1z" />
+      <path d="M16 12.5v6" />
+      <path d="M16 12.5h3" />
+      <path d="M16 15h2" />
+    </>
+  ),
+  'file-word': (
+    <>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M8 12.5l2 5.5 1.5-4 1.5 4 2-5.5" />
+    </>
+  ),
+  'file-powerpoint': (
+    <>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M9 12.5v6" />
+      <path d="M9 12.5h2.5a2.5 2.5 0 0 1 0 5H9" />
+    </>
+  ),
+  'file-excel': (
+    <>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M9 12.5l4 5.5" />
+      <path d="M13 12.5l-4 5.5" />
+    </>
+  ),
+  'file-code': (
+    <>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="m8 12.5-2.5 2.5 2.5 2.5" />
+      <path d="m13 12.5 2.5 2.5-2.5 2.5" />
+      <path d="m12 12.5-1.5 5" />
+    </>
+  ),
+  'file-zip': (
+    <>
+      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+      <polyline points="14 2 14 8 20 8" />
+      <path d="M9 12.5h4v1.5l-4 3v1.5h4" />
+    </>
+  ),
+}
+
+export function getFileIconName(filenameOrType) {
+  if (!filenameOrType) return 'file'
+  const str = filenameOrType.toLowerCase()
+  if (str.endsWith('.pdf') || str === 'pdf') return 'file-pdf'
+  if (str.endsWith('.docx') || str.endsWith('.doc') || str === 'docx' || str === 'doc' || str === 'word') return 'file-word'
+  if (str.endsWith('.pptx') || str.endsWith('.ppt') || str === 'pptx' || str === 'ppt' || str === 'powerpoint') return 'file-powerpoint'
+  if (str.endsWith('.xlsx') || str.endsWith('.xls') || str === 'xlsx' || str === 'xls' || str === 'excel') return 'file-excel'
+  if (str.endsWith('.zip') || str.endsWith('.rar') || str.endsWith('.tar') || str === 'zip' || str === 'rar') return 'file-zip'
+  if (str.endsWith('.png') || str.endsWith('.jpg') || str.endsWith('.jpeg') || str.endsWith('.gif') || str.endsWith('.webp') || str === 'image') return 'image'
+  const codeExtensions = ['.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.json', '.py', '.java', '.c', '.cpp', '.cs', '.sh', '.sql']
+  if (codeExtensions.some(ext => str.endsWith(ext)) || str === 'code' || str === 'source code' || str === 'source_code') return 'file-code'
+  return 'file-text'
+}
+
+export function getFileIconColor(filenameOrType) {
+  if (!filenameOrType) return '#94a3b8'
+  const str = filenameOrType.toLowerCase()
+  if (str.endsWith('.pdf') || str === 'pdf') return '#ef4444'
+  if (str.endsWith('.docx') || str.endsWith('.doc') || str === 'docx' || str === 'doc' || str === 'word') return '#3b82f6'
+  if (str.endsWith('.pptx') || str.endsWith('.ppt') || str === 'pptx' || str === 'ppt' || str === 'powerpoint') return '#f59e0b'
+  if (str.endsWith('.xlsx') || str.endsWith('.xls') || str === 'xlsx' || str === 'xls' || str === 'excel') return '#10b981'
+  if (str.endsWith('.zip') || str.endsWith('.rar') || str.endsWith('.tar') || str === 'zip' || str === 'rar') return '#b45309'
+  const codeExtensions = ['.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.json', '.py', '.java', '.c', '.cpp', '.cs', '.sh', '.sql']
+  if (codeExtensions.some(ext => str.endsWith(ext)) || str === 'code' || str === 'source code' || str === 'source_code') return '#6366f1'
+  return '#64748b'
 }
 
 export default function StudyHubIcon({ name, size = 20, className = '' }) {

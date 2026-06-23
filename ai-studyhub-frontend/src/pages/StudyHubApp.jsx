@@ -12,6 +12,7 @@ import StudyDocumentApi from './study-hub/StudyDocumentApi'
 import useAuth from '../hooks/useAuth'
 import { getFolder } from '../features/folders/folderService'
 import { getDocument } from '../features/documents/documentService'
+import { register as apiRegister } from '../features/auth/authService'
 
 const defaultStudyFile = {
   name: '漢字--JPD316 Lesson 5-NEW.pptx',
@@ -53,6 +54,9 @@ export default function StudyHubApp() {
   const [studyBreadcrumbs, setStudyBreadcrumbs] = useState([])
   const [initialFolderId, setInitialFolderId] = useState(null)
   const [toast, setToast] = useState(null)
+  const [currentDoc, setCurrentDoc] = useState(null)
+  const [currentFolder, setCurrentFolder] = useState(null)
+  const [docBreadcrumbs, setDocBreadcrumbs] = useState([])
 
   useEffect(() => {
     window.showToast = (message, type = 'success') => {
@@ -103,7 +107,7 @@ export default function StudyHubApp() {
     const fetchBreadcrumbs = async () => {
       try {
         let folderId = studyFile.folderId
-        
+
         // If folderId is not present, fetch document details first
         if (folderId === undefined || folderId === null) {
           const docRes = await getDocument(studyFile.id)
@@ -149,15 +153,68 @@ export default function StudyHubApp() {
     }
   }, [studyFile?.id, route])
 
-  const handleBreadcrumbClick = (folderId) => {
-    if (folderId === null) {
+  useEffect(() => {
+    if (route !== 'doc-detail' || !currentDoc?.folderId) {
+      setDocBreadcrumbs([])
+      return undefined
+    }
+
+    let isMounted = true
+
+    const fetchDocBreadcrumbs = async () => {
+      try {
+        const folderId = currentDoc.folderId
+        const path = []
+        let currentFolderId = folderId
+
+        while (currentFolderId) {
+          const folderRes = await getFolder(currentFolderId)
+          const folder = folderRes?.data || folderRes
+          if (folder) {
+            path.unshift({
+              id: folder.id,
+              name: folder.folderName || folder.name || 'Untitled Folder'
+            })
+            currentFolderId = folder.parentFolderId
+          } else {
+            break
+          }
+        }
+
+        if (isMounted) {
+          setDocBreadcrumbs(path)
+        }
+      } catch (e) {
+        console.error('Error fetching doc breadcrumbs:', e)
+        if (isMounted) setDocBreadcrumbs([])
+      }
+    }
+
+    fetchDocBreadcrumbs()
+
+    return () => {
+      isMounted = false
+    }
+  }, [currentDoc?.folderId, route])
+
+  const handleBreadcrumbClick = (id) => {
+    if (id === 'explore') {
+      navigate('explore')
+    } else if (id === 'library') {
+      navigate('library')
+    } else if (id === null) {
       setInitialFolderId(null)
       setLibraryTab('folders')
       navigate('library')
-    } else {
-      setInitialFolderId(folderId)
-      setLibraryTab('folders')
-      navigate('library')
+    } else if (typeof id === 'number' || !isNaN(Number(id))) {
+      if (route === 'doc-detail') {
+        setSelectedFolderId(Number(id))
+        navigate('folder-detail')
+      } else {
+        setInitialFolderId(Number(id))
+        setLibraryTab('folders')
+        navigate('library')
+      }
     }
   }
 
@@ -231,8 +288,10 @@ export default function StudyHubApp() {
     const savedTheme = localStorage.getItem('theme')
     if (savedTheme === 'dark') {
       document.body.classList.add('dark-theme')
+      document.documentElement.classList.add('dark')
     } else {
       document.body.classList.remove('dark-theme')
+      document.documentElement.classList.remove('dark')
     }
   }, [])
 
@@ -257,6 +316,9 @@ export default function StudyHubApp() {
     if (nextRoute === 'feature-request') { setShowFeatureRequest(true); return }
     if (nextRoute === 'support') { setShowSupport(true); return }
     if (nextRoute === 'chrome-extension') { setShowExtension(true); return }
+
+    if (nextRoute !== 'doc-detail') setCurrentDoc(null)
+    if (nextRoute !== 'folder-detail') setCurrentFolder(null)
 
     // Enforce route guards
     const hasToken = !!localStorage.getItem('accessToken')
@@ -327,7 +389,7 @@ export default function StudyHubApp() {
         if (Array.isArray(guestItems) && guestItems.length > 0) {
           const userSaved = localStorage.getItem(userKey)
           const userItems = userSaved ? JSON.parse(userSaved) : []
-          
+
           // Merge guest items into user items, avoiding duplicates
           const merged = [...userItems]
           guestItems.forEach(gItem => {
@@ -336,11 +398,11 @@ export default function StudyHubApp() {
               merged.push(gItem)
             }
           })
-          
+
           const updated = merged
             .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
             .slice(0, 10)
-            
+
           localStorage.setItem(userKey, JSON.stringify(updated))
         }
       }
@@ -359,18 +421,21 @@ export default function StudyHubApp() {
     navigate(r === 'admin' ? 'admin-overview' : 'explore')
   }
 
-  const handleRegister = async (res) => {
-    const u = await authRegister(res)
+  const handleRegister = async (formData) => {
+    const session = await apiRegister(formData)
+    const u = await authRegister(session)
     if (u) {
       migrateGuestHistoryToUser(u.id || u.email || 'user')
+      window.showToast?.('Registration successful! Welcome to AI Study Hub 🎉', 'success')
+      navigate('explore')
+    } else {
+      throw new Error('Failed to save login session. Please try again.')
     }
-    const r = u.role?.toUpperCase() === 'ADMIN' ? 'admin' : 'student'
-    navigate(r === 'admin' ? 'admin-overview' : 'explore')
   }
 
   const handleLogout = async () => {
     await authLogout()
-    try { localStorage.removeItem('recentItems_guest') } catch (e) {}
+    try { localStorage.removeItem('recentItems_guest') } catch (e) { }
     navigate('explore')
   }
 
@@ -380,6 +445,7 @@ export default function StudyHubApp() {
       name: file.name, attachmentName: file.name, subject: file.subject,
       content: '', sizeLabel: file.sizeLabel,
       fileUrl: file.fileUrl || '',
+      visibility: file.visibility || 'PRIVATE',
     }
     setStudyFile(activeFile)
     addRecentItem({
@@ -400,6 +466,7 @@ export default function StudyHubApp() {
       content: file.content || '',
       sizeLabel: file.sizeLabel || '',
       fileUrl: file.fileUrl || '',
+      visibility: file.visibility || 'PRIVATE',
     }
     setStudyFile(activeFile)
     addRecentItem({
@@ -422,13 +489,26 @@ export default function StudyHubApp() {
 
   const activeRoute = ['explore', 'folder-detail', 'doc-detail'].includes(route) ? 'explore'
     : route === 'library' ? (libraryTab === 'shared' ? 'library-shared' : libraryTab === 'folders' ? 'library-folders' : libraryTab === 'favorites' ? 'library-favorites' : 'library')
-    : route
+      : route
+
+  const appTitle = route === 'doc-detail' ? (currentDoc?.title || 'Loading document...')
+    : route === 'folder-detail' ? (currentFolder?.folderName || currentFolder?.name || 'Loading folder...')
+      : route === 'study' ? studyFile?.name
+        : null
+
+  const appBreadcrumbs = route === 'folder-detail'
+    ? [{ id: 'explore', name: 'Explore' }]
+    : route === 'doc-detail'
+      ? [{ id: 'explore', name: 'Explore' }, ...docBreadcrumbs]
+      : route === 'study'
+        ? [{ id: 'library', name: 'Library' }, ...studyBreadcrumbs]
+        : []
 
   return (
     <AppLayout
       active={activeRoute} className={route === 'study' ? 'app-shell--study' : ''}
       guest={guest} user={user}
-      title={route === 'study' ? studyFile?.name : null}
+      title={appTitle}
       onNavigate={navigate}
       onNotifications={() => setShowNotifications((open) => !open)}
       sidebarCollapsed={sidebarCollapsed}
@@ -436,20 +516,22 @@ export default function StudyHubApp() {
       recentItems={recentItems}
       onOpenRecentItem={handleOpenRecentItem}
       activeItemContext={{ route, studyFileId: studyFile?.id, selectedDocId, selectedFolderId }}
-      breadcrumbs={studyBreadcrumbs}
+      breadcrumbs={appBreadcrumbs}
       onBreadcrumbClick={handleBreadcrumbClick}
+      visibility={route === 'study' ? studyFile?.visibility : null}
+      route={route}
       onRenameTitle={(newName) => {
         if (!studyFile?.id) return
         try {
           const localRenames = JSON.parse(localStorage.getItem('renamedDocs') || '{}')
           localRenames[studyFile.id] = newName
           localStorage.setItem('renamedDocs', JSON.stringify(localRenames))
-          
+
           setStudyFile(prev => ({ ...prev, name: newName }))
-          window.showToast?.('Đổi tên tài liệu thành công', 'success')
+          window.showToast?.('Document renamed successfully', 'success')
         } catch (e) {
           console.error(e)
-          window.showToast?.('Đổi tên tài liệu thất bại', 'error')
+          window.showToast?.('Failed to rename document', 'error')
         }
       }}
     >
@@ -457,15 +539,17 @@ export default function StudyHubApp() {
 
       {route === 'explore' && <ExplorePage guest={guest} onNavigate={navigate} onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail') }} onOpenFolder={(id) => { setSelectedFolderId(id); navigate('folder-detail') }} />}
       {route === 'folder-detail' && (
-        <FolderDetailPage 
-          id={selectedFolderId} 
-          onNavigate={navigate} 
+        <FolderDetailPage
+          id={selectedFolderId}
+          guest={guest}
+          onNavigate={navigate}
           onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail') }}
           onLoad={(folder) => {
+            setCurrentFolder(folder)
             addRecentItem({
               id: folder.id || selectedFolderId,
               type: 'folder',
-              name: folder.name || 'Untitled Folder',
+              name: folder.folderName || folder.name || 'Untitled Folder',
               target: 'folder-detail',
               params: { id: folder.id || selectedFolderId }
             })
@@ -473,20 +557,20 @@ export default function StudyHubApp() {
         />
       )}
       {route === 'library' && (
-      <LibraryPage
-        activeTab={libraryTab}
-        onNavigate={navigate}
-        onOpenFile={openStudyFile}
-        onTabChange={setLibraryTab}
-        user={user}
-        onRemoveRecentItem={removeRecentItem}
-        onPurgeStaleRecent={purgeStaleRecentItems}
-        initialFolderId={initialFolderId}
-        onClearInitialFolderId={() => setInitialFolderId(null)}
-      />
+        <LibraryPage
+          activeTab={libraryTab}
+          onNavigate={navigate}
+          onOpenFile={openStudyFile}
+          onTabChange={setLibraryTab}
+          user={user}
+          onRemoveRecentItem={removeRecentItem}
+          onPurgeStaleRecent={purgeStaleRecentItems}
+          initialFolderId={initialFolderId}
+          onClearInitialFolderId={() => setInitialFolderId(null)}
+        />
       )}
       {route === 'upload' && <UploadPage mode={uploadMode} onStudyFileUploaded={handleStudyUpload} onNavigate={navigate} />}
-      {route === 'profile' && <ProfilePage />}
+      {route === 'profile' && <ProfilePage user={user} />}
       {route === 'pricing' && <PricingPage onNavigate={navigate} />}
       {route === 'doc-detail' && (
         <DocumentDetailPage
@@ -497,6 +581,7 @@ export default function StudyHubApp() {
           onBack={() => navigate(previousRoute || 'explore')}
           onReport={() => setShowReport(true)}
           onLoad={(doc) => {
+            setCurrentDoc(doc)
             addRecentItem({
               id: doc.id || selectedDocId,
               type: 'file',
@@ -557,7 +642,7 @@ export default function StudyHubApp() {
             {toast.type === 'error' ? '×' : '✓'}
           </span>
           <span style={{ whiteSpace: 'nowrap' }}>{toast.message}</span>
-          <button 
+          <button
             onClick={() => setToast(null)}
             style={{
               background: 'none',

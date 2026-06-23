@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
-import { uploadDocument } from '../../services/documentService'
-import { getRootFolders } from '../../services/folderService'
+import { uploadDocument } from '../../features/documents/documentService'
+import { getRootFolders } from '../../features/folders/folderService'
 import { PageTitle } from './shared'
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024
@@ -43,12 +43,12 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
 
     const extension = selected.name.split('.').pop()?.toLowerCase()
     if (!ALLOWED_EXTENSIONS.includes(extension)) {
-      setError('Chỉ hỗ trợ file PDF, DOCX hoặc PPTX.')
+      setError('Only PDF, DOCX, or PPTX files are supported.')
       resetFileInput()
       return
     }
     if (selected.size > MAX_FILE_SIZE) {
-      setError('Dung lượng file không được vượt quá 50MB.')
+      setError('File size cannot exceed 50MB.')
       resetFileInput()
       return
     }
@@ -79,7 +79,7 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
 
   const handleUpload = async () => {
     if (!file || !title.trim()) {
-      setError('Vui lòng chọn file và nhập tiêu đề.')
+      setError('Please select a file and enter a title.')
       return
     }
 
@@ -97,7 +97,7 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
         tags: tags.split(','),
       })
 
-      setStatus('Tài liệu đã được tải lên thành công.')
+      setStatus('Document uploaded successfully.')
       if (isStudyUpload && onStudyFileUploaded) {
         onStudyFileUploaded({
           id: document.id,
@@ -120,8 +120,8 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
   return (
     <main className="page-surface upload-page">
       <PageTitle
-        title={isStudyUpload ? 'Tạo Study Session mới' : 'Tải lên tài liệu'}
-        subtitle={isStudyUpload ? 'Tải file lên để AI tạo workspace học tập' : 'Chia sẻ tài liệu hoặc lưu trữ cá nhân'}
+        title={isStudyUpload ? 'Create New Study Session' : 'Upload Document'}
+        subtitle={isStudyUpload ? 'Upload a file to let AI create a study workspace' : 'Share documents or store them privately'}
       />
       <section className="upload-card">
         {!file ? (
@@ -142,46 +142,46 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
               }}
             >
               <StudyHubIcon name="upload" size={46} />
-              <h3>Kéo thả file vào đây</h3>
-              <p>hoặc</p>
+              <h3>Drag and drop files here</h3>
+              <p>or</p>
               <button className="file-picker-button" onClick={() => inputRef.current?.click()} type="button">
-                <StudyHubIcon name="file" size={18} /> Chọn file
+                <StudyHubIcon name="file" size={18} /> Select File
               </button>
-              <small>Hỗ trợ: PDF, DOCX, PPTX (tối đa 50MB)</small>
+              <small>Supported: PDF, DOCX, PPTX (max 50MB)</small>
             </div>
             {error && <p className="api-status api-status--error">{error}</p>}
           </>
         ) : (
           <div className="upload-form">
-            <h3>File đã chọn</h3>
+            <h3>Selected File</h3>
             <div className="selected-file">
               <StudyHubIcon name="file" size={18} />
               <span><strong>{file.name}</strong><small>{formatFileSize(file.size)}</small></span>
-              <button aria-label="Bỏ file đã chọn" disabled={uploading} onClick={clearFile} type="button">×</button>
+              <button aria-label="Remove selected file" disabled={uploading} onClick={clearFile} type="button">×</button>
             </div>
-            <label>Tiêu đề tài liệu *<input onChange={(event) => setTitle(event.target.value)} value={title} /></label>
-            <label>Mô tả<textarea onChange={(event) => setDescription(event.target.value)} value={description} /></label>
+            <label>Document Title *<input onChange={(event) => setTitle(event.target.value)} value={title} /></label>
+            <label>Description<textarea onChange={(event) => setDescription(event.target.value)} value={description} /></label>
             <div className="upload-form__grid">
               <label>
-                Mã môn học
-                <input onChange={(event) => setCourseCode(event.target.value)} placeholder="VD: PRF192" value={courseCode} />
+                Course Code
+                <input onChange={(event) => setCourseCode(event.target.value)} placeholder="e.g. PRF192" value={courseCode} />
               </label>
               <label>
-                Danh mục
-                <input onChange={(event) => setCategoryName(event.target.value)} placeholder="VD: Exam" value={categoryName} />
+                Category
+                <input onChange={(event) => setCategoryName(event.target.value)} placeholder="e.g. Exam" value={categoryName} />
               </label>
               <label>
-                Thư mục
+                Folder
                 <select onChange={(event) => setFolderId(event.target.value)} value={folderId}>
-                  <option value="">Thư mục gốc</option>
+                  <option value="">Root Folder</option>
                   {folders.map((folder) => <option key={folder.id} value={folder.id}>{folder.folderName}</option>)}
                 </select>
               </label>
               <label>
-                Quyền xem
+                Visibility
                 <select onChange={(event) => setVisibility(event.target.value)} value={visibility}>
-                  <option value="PRIVATE">Riêng tư</option>
-                  <option value="PUBLIC">Công khai</option>
+                  <option value="PRIVATE">Private</option>
+                  <option value="PUBLIC">Public</option>
                 </select>
               </label>
             </div>
@@ -190,9 +190,9 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
             {error && <p className="api-status api-status--error">{error}</p>}
             <div className="upload-form__actions">
               <button className="upload-submit" disabled={uploading} onClick={handleUpload} type="button">
-                {uploading ? 'Đang tải lên...' : isStudyUpload ? 'Tải lên và học với AI' : 'Tải lên'}
+                {uploading ? 'Uploading...' : isStudyUpload ? 'Upload and Learn with AI' : 'Upload'}
               </button>
-              <button className="cancel-button" disabled={uploading} onClick={clearFile} type="button">Hủy</button>
+              <button className="cancel-button" disabled={uploading} onClick={clearFile} type="button">Cancel</button>
             </div>
           </div>
         )}
@@ -202,10 +202,10 @@ export default function UploadPageApi({ mode = 'document', onStudyFileUploaded }
 }
 
 function getUploadErrorMessage(error) {
-  if (error.status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
-  if (error.status === 413) return 'Dung lượng file vượt quá giới hạn 50MB.'
-  if (error.status === 400) return error.message || 'Thông tin tài liệu hoặc định dạng file không hợp lệ.'
-  return error.message || 'Không thể tải tài liệu lên. Vui lòng thử lại.'
+  if (error.status === 401) return 'Session expired. Please log in again.'
+  if (error.status === 413) return 'File size exceeds the 50MB limit.'
+  if (error.status === 400) return error.message || 'Invalid document information or file format.'
+  return error.message || 'Unable to upload document. Please try again.'
 }
 
 function formatFileSize(bytes = 0) {
