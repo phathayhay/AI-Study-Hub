@@ -154,6 +154,7 @@ public class AuthService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .fullName(user.getFullName())
+                .avatarUrl(user.getAvatarUrl())
                 .build();
     }
 
@@ -210,6 +211,7 @@ public class AuthService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .fullName(user.getFullName())
+                .avatarUrl(user.getAvatarUrl())
                 .build();
     }
 

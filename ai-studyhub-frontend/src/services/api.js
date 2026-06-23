@@ -48,3 +48,57 @@ export function apiGet(path, opts) { return request('GET', path, null, opts) }
 export function apiPost(path, body, opts) { return request('POST', path, body instanceof FormData ? body : JSON.stringify(body), opts) }
 export function apiPut(path, body, opts) { return request('PUT', path, body ? JSON.stringify(body) : null, opts) }
 export function apiDelete(path, opts) { return request('DELETE', path, null, opts) }
+
+export function uploadFileWithProgress(path, fileOrFormData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const url = `${API_BASE}${path}`
+    
+    xhr.open('POST', url)
+    
+    const token = getToken()
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    }
+    
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentage = Math.round((event.loaded / event.total) * 100)
+          onProgress(percentage)
+        }
+      }
+    }
+    
+    xhr.onload = () => {
+      const ct = xhr.getResponseHeader('content-type') || ''
+      let data
+      try {
+        data = ct.includes('application/json') ? JSON.parse(xhr.responseText) : xhr.responseText
+      } catch (e) {
+        data = xhr.responseText
+      }
+      
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data)
+      } else {
+        reject(new ApiError(data?.message || `HTTP ${xhr.status}`, xhr.status, data))
+      }
+    }
+    
+    xhr.onerror = () => {
+      reject(new Error('Network error during upload.'))
+    }
+    
+    let formData
+    if (fileOrFormData instanceof FormData) {
+      formData = fileOrFormData
+    } else {
+      formData = new FormData()
+      formData.append('file', fileOrFormData)
+    }
+    
+    xhr.send(formData)
+  })
+}
+

@@ -1,15 +1,17 @@
-import { apiPost } from './api'
+import { apiPost, uploadFileWithProgress } from './api'
 
 /**
  * Upload user avatar
  * Uploads an avatar image to Firebase Storage, automatically cleans up the old one if it exists, and updates avatarUrl in the database.
  * Method: POST
  * Path: /api/users/avatar
- * @param {any} body - Request body
+ * @param {File} file - File object to upload
+ * @param {Function} onProgress - Progress callback function
  */
-export function uploadAvatar(body) {
-  return apiPost(`/users/avatar`, body);
+export function uploadAvatar(file, onProgress) {
+  return uploadFileWithProgress(`/users/avatar`, file, onProgress);
 }
+
 
 /**
  * Submit student identity verification

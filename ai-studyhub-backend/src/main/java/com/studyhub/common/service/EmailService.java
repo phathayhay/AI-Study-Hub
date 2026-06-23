@@ -2,6 +2,7 @@ package com.studyhub.common.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -13,10 +14,14 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    @Value("${spring.mail.username}")
+    private String fromEmail;
+
     public void sendPasswordResetEmail(String toEmail, String resetLink) {
         log.info("Sending password reset email to {}", toEmail);
         try {
             SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom("AI Study Hub FPT <" + fromEmail + ">");
             message.setTo(toEmail);
             message.setSubject("Yêu cầu đặt lại mật khẩu - AI Study Hub FPT");
             message.setText("Chào bạn,\n\n" +
@@ -38,6 +43,7 @@ public class EmailService {
         log.info("Sending email verification email to {}", toEmail);
         try {
             SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom("AI Study Hub FPT <" + fromEmail + ">");
             message.setTo(toEmail);
             message.setSubject("Xác nhận email tài khoản - AI Study Hub FPT");
             message.setText("Chào bạn,\n\n" +

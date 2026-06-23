@@ -156,6 +156,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
   const [loading, setLoading] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+  const [uploadProgress, setUploadProgress] = useState(null)
 
   // Password state
   const [oldPassword, setOldPassword] = useState('')
@@ -175,10 +176,11 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
     setLoading(true)
     setSuccessMsg('')
     setErrorMsg('')
+    setUploadProgress(0)
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await uploadAvatar(formData)
+      const res = await uploadAvatar(file, (progress) => {
+        setUploadProgress(progress)
+      })
       if (res?.success && res?.data) {
         const updatedUser = { ...user, avatarUrl: res.data }
         onUserUpdate(updatedUser)
@@ -190,6 +192,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
       setErrorMsg(err.message || 'Error uploading profile picture.')
     } finally {
       setLoading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -270,11 +273,25 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
                   className="avatar-upload-preview"
                 />
                 <div className="avatar-upload-btn-container">
-                  <label className="avatar-upload-btn bg-[#6366f1] hover:bg-indigo-700 transition-colors duration-250">
-                    Change Avatar
-                    <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} disabled={loading} />
-                  </label>
-                  <span className="avatar-upload-info text-slate-400 dark:text-slate-500">Supports JPG, PNG max 5MB.</span>
+                  {uploadProgress !== null ? (
+                    <div style={{ width: '100%', minWidth: '180px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }} className="text-slate-600 dark:text-slate-400 font-medium">
+                        <span>Uploading avatar...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }} className="dark:bg-slate-700">
+                        <div style={{ width: `${uploadProgress}%`, height: '100%', backgroundColor: '#6366f1', borderRadius: '3px', transition: 'width 0.1s ease-out' }}></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="avatar-upload-btn bg-[#6366f1] hover:bg-indigo-700 transition-colors duration-250">
+                        Change Avatar
+                        <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} disabled={loading} />
+                      </label>
+                      <span className="avatar-upload-info text-slate-400 dark:text-slate-500">Supports JPG, PNG max 5MB.</span>
+                    </>
+                  )}
                 </div>
               </div>
 
