@@ -1,8 +1,159 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
-import { adminCourses, adminDocuments, adminNavItems, adminUsers } from './config'
+import {
+  banAdminUser,
+  createAdminCategory,
+  createAdminCourse,
+  createAdminMajor,
+  createAdminPlan,
+  deleteAdminCategory,
+  deleteAdminCourse,
+  deleteAdminMajor,
+  deleteAdminPlan,
+  getAdminCategories,
+  getAdminCourses,
+  getAdminDashboardData,
+  getAdminDocuments,
+  getAdminMajors,
+  getAdminPlans,
+  getAdminReports,
+  getAdminUsers,
+  getPendingVerifications,
+  moderateAdminDocument,
+  resolveAdminReport,
+  reviewVerification,
+  unbanAdminUser,
+  updateAdminCategory,
+  updateAdminCourse,
+  updateAdminMajor,
+  updateAdminPlan,
+} from '../../features/admin/adminService'
+import { adminNavItems } from './config'
 import { InfoBlock } from './shared'
+
+const callToast = (message, tone = 'success') => {
+  if (window.showToast) window.showToast(message, tone)
+}
+
+const unwrapList = (response) => {
+  const data = response?.data ?? response
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.content)) return data.content
+  if (Array.isArray(data?.items)) return data.items
+  if (Array.isArray(data?.data)) return data.data
+  if (Array.isArray(data?.result)) return data.result
+  if (Array.isArray(data?.results)) return data.results
+  if (Array.isArray(data?.list)) return data.list
+  if (Array.isArray(data?.records)) return data.records
+  return []
+}
+
+const formatAdminError = (err) => {
+  const target = err.path ? `${err.method || 'GET'} ${err.path}` : 'admin data'
+  if (err.status >= 500) return `Server error while loading ${target}. Please check the backend logs.`
+  if (err.status === 403) return `You do not have permission to load ${target}. Please sign in with an admin account.`
+  if (err.status === 401) return `Your session expired while loading ${target}. Please sign in again.`
+  return err.message || 'Unable to load admin data'
+}
+
+const formatDate = (value) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleDateString('vi-VN')
+}
+
+const formatBytes = (value = 0) => {
+  if (!value) return '0 MB'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let size = Number(value)
+  let index = 0
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024
+    index += 1
+  }
+  return `${size.toFixed(size >= 10 || index === 0 ? 0 : 1)} ${units[index]}`
+}
+
+const normalizeStatus = (value) => String(value || 'pending').toLowerCase()
+const getInitial = (value = 'A') => value.trim().charAt(0).toUpperCase() || 'A'
+const getDocumentName = (doc = {}) => doc.title || doc.fileName || 'Untitled'
+const STATUS_LABELS = {
+  active: 'Active',
+  banned: 'Banned',
+  blocked: 'Banned',
+  suspended: 'Suspended',
+  inactive: 'Inactive',
+  pending: 'Pending',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  resolved: 'Resolved',
+}
+
+const normalizeText = (value) => String(value || '').toLowerCase()
+const matchesSearch = (query, values) => {
+  const term = normalizeText(query).trim()
+  if (!term) return true
+  return values.some((value) => normalizeText(value).includes(term))
+}
+const matchesStatus = (selected, status) => !selected || normalizeStatus(status) === selected
+const compareText = (left, right) => String(left || '').localeCompare(String(right || ''), 'vi', { sensitivity: 'base' })
+const compareDate = (left, right) => {
+  const leftTime = left ? new Date(left).getTime() : 0
+  const rightTime = right ? new Date(right).getTime() : 0
+  return (Number.isNaN(leftTime) ? 0 : leftTime) - (Number.isNaN(rightTime) ? 0 : rightTime)
+}
+
+function getStatusOptions(items, readStatus, defaults = []) {
+  const options = new Set(defaults)
+  items.forEach((item) => {
+    const status = readStatus(item)
+    if (status) options.add(normalizeStatus(status))
+  })
+  return [...options]
+}
+
+function sortItems(items, sortValue, readers) {
+  const [field, direction = 'asc'] = sortValue.split(':')
+  const multiplier = direction === 'desc' ? -1 : 1
+  return [...items].sort((left, right) => {
+    if (field === 'date') return compareDate(readers.date(left), readers.date(right)) * multiplier
+    if (field === 'status') return compareText(normalizeStatus(readers.status(left)), normalizeStatus(readers.status(right))) * multiplier
+    return compareText(readers.name(left), readers.name(right)) * multiplier
+  })
+}
+
+function useAdminList(loader) {
+  const [state, setState] = useState({ data: [], error: '', loading: true })
+
+  const load = useCallback(async () => {
+    setState((current) => ({ ...current, error: '', loading: true }))
+    try {
+      const response = await loader()
+      setState({ data: unwrapList(response), error: '', loading: false })
+    } catch (err) {
+      setState({ data: [], error: formatAdminError(err), loading: false })
+    }
+  }, [loader])
+
+  useEffect(() => {
+    const timer = window.setTimeout(load, 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
+
+  return { ...state, reload: load }
+}
+
+async function runAdminAction(action, refresh, successMessage) {
+  try {
+    await action()
+    callToast(successMessage)
+    await refresh?.()
+  } catch (err) {
+    callToast(err.message || 'Admin action failed', 'error')
+  }
+}
 
 export function AdminApp({ route, onNavigate, onLogout }) {
   const [userModal, setUserModal] = useState(null)
@@ -10,16 +161,23 @@ export function AdminApp({ route, onNavigate, onLogout }) {
 
   return (
     <AdminLayout active={route} onNavigate={onNavigate} onLogout={onLogout}>
-      {route === 'admin-overview' && <AdminOverview />}
-      {route === 'admin-users' && <AdminUsers onOpenUser={() => setUserModal(adminUsers[0])} />}
+      {route === 'admin-overview' && <AdminOverview onOpenUser={setUserModal} />}
+      {route === 'admin-users' && <AdminUsers onOpenUser={setUserModal} />}
       {route === 'admin-documents' && <AdminDocuments />}
-      {route === 'admin-courses' && <AdminCourses onAdd={() => setCourseModal('add')} onEdit={() => setCourseModal('edit')} />}
+      {route === 'admin-courses' && <AdminCourses onEdit={setCourseModal} />}
       {route === 'admin-storage' && <AdminStorage />}
       {route === 'admin-reports' && <AdminReports />}
       {route === 'admin-logs' && <AdminLogs />}
       {route === 'admin-settings' && <AdminSettings />}
       {userModal && <AdminUserModal user={userModal} onClose={() => setUserModal(null)} />}
-      {courseModal && <AdminCourseModal mode={courseModal} onClose={() => setCourseModal(null)} />}
+      {courseModal && (
+        <AdminCourseModal
+          course={courseModal.course}
+          mode={courseModal.mode}
+          onClose={() => setCourseModal(null)}
+          onSaved={courseModal.onSaved}
+        />
+      )}
     </AdminLayout>
   )
 }
@@ -29,7 +187,7 @@ function AdminLayout({ active, children, onNavigate, onLogout }) {
     <div className="admin-shell">
       <AdminSidebar active={active} onNavigate={onNavigate} onLogout={onLogout} />
       <div className="admin-body">
-        <AdminTopbar />
+        <AdminTopbar active={active} />
         {children}
       </div>
     </div>
@@ -40,8 +198,8 @@ function AdminSidebar({ active, onNavigate, onLogout }) {
   return (
     <aside className="admin-sidebar">
       <div className="admin-brand">
-        <StudyHubIcon name="book" size={28} />
-        <span><strong>AI Study Hub</strong><small>FPT University</small></span>
+        <img alt="StudyHub Admin" src="/images/Thiết kế chưa có tên.png" />
+        <span><strong>StudyHub Admin</strong><small>Control Panel</small></span>
       </div>
       <nav>
         {adminNavItems.map((item) => (
@@ -67,24 +225,72 @@ function AdminSidebar({ active, onNavigate, onLogout }) {
   )
 }
 
-function AdminTopbar() {
+function AdminTopbar({ active }) {
+  const currentPage = adminNavItems.find((item) => item.id === active)
+
   return (
     <header className="admin-topbar">
-      <Badge tone="purple">Admin</Badge>
-      <strong>FPTU Admin</strong>
+      <div>
+        <strong>{currentPage?.label || 'Admin'}</strong>
+        <small>Manage StudyHub workspace</small>
+      </div>
+      <div>
+        <Badge tone="purple">Admin</Badge>
+        <strong>FPTU Admin</strong>
+      </div>
     </header>
   )
 }
 
-function AdminOverview() {
+function AdminOverview({ onOpenUser }) {
+  const [state, setState] = useState({ data: null, error: '', loading: true })
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const response = await getAdminDashboardData()
+        if (cancelled) return
+        setState({
+          data: {
+            users: unwrapList(response.users),
+            documents: unwrapList(response.documents),
+            reports: unwrapList(response.reports),
+            verifications: unwrapList(response.verifications),
+            plans: unwrapList(response.plans),
+            majors: unwrapList(response.majors),
+            courses: unwrapList(response.courses),
+            categories: unwrapList(response.categories),
+          },
+          error: '',
+          loading: false,
+        })
+      } catch (err) {
+        if (!cancelled) setState({ data: null, error: err.message || 'Unable to load dashboard', loading: false })
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const data = state.data || {}
+  const users = data.users || []
+  const documents = data.documents || []
+  const reports = data.reports || []
+  const pendingDocs = documents.filter((doc) => normalizeStatus(doc.moderationStatus) === 'pending')
+  const totalStorage = documents.reduce((sum, doc) => sum + Number(doc.fileSize || 0), 0)
+
   return (
     <main className="admin-page admin-page--dashboard">
+      <AdminTableState error={state.error} loading={state.loading} />
       <div className="admin-stat-grid">
         {[
-          ['users', '567', 'Total Users', '+12%', 'users'],
-          ['documents', '1,234', 'Total Documents', '+8%', 'file'],
-          ['downloads', '45,678', 'Downloads', '+23%', 'download'],
-          ['sessions', '2,456', 'AI Chat Sessions', '+15%', 'message'],
+          ['users', users.length, 'Total Users', `${data.verifications?.length || 0} pending`, 'users'],
+          ['documents', documents.length, 'Total Documents', `${pendingDocs.length} pending`, 'file'],
+          ['reports', reports.length, 'Reports', `${reports.filter((r) => normalizeStatus(r.status) === 'pending').length} pending`, 'flag'],
+          ['storage', formatBytes(totalStorage), 'Stored Files', `${data.courses?.length || 0} courses`, 'archive'],
         ].map(([id, value, label, change, icon]) => (
           <article className="admin-stat-card" key={id}>
             <span><StudyHubIcon name={icon} size={22} /></span>
@@ -94,56 +300,108 @@ function AdminOverview() {
           </article>
         ))}
       </div>
-      <section className="admin-card recent-users">
-        <h2><StudyHubIcon name="users" size={20} /> New Users</h2>
-        {adminUsers.slice(0, 3).map((user) => (
-          <div className="admin-user-mini" key={user.email}>
-            <span>{user.initial}</span>
-            <p><strong>{user.name}</strong><small>{user.email}</small></p>
-            <AdminStatus status={user.status === 'active' ? 'active' : 'suspended'} />
-            <StudyHubIcon name="eye" size={15} />
-          </div>
-        ))}
-      </section>
+      <div className="admin-dashboard-panels">
+        <section className="admin-card recent-users">
+          <h2><StudyHubIcon name="users" size={20} /> New Users</h2>
+          {users.slice(0, 3).map((user) => (
+            <button className="admin-user-mini" key={user.id || user.email} onClick={() => onOpenUser(user)} type="button">
+              <span>{getInitial(user.fullName || user.email)}</span>
+              <p><strong>{user.fullName || user.email}</strong><small>{user.email}</small></p>
+              <AdminStatus status={user.status} />
+              <StudyHubIcon name="eye" size={15} />
+            </button>
+          ))}
+        </section>
+        <section className="admin-card system-activity">
+          <h2><StudyHubIcon name="trend" size={18} /> System Activities</h2>
+          {reports.slice(0, 3).map((report) => (
+            <AdminLogItem
+              key={report.id}
+              text={`${report.documentTitle || 'Document'} - ${formatDate(report.createdAt)}`}
+              title={report.reportType || 'Report'}
+              tone="orange"
+            />
+          ))}
+        </section>
+      </div>
       <div className="admin-chart-grid">
         <AdminChart title="Upload/Download Trends" type="line" />
         <AdminChart title="Document Distribution by Subject" type="pie" />
         <AdminChart title="Active Users by Day" type="bars" />
         <AdminChart title="AI Chat Usage (24h)" type="curve" />
       </div>
-      <section className="admin-card system-activity">
-        <h2><StudyHubIcon name="trend" size={18} /> System Activities</h2>
-        <AdminLogItem tone="blue" title="New User Registration" text="Nguyen Van A joined - 2 hours ago" />
-        <AdminLogItem tone="green" title="Document Approved" text="CEA201 - Chapter 5 approved - 5 hours ago" />
-        <AdminLogItem tone="orange" title="New Report" text="Inappropriate content reported - 1 day ago" />
-      </section>
     </main>
   )
 }
 
 function AdminUsers({ onOpenUser }) {
+  const { data: users, error, loading, reload } = useAdminList(getAdminUsers)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('date:desc')
+  const statusOptions = useMemo(() => getStatusOptions(users, (user) => user.status, ['active', 'inactive', 'banned']), [users])
+  const visibleUsers = useMemo(() => {
+    const filtered = users.filter((user) => {
+      return matchesStatus(statusFilter, user.status) && matchesSearch(query, [
+        user.fullName,
+        user.email,
+        user.planName,
+        formatDate(user.createdAt),
+      ])
+    })
+    return sortItems(filtered, sortBy, {
+      date: (user) => user.createdAt,
+      name: (user) => user.fullName || user.email,
+      status: (user) => user.status,
+    })
+  }, [query, sortBy, statusFilter, users])
+
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
         <AdminSectionHeader icon="users" title="User Management">
-          <AdminSearch placeholder="Search users..." />
+          <AdminStatusFilter onChange={setStatusFilter} options={statusOptions} value={statusFilter} />
+          <AdminSearch onChange={setQuery} placeholder="Search users..." value={query} />
         </AdminSectionHeader>
+        <AdminTableState error={error} loading={loading} />
         <table className="admin-table">
-          <thead><tr><th>User</th><th>Email</th><th>Joined</th><th>Documents</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead>
+            <tr>
+              <AdminSortableTh field="name" sortBy={sortBy} onSort={setSortBy}>User</AdminSortableTh>
+              <th>Email</th>
+              <AdminSortableTh defaultDirection="desc" field="date" sortBy={sortBy} onSort={setSortBy}>Joined</AdminSortableTh>
+              <th>Plan</th>
+              <AdminSortableTh field="status" sortBy={sortBy} onSort={setSortBy}>Status</AdminSortableTh>
+              <th>Actions</th>
+            </tr>
+          </thead>
           <tbody>
-            {adminUsers.map((user) => (
-              <tr key={user.email}>
-                <td><span className="admin-avatar">{user.initial}</span>{user.name}</td>
-                <td>{user.email}</td>
-                <td>{user.joined}</td>
-                <td>{user.docs}</td>
-                <td><AdminStatus status={user.status} /></td>
-                <td className="admin-actions">
-                  <button onClick={onOpenUser} type="button"><StudyHubIcon name="eye" size={16} /></button>
-                  <button type="button"><StudyHubIcon name="x" size={16} /></button>
-                </td>
-              </tr>
-            ))}
+            {visibleUsers.map((user) => {
+              const banned = normalizeStatus(user.status) === 'banned'
+              return (
+                <tr key={user.id || user.email}>
+                  <td><span className="admin-avatar">{getInitial(user.fullName || user.email)}</span>{user.fullName || '-'}</td>
+                  <td>{user.email}</td>
+                  <td>{formatDate(user.createdAt)}</td>
+                  <td>{user.planName || '-'}</td>
+                  <td><AdminStatus status={user.status} /></td>
+                  <td className="admin-actions">
+                    <button onClick={() => onOpenUser(user)} type="button"><StudyHubIcon name="eye" size={16} /></button>
+                    <button
+                      onClick={() => runAdminAction(
+                        () => (banned ? unbanAdminUser(user.id) : banAdminUser(user.id)),
+                        reload,
+                        banned ? 'User unbanned' : 'User banned',
+                      )}
+                      type="button"
+                    >
+                      <StudyHubIcon name={banned ? 'check' : 'x'} size={16} />
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+            {!loading && !error && visibleUsers.length === 0 && <AdminNoResults colSpan={6} />}
           </tbody>
         </table>
       </section>
@@ -152,22 +410,66 @@ function AdminUsers({ onOpenUser }) {
 }
 
 function AdminDocuments() {
+  const { data: documents, error, loading, reload } = useAdminList(getAdminDocuments)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('date:desc')
+  const statusOptions = useMemo(() => getStatusOptions(documents, (doc) => doc.moderationStatus, ['pending', 'approved', 'rejected']), [documents])
+  const visibleDocuments = useMemo(() => {
+    const filtered = documents.filter((doc) => {
+      return matchesStatus(statusFilter, doc.moderationStatus) && matchesSearch(query, [
+        getDocumentName(doc),
+        doc.ownerEmail,
+        doc.visibility,
+        formatDate(doc.createdAt),
+        formatBytes(doc.fileSize),
+      ])
+    })
+    return sortItems(filtered, sortBy, {
+      date: (doc) => doc.createdAt,
+      name: (doc) => getDocumentName(doc),
+      status: (doc) => doc.moderationStatus,
+    })
+  }, [documents, query, sortBy, statusFilter])
+
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
         <AdminSectionHeader icon="file" title="Document Management">
-          <input className="admin-filter-input" />
-          <AdminSearch placeholder="Search documents..." />
+          <AdminStatusFilter onChange={setStatusFilter} options={statusOptions} value={statusFilter} />
+          <AdminSearch onChange={setQuery} placeholder="Search documents..." value={query} />
         </AdminSectionHeader>
+        <AdminTableState error={error} loading={loading} />
         <table className="admin-table">
-          <thead><tr><th>Title</th><th>Uploader</th><th>Upload Date</th><th>Downloads</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead>
+            <tr>
+              <AdminSortableTh field="name" sortBy={sortBy} onSort={setSortBy}>Title</AdminSortableTh>
+              <th>Uploader</th>
+              <AdminSortableTh defaultDirection="desc" field="date" sortBy={sortBy} onSort={setSortBy}>Upload Date</AdminSortableTh>
+              <th>Size</th>
+              <AdminSortableTh field="status" sortBy={sortBy} onSort={setSortBy}>Status</AdminSortableTh>
+              <th>Actions</th>
+            </tr>
+          </thead>
           <tbody>
-            {adminDocuments.map(([title, owner, date, downloads, status]) => (
-              <tr key={title}>
-                <td>{title}</td><td>{owner}</td><td>{date}</td><td>{downloads}</td><td><AdminStatus status={status} /></td>
-                <td className="admin-actions"><button><StudyHubIcon name="check" size={16} /></button><button><StudyHubIcon name="x" size={16} /></button><button><StudyHubIcon name="archive" size={16} /></button></td>
+            {visibleDocuments.map((doc) => (
+              <tr key={doc.id || doc.title}>
+                <td>{getDocumentName(doc)}</td>
+                <td>{doc.ownerEmail || '-'}</td>
+                <td>{formatDate(doc.createdAt)}</td>
+                <td>{formatBytes(doc.fileSize)}</td>
+                <td><AdminStatus status={doc.moderationStatus} /></td>
+                <td className="admin-actions">
+                  <button onClick={() => runAdminAction(() => moderateAdminDocument(doc.id, 'APPROVED'), reload, 'Document approved')} type="button">
+                    <StudyHubIcon name="check" size={16} />
+                  </button>
+                  <button onClick={() => runAdminAction(() => moderateAdminDocument(doc.id, 'REJECTED'), reload, 'Document rejected')} type="button">
+                    <StudyHubIcon name="x" size={16} />
+                  </button>
+                </td>
               </tr>
             ))}
+            {!loading && !error && visibleDocuments.length === 0 && <AdminNoResults colSpan={6} />}
           </tbody>
         </table>
       </section>
@@ -175,30 +477,37 @@ function AdminDocuments() {
   )
 }
 
-function AdminCourses({ onAdd, onEdit }) {
+function AdminCourses({ onEdit }) {
+  const { data: courses, error, loading, reload } = useAdminList(getAdminCourses)
+
   return (
     <main className="admin-page">
       <section className="admin-card admin-course-card">
         <AdminSectionHeader icon="book" title="Subject Management">
-          <button className="admin-primary" onClick={onAdd} type="button"><StudyHubIcon name="plus" size={18} /> Add Subject</button>
+          <button className="admin-primary" onClick={() => onEdit({ mode: 'add', onSaved: reload })} type="button">
+            <StudyHubIcon name="plus" size={18} /> Add Subject
+          </button>
         </AdminSectionHeader>
         <div className="admin-search-row">
           <AdminSearch placeholder="Search subjects..." />
-          <input />
+          <input placeholder="Major" />
         </div>
+        <AdminTableState error={error} loading={loading} />
         <div className="course-grid">
-          {adminCourses.map(([code, name, semester, major, count]) => (
-            <article className="course-card" key={code}>
+          {courses.map((course) => (
+            <article className="course-card" key={course.id || course.courseCode}>
               <div>
-                <h3>{code}</h3>
-                <p>{name}</p>
+                <h3>{course.courseCode}</h3>
+                <p>{course.courseName}</p>
               </div>
               <div className="course-actions">
-                <button onClick={onEdit} type="button"><StudyHubIcon name="edit" size={16} /></button>
-                <button type="button"><StudyHubIcon name="archive" size={16} /></button>
+                <button onClick={() => onEdit({ mode: 'edit', course, onSaved: reload })} type="button"><StudyHubIcon name="edit" size={16} /></button>
+                <button onClick={() => runAdminAction(() => deleteAdminCourse(course.id), reload, 'Course deleted')} type="button">
+                  <StudyHubIcon name="archive" size={16} />
+                </button>
               </div>
-              <div><Badge tone="purple">{semester}</Badge><Badge tone="blue">{major}</Badge></div>
-              <footer><span>{count} documents</span><button type="button">View →</button></footer>
+              <div><Badge tone="purple">{course.isActive ? 'Active' : 'Inactive'}</Badge><Badge tone="blue">{course.major?.majorCode || 'Major'}</Badge></div>
+              <footer><span>{course.description || 'No description'}</span></footer>
             </article>
           ))}
         </div>
@@ -208,23 +517,29 @@ function AdminCourses({ onAdd, onEdit }) {
 }
 
 function AdminStorage() {
+  const { data: documents, error, loading } = useAdminList(getAdminDocuments)
+  const totalBytes = documents.reduce((sum, doc) => sum + Number(doc.fileSize || 0), 0)
+  const largest = useMemo(() => {
+    return [...documents].sort((a, b) => Number(b.fileSize || 0) - Number(a.fileSize || 0)).slice(0, 5)
+  }, [documents])
+
   return (
     <main className="admin-page">
+      <AdminTableState error={error} loading={loading} />
       <div className="storage-summary">
-        <StorageMetric tone="blue" label="Total Storage" value="500 GB" />
-        <StorageMetric tone="green" label="Used" value="287 GB" sub="57.4%" />
-        <StorageMetric tone="purple" label="Free" value="213 GB" sub="42.6%" />
+        <StorageMetric tone="blue" label="Total Files" value={documents.length} />
+        <StorageMetric tone="green" label="Used" value={formatBytes(totalBytes)} />
+        <StorageMetric tone="purple" label="Average" value={formatBytes(documents.length ? totalBytes / documents.length : 0)} />
       </div>
       <div className="admin-chart-grid">
         <section className="admin-card storage-bars">
           <h2>Storage Allocation</h2>
-          {[
-            ['PDF', '125 GB (43%)', 78, 'red'],
-            ['Word/PowerPoint', '89 GB (31%)', 56, 'blue'],
-            ['ZIP/RAR', '56 GB (19%)', 34, 'green'],
-            ['Others', '17 GB (7%)', 14, 'gray'],
-          ].map(([label, value, width, tone]) => (
-            <div className="storage-row" key={label}><span>{label}</span><small>{value}</small><i className={tone} style={{ width: `${width}%` }} /></div>
+          {largest.map((doc) => (
+            <div className="storage-row" key={doc.id || doc.fileName}>
+              <span>{getDocumentName(doc)}</span>
+              <small>{formatBytes(doc.fileSize)}</small>
+              <i className="blue" style={{ width: `${Math.max(8, Math.min(100, (Number(doc.fileSize || 0) / Math.max(totalBytes, 1)) * 100))}%` }} />
+            </div>
           ))}
         </section>
         <AdminChart title="Usage Trend (30 Days)" type="area" />
@@ -232,13 +547,13 @@ function AdminStorage() {
       <section className="admin-card admin-table-card">
         <h2>Largest Files</h2>
         <table className="admin-table">
-          <thead><tr><th>File Name</th><th>Uploader</th><th>Size</th><th>Type</th></tr></thead>
+          <thead><tr><th>File Name</th><th>Uploader</th><th>Size</th><th>Visibility</th></tr></thead>
           <tbody>
-            {[
-              ['SWP391-Complete-Project.zip', 'Nguyen Van A', '245 MB', 'ZIP'],
-              ['CEA201-Full-Course-Slides.pdf', 'Tran Thi B', '189 MB', 'PDF'],
-              ['PRF192-Video-Lectures.zip', 'Le Van C', '167 MB', 'ZIP'],
-            ].map(([name, owner, size, type]) => <tr key={name}><td>{name}</td><td>{owner}</td><td>{size}</td><td><Badge tone="blue">{type}</Badge></td></tr>)}
+            {largest.map((doc) => (
+              <tr key={doc.id || doc.fileName}>
+                <td>{getDocumentName(doc)}</td><td>{doc.ownerEmail}</td><td>{formatBytes(doc.fileSize)}</td><td><Badge tone="blue">{doc.visibility || '-'}</Badge></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </section>
@@ -247,22 +562,65 @@ function AdminStorage() {
 }
 
 function AdminReports() {
-  const rows = [
-    ['Nguyen Van A', 'Tran Thi B', 'Inappropriate content', '28/5/2024', 'pending'],
-    ['Le Van C', 'Pham Van D', 'Copyright infringement', '27/5/2024', 'rejected'],
-    ['Hoang Thi E', 'Nguyen Van F', 'Spam', '26/5/2024', 'approved'],
-    ['Tran Van G', 'Le Thị H', 'Harassment', '25/5/2024', 'rejected'],
-  ]
+  const { data: reports, error, loading, reload } = useAdminList(getAdminReports)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('date:desc')
+  const statusOptions = useMemo(() => getStatusOptions(reports, (report) => report.status, ['pending', 'resolved']), [reports])
+  const visibleReports = useMemo(() => {
+    const filtered = reports.filter((report) => {
+      return matchesStatus(statusFilter, report.status) && matchesSearch(query, [
+        report.reporterEmail,
+        report.documentTitle,
+        report.documentId,
+        report.reportType,
+        report.reportReason,
+        formatDate(report.createdAt),
+      ])
+    })
+    return sortItems(filtered, sortBy, {
+      date: (report) => report.createdAt,
+      name: (report) => report.documentTitle || `Document #${report.documentId}`,
+      status: (report) => report.status,
+    })
+  }, [query, reports, sortBy, statusFilter])
+
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
         <AdminSectionHeader icon="flag" title="Reports">
-          <input className="admin-filter-input" />
-          <AdminSearch placeholder="Search reports..." />
+          <AdminStatusFilter onChange={setStatusFilter} options={statusOptions} value={statusFilter} />
+          <AdminSearch onChange={setQuery} placeholder="Search reports..." value={query} />
         </AdminSectionHeader>
+        <AdminTableState error={error} loading={loading} />
         <table className="admin-table">
-          <thead><tr><th>Reporter</th><th>Violator</th><th>Violation Type</th><th>Report Date</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>{rows.map(([a, b, type, date, status]) => <tr key={type}><td><AdminNameCell name={a} /></td><td><AdminNameCell name={b} orange /></td><td><Badge tone="orange">{type}</Badge></td><td>{date}</td><td><AdminStatus status={status} /></td><td className="admin-actions"><button><StudyHubIcon name="eye" size={15} /></button><button><StudyHubIcon name="check" size={15} /></button><button><StudyHubIcon name="x" size={15} /></button></td></tr>)}</tbody>
+          <thead>
+            <tr>
+              <th>Reporter</th>
+              <AdminSortableTh field="name" sortBy={sortBy} onSort={setSortBy}>Document</AdminSortableTh>
+              <th>Violation Type</th>
+              <AdminSortableTh defaultDirection="desc" field="date" sortBy={sortBy} onSort={setSortBy}>Report Date</AdminSortableTh>
+              <AdminSortableTh field="status" sortBy={sortBy} onSort={setSortBy}>Status</AdminSortableTh>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleReports.map((report) => (
+              <tr key={report.id}>
+                <td><AdminNameCell name={report.reporterEmail || '-'} /></td>
+                <td>{report.documentTitle || `Document #${report.documentId}`}</td>
+                <td><Badge tone="orange">{report.reportType || '-'}</Badge></td>
+                <td>{formatDate(report.createdAt)}</td>
+                <td><AdminStatus status={report.status} /></td>
+                <td className="admin-actions">
+                  <button onClick={() => callToast(report.reportReason || 'No reason provided', 'info')} type="button"><StudyHubIcon name="eye" size={15} /></button>
+                  <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', false), reload, 'Report resolved')} type="button"><StudyHubIcon name="check" size={15} /></button>
+                  <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', true), reload, 'Report resolved and document rejected')} type="button"><StudyHubIcon name="x" size={15} /></button>
+                </td>
+              </tr>
+            ))}
+            {!loading && !error && visibleReports.length === 0 && <AdminNoResults colSpan={6} />}
+          </tbody>
         </table>
       </section>
     </main>
@@ -270,44 +628,151 @@ function AdminReports() {
 }
 
 function AdminLogs() {
+  const { data: reports } = useAdminList(getAdminReports)
+  const { data: documents } = useAdminList(getAdminDocuments)
+  const items = [
+    ...reports.slice(0, 3).map((report) => ({ tone: 'orange', title: report.reportType || 'Report', text: report.documentTitle || report.reportReason, time: formatDate(report.createdAt) })),
+    ...documents.slice(0, 3).map((doc) => ({ tone: 'green', title: 'Document Uploaded', text: getDocumentName(doc), time: formatDate(doc.createdAt) })),
+  ]
+
   return (
     <main className="admin-page">
       <section className="admin-card logs-card">
         <AdminSectionHeader icon="trend" title="Activity Logs">
-          <input className="admin-filter-input" />
+          <input className="admin-filter-input" placeholder="Search" />
           <button className="admin-primary" type="button">Export</button>
         </AdminSectionHeader>
-        <AdminLogItem tone="blue" title="New User Registration" text="Nguyen Van A (studenta@fpt.edu.vn)" time="2 minutes ago" />
-        <AdminLogItem tone="green" title="New Document Uploaded" text="CEA201 - Chapter 5: Cache Memory" time="15 minutes ago" />
-        <AdminLogItem tone="green" title="Document Approved" text="PRF192 - Assignment Solution" time="1 hour ago" />
-        <AdminLogItem tone="red" title="User Suspended" text="Le Van C - Policy Violation" time="2 hours ago" />
-        <AdminLogItem tone="purple" title="System Backup Completed" text="Database backup - 287GB" time="3 hours ago" />
-        <AdminLogItem tone="orange" title="Document Rejected" text="PRO192 - Plagiarized content detected" time="5 hours ago" />
-        <AdminLogItem tone="blue" title="Admin Logged In" text="Admin Dashboard access" time="8 hours ago" />
+        {items.map((item, index) => <AdminLogItem key={`${item.title}-${index}`} {...item} />)}
       </section>
     </main>
   )
 }
 
 function AdminSettings() {
+  const plans = useAdminList(getAdminPlans)
+  const majors = useAdminList(getAdminMajors)
+  const categories = useAdminList(getAdminCategories)
+  const verifications = useAdminList(getPendingVerifications)
+
   return (
     <main className="admin-page settings-page">
       <section className="admin-card settings-card">
-        <h2><StudyHubIcon name="sparkle" size={18} /> General Settings</h2>
-        <label>System Name<input defaultValue="AI Study Hub" /></label>
-        <label>Contact Email<input defaultValue="admin@aistudyhub.com" /></label>
-        <label>Max File Size (MB)<input defaultValue="50" /></label>
-        <SettingToggle title="Auto-approve documents" text="Bypass manual review process" />
-        <SettingToggle title="Allow new registrations" text="Users can create new accounts" active />
-        <button className="admin-primary" type="button"><StudyHubIcon name="file" size={16} /> Save Settings</button>
+        <h2><StudyHubIcon name="sparkle" size={18} /> Lookup Config</h2>
+        <LookupRows
+          fields={['majorCode', 'majorName', 'description']}
+          items={majors.data}
+          labelKey="majorName"
+          loading={majors.loading}
+          onCreate={() => createLookup('major', majors.reload)}
+          onDelete={(item) => runAdminAction(() => deleteAdminMajor(item.id), majors.reload, 'Major deleted')}
+          onUpdate={(item) => updateLookup('major', item, majors.reload)}
+          title="Majors"
+        />
+        <LookupRows
+          fields={['categoryName']}
+          items={categories.data}
+          labelKey="categoryName"
+          loading={categories.loading}
+          onCreate={() => createLookup('category', categories.reload)}
+          onDelete={(item) => runAdminAction(() => deleteAdminCategory(item.id), categories.reload, 'Category deleted')}
+          onUpdate={(item) => updateLookup('category', item, categories.reload)}
+          title="Categories"
+        />
+        <LookupRows
+          fields={['planName', 'price', 'storageLimitMb', 'aiRequestsPerDay']}
+          items={plans.data}
+          labelKey="planName"
+          loading={plans.loading}
+          onCreate={() => createLookup('plan', plans.reload)}
+          onDelete={(item) => runAdminAction(() => deleteAdminPlan(item.id), plans.reload, 'Plan deleted')}
+          onUpdate={(item) => updateLookup('plan', item, plans.reload)}
+          title="Plans"
+        />
       </section>
       <section className="admin-card settings-card">
-        <h2><StudyHubIcon name="lock" size={18} /> Security</h2>
-        <SettingAction title="Change Admin Password" text="Update login password" icon="edit" />
-        <SettingAction title="Session Management" text="View and sign out active sessions" icon="eye" />
-        <SettingAction danger title="Delete All Data" text="Permanently delete all system data" icon="archive" />
+        <h2><StudyHubIcon name="lock" size={18} /> Pending Verifications</h2>
+        <AdminTableState error={verifications.error} loading={verifications.loading} />
+        {verifications.data.map((item) => (
+          <div className="setting-row" key={item.id}>
+            <p><strong>{item.fullName || item.userEmail || `Request #${item.id}`}</strong><small>{item.studentCode || item.reviewNote || 'Student verification'}</small></p>
+            <span className="admin-actions">
+              <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'APPROVED', 'Approved by admin'), verifications.reload, 'Verification approved')} type="button"><StudyHubIcon name="check" size={16} /></button>
+              <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'REJECTED', 'Rejected by admin'), verifications.reload, 'Verification rejected')} type="button"><StudyHubIcon name="x" size={16} /></button>
+            </span>
+          </div>
+        ))}
       </section>
     </main>
+  )
+}
+
+async function createLookup(type, reload) {
+  const body = promptLookup(type)
+  if (!body) return
+  const actions = {
+    category: () => createAdminCategory(body),
+    major: () => createAdminMajor(body),
+    plan: () => createAdminPlan(body),
+  }
+  await runAdminAction(actions[type], reload, `${type} created`)
+}
+
+async function updateLookup(type, item, reload) {
+  const body = promptLookup(type, item)
+  if (!body) return
+  const actions = {
+    category: () => updateAdminCategory(item.id, body),
+    major: () => updateAdminMajor(item.id, body),
+    plan: () => updateAdminPlan(item.id, body),
+  }
+  await runAdminAction(actions[type], reload, `${type} updated`)
+}
+
+function promptLookup(type, item = {}) {
+  if (type === 'category') {
+    const categoryName = window.prompt('Category name', item.categoryName || '')
+    return categoryName ? { categoryName } : null
+  }
+  if (type === 'major') {
+    const majorCode = window.prompt('Major code', item.majorCode || '')
+    if (!majorCode) return null
+    const majorName = window.prompt('Major name', item.majorName || '')
+    if (!majorName) return null
+    const description = window.prompt('Description', item.description || '') || ''
+    return { majorCode, majorName, description }
+  }
+  const planName = window.prompt('Plan name', item.planName || '')
+  if (!planName) return null
+  return {
+    planName,
+    description: window.prompt('Description', item.description || '') || '',
+    price: Number(window.prompt('Price', item.price ?? 0)),
+    storageLimitMb: Number(window.prompt('Storage limit MB', item.storageLimitMb ?? 1024)),
+    aiRequestsPerDay: Number(window.prompt('AI requests per day', item.aiRequestsPerDay ?? 10)),
+    isActive: item.isActive ?? true,
+  }
+}
+
+function LookupRows({ fields, items, labelKey, loading, onCreate, onDelete, onUpdate, title }) {
+  return (
+    <div className="setting-row lookup-row">
+      <p className="lookup-summary"><strong>{title}</strong><small>{loading ? 'Loading...' : `${items.length} records`}</small></p>
+      <span className="admin-actions lookup-create">
+        <button onClick={onCreate} type="button"><StudyHubIcon name="plus" size={16} /></button>
+      </span>
+      <div className="lookup-list">
+        {items.map((item) => (
+          <p className="lookup-item" key={item.id || item[labelKey]}>
+            <strong>{item[labelKey]}</strong>
+            <small>{fields.map((field) => item[field]).filter(Boolean).join(' - ')}</small>
+            <span className="admin-actions">
+              <button onClick={() => onUpdate(item)} type="button"><StudyHubIcon name="edit" size={16} /></button>
+              <button onClick={() => onDelete(item)} type="button"><StudyHubIcon name="archive" size={16} /></button>
+            </span>
+          </p>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -315,8 +780,8 @@ function AdminChart({ title, type }) {
   return (
     <section className={`admin-card admin-chart admin-chart--${type}`}>
       <h2>{title}</h2>
-      {type === 'pie' ?<div className="fake-pie" /> : <div className="fake-chart">{[35, 48, 66, 60, 78, 56, 40].map((height, index) => <span key={index} style={{ height: `${height}%` }} />)}</div>}
-      <small>{type === 'pie' ? 'CEA201 19% · PRF192 16% · Others 30%' : 'Uploads → Downloads'}</small>
+      {type === 'pie' ? <div className="fake-pie" /> : <div className="fake-chart">{[35, 48, 66, 60, 78, 56, 40].map((height, index) => <span key={index} style={{ height: `${height}%` }} />)}</div>}
+      <small>{type === 'pie' ? 'Courses and categories' : 'Live admin summary'}</small>
     </section>
   )
 }
@@ -325,17 +790,56 @@ function AdminSectionHeader({ children, icon, title }) {
   return <header className="admin-section-header"><h1><StudyHubIcon name={icon} size={28} /> {title}</h1><div>{children}</div></header>
 }
 
-function AdminSearch({ placeholder }) {
-  return <label className="admin-search"><StudyHubIcon name="search" size={18} /><input placeholder={placeholder} /></label>
+function AdminSearch({ onChange, placeholder, value }) {
+  const inputProps = {}
+  if (value !== undefined) inputProps.value = value
+  if (onChange) inputProps.onChange = (event) => onChange(event.target.value)
+  return <label className="admin-search"><StudyHubIcon name="search" size={18} /><input placeholder={placeholder} {...inputProps} /></label>
+}
+
+function AdminStatusFilter({ onChange, options, value }) {
+  return (
+    <select aria-label="Filter by status" className="admin-filter-input" onChange={(event) => onChange(event.target.value)} value={value}>
+      <option value="">All statuses</option>
+      {options.map((option) => <option key={option} value={option}>{STATUS_LABELS[option] ?? option}</option>)}
+    </select>
+  )
+}
+
+function AdminSortableTh({ children, defaultDirection = 'asc', field, onSort, sortBy }) {
+  const [activeField, direction = 'asc'] = sortBy.split(':')
+  const active = activeField === field
+  const nextDirection = active && direction === 'asc' ? 'desc' : 'asc'
+  const nextSort = active ? `${field}:${nextDirection}` : `${field}:${defaultDirection}`
+
+  return (
+    <th aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button className={`admin-sort-header${active ? ' is-active' : ''}`} onClick={() => onSort(nextSort)} type="button">
+        <span>{children}</span>
+        <span aria-hidden="true" className="admin-sort-arrows">{active ? (direction === 'asc' ? '↑' : '↓') : '↑↓'}</span>
+      </button>
+    </th>
+  )
+}
+
+function AdminTableState({ error, loading }) {
+  if (loading) return <p className="admin-empty">Loading admin data...</p>
+  if (error) return <p className="admin-empty">{error}</p>
+  return null
+}
+
+function AdminNoResults({ colSpan }) {
+  return <tr><td className="admin-table-empty" colSpan={colSpan}>No matching records</td></tr>
 }
 
 function AdminStatus({ status }) {
-  const labels = { active: 'Active', blocked: 'Banned', suspended: 'Suspended', pending: 'Pending', approved: 'Approved', rejected: 'Rejected' }
-  return <span className={`admin-status admin-status--${status}`}>{labels[status] ?? status}</span>
+  const normalized = normalizeStatus(status)
+  const cssStatus = normalized === 'banned' ? 'blocked' : normalized === 'resolved' ? 'approved' : normalized
+  return <span className={`admin-status admin-status--${cssStatus}`}>{STATUS_LABELS[normalized] ?? status ?? '-'}</span>
 }
 
-function AdminNameCell({ name, orange = false }) {
-  return <span className="admin-name-cell"><span className={orange ? 'orange' : ''}>{name.charAt(0)}</span><strong>{name}</strong><small>student@fpt.edu.vn</small></span>
+function AdminNameCell({ name }) {
+  return <span className="admin-name-cell"><span>{getInitial(name)}</span><strong>{name}</strong><small>student@fpt.edu.vn</small></span>
 }
 
 function AdminLogItem({ text, time, title, tone }) {
@@ -346,47 +850,70 @@ function StorageMetric({ label, sub, tone, value }) {
   return <article className={`storage-metric storage-metric--${tone}`}><span>{label}</span><strong>{value}</strong>{sub && <small>{sub}</small>}</article>
 }
 
-function SettingToggle({ active = false, text, title }) {
-  return <div className="setting-row"><p><strong>{title}</strong><small>{text}</small></p><span className={active ? 'toggle is-on' : 'toggle'} /></div>
-}
-
-function SettingAction({ danger = false, icon, text, title }) {
-  return <div className={danger ? 'setting-row setting-row--danger' : 'setting-row'}><p><strong>{title}</strong><small>{text}</small></p><StudyHubIcon name={icon} size={18} /></div>
-}
-
 function AdminUserModal({ onClose, user }) {
   return (
     <div className="admin-modal-backdrop">
       <section className="admin-user-modal">
-        <button className="admin-modal-close" onClick={onClose} type="button">×</button>
+        <button className="admin-modal-close" onClick={onClose} type="button">x</button>
         <h2>Account Details</h2>
-        <div className="admin-user-profile"><span>{user.initial}</span><div><h3>{user.name}</h3><p>Joined: {user.joined}</p></div></div>
+        <div className="admin-user-profile"><span>{getInitial(user.fullName || user.email)}</span><div><h3>{user.fullName || user.email}</h3><p>Joined: {formatDate(user.createdAt)}</p></div></div>
         <div className="admin-detail-grid">
-          <InfoBlock label="Email" value={user.email} />
-          <InfoBlock label="Phone Number" value="0912345678" />
-          <InfoBlock label="Gender" value="Male" />
-          <InfoBlock label="Date of Birth" value="15/03/2002" />
-          <InfoBlock label="Address" value="123 Nguyen Hue, Dist.1, HCMC" />
+          <InfoBlock label="Email" value={user.email || '-'} />
+          <InfoBlock label="Student Code" value={user.studentCode || '-'} />
+          <InfoBlock label="Verification" value={user.verificationStatus || '-'} />
+          <InfoBlock label="Role" value={user.roleName || '-'} />
+          <InfoBlock label="Plan" value={user.planName || '-'} />
         </div>
-        <footer><p><small>Account Status</small><strong className="green-text">Active</strong></p><p><small>Total Documents</small><strong className="purple-text">{user.docs}</strong></p></footer>
+        <footer><p><small>Account Status</small><strong className="green-text">{user.status || '-'}</strong></p></footer>
       </section>
     </div>
   )
 }
 
-function AdminCourseModal({ mode, onClose }) {
+function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
   const edit = mode === 'edit'
+  const majors = useAdminList(getAdminMajors)
+  const hasMajors = majors.data.length > 0
+  const [form, setForm] = useState(() => ({
+    courseCode: course.courseCode || '',
+    courseName: course.courseName || '',
+    description: course.description || '',
+    majorId: course.major?.id || '',
+    isActive: course.isActive ?? true,
+  }))
+
+  const submit = async (event) => {
+    event.preventDefault()
+    const payload = { ...form, majorId: Number(form.majorId) }
+    await runAdminAction(
+      () => (edit ? updateAdminCourse(course.id, payload) : createAdminCourse(payload)),
+      onSaved,
+      edit ? 'Course updated' : 'Course created',
+    )
+    onClose()
+  }
+
   return (
     <div className="admin-modal-backdrop">
-      <section className="admin-course-modal">
-        <button className="admin-modal-close" onClick={onClose} type="button">×</button>
+      <form className="admin-course-modal" onSubmit={submit}>
+        <button className="admin-modal-close" onClick={onClose} type="button">x</button>
         <h2>{edit ? 'Edit Subject' : 'Add New Subject'}</h2>
-        <label>Course Code<input placeholder="e.g. CEA201" defaultValue={edit ? 'CEA201' : ''} /></label>
-        <label>Course Name<input placeholder="e.g. Computer Architecture" defaultValue={edit ? 'Computer Architecture' : ''} /></label>
-        <label>Semester<input placeholder="e.g. Semester 3" defaultValue={edit ? 'Semester 3' : ''} /></label>
-        <label>Major<input placeholder="e.g. SE" defaultValue={edit ? 'SE' : ''} /></label>
-        <footer><button onClick={onClose} type="button">Cancel</button><button className="dark-button" type="button">{edit ? 'Update' : 'Add Subject'}</button></footer>
-      </section>
+        <label>Course Code<input onChange={(e) => setForm({ ...form, courseCode: e.target.value })} placeholder="e.g. CEA201" required value={form.courseCode} /></label>
+        <label>Course Name<input onChange={(e) => setForm({ ...form, courseName: e.target.value })} placeholder="e.g. Computer Architecture" required value={form.courseName} /></label>
+        <label>Description<input onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Short description" value={form.description} /></label>
+        <label>
+          Major
+          <select disabled={majors.loading || Boolean(majors.error) || !hasMajors} onChange={(e) => setForm({ ...form, majorId: e.target.value })} required value={form.majorId}>
+            <option value="">
+              {majors.loading ? 'Loading majors...' : majors.error ? 'Unable to load majors' : hasMajors ? 'Select major' : 'No majors available'}
+            </option>
+            {majors.data.map((major) => <option key={major.id} value={major.id}>{major.majorCode} - {major.majorName}</option>)}
+          </select>
+          {majors.error && <small className="admin-field-error">{majors.error}</small>}
+          {!majors.loading && !majors.error && !hasMajors && <small className="admin-field-error">Please create a major in Settings first.</small>}
+        </label>
+        <footer><button onClick={onClose} type="button">Cancel</button><button className="dark-button" type="submit">{edit ? 'Update' : 'Add Subject'}</button></footer>
+      </form>
     </div>
   )
 }

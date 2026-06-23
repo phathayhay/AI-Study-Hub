@@ -1,11 +1,14 @@
 const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '')
 
 export class ApiError extends Error {
-  constructor(message, status, data) {
+  constructor(message, status, data, request = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.data = data
+    this.method = request.method
+    this.path = request.path
+    this.url = request.url
   }
 }
 
@@ -37,7 +40,7 @@ async function request(method, path, body, opts = {}) {
     console.error(`[API] Parse error ${method} ${url}:`, parseErr)
     throw new Error(`Error reading response from server`)
   }
-  if (!res.ok) throw new ApiError(data?.message || `HTTP ${res.status}`, res.status, data)
+  if (!res.ok) throw new ApiError(data?.message || `HTTP ${res.status}`, res.status, data, { method, path, url })
   return res.status === 204 ? null : data
 }
 
