@@ -4,7 +4,8 @@ import {
   MessageSquare, CheckSquare, FileText, AlertCircle, Eye, EyeOff, ClipboardList, Check, Layers
 } from 'lucide-react'
 import Brand from '../../components/layout/Brand'
-import { login as apiLogin, register as apiRegister, sendVerifyEmail } from '../../features/auth/authService'
+import { login as apiLogin, register as apiRegister } from '../../services/authService'
+import { sendVerifyEmail } from '../../features/auth/authService'
 
 export function LoginPage({ onLogin, onNavigate }) {
   return (
@@ -43,7 +44,7 @@ export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 dark:bg-[#0f172a] flex flex-col lg:flex-row font-sans transition-colors duration-300">
+    <main className="h-screen overflow-hidden bg-slate-50 dark:bg-[#0f172a] flex flex-col lg:flex-row font-sans transition-colors duration-300">
       <style>{`
         @keyframes authFadeIn {
           from { opacity: 0; transform: translateY(8px); }
@@ -55,7 +56,7 @@ export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
       `}</style>
 
       {/* Hero Section (Left Column) */}
-      <section className="relative overflow-hidden w-full lg:w-[42%] bg-[#0a0f1d] flex flex-col justify-between p-8 lg:p-12 text-white min-h-[400px] lg:min-h-screen border-b lg:border-b-0 lg:border-r border-slate-800/50">
+      <section className="relative hidden lg:flex w-full lg:w-[42%] bg-[#0a0f1d] flex-col justify-between p-8 lg:p-10 text-white lg:h-full overflow-y-auto border-r border-slate-800/50">
         {/* Glow Blobs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-[120px] animate-pulse duration-[8000ms]" />
@@ -127,11 +128,11 @@ export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
       </section>
 
       {/* Form / Interactive Section (Right Column) */}
-      <section className="w-full lg:w-[58%] flex flex-col justify-center py-12 px-6 lg:px-16 xl:px-24">
+      <section className="w-full lg:w-[58%] flex flex-col justify-center overflow-y-auto h-full py-6 px-6 lg:px-16 xl:px-24">
         <div className="w-full max-w-md mx-auto animate-auth-fade-in">
           
           {/* Header section (switches based on mode) */}
-          <div className="mb-8">
+          <div className="mb-5">
             {mode === 'signin' && (
               <>
                 <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Sign In</h1>
@@ -201,7 +202,7 @@ export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
           )}
 
           {/* Back Home link */}
-          <div className="mt-8 border-t border-slate-100 dark:border-slate-800/60 pt-6 text-center">
+          <div className="mt-4 border-t border-slate-100 dark:border-slate-800/60 pt-4 text-center">
             <button 
               onClick={() => onNavigate?.('explore')}
               className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
@@ -226,7 +227,9 @@ function InputField({
   onChange,
   autoComplete,
   required = true,
-  revealable = false
+  revealable = false,
+  maxLength,
+  minLength
 }) {
   const [showPassword, setShowPassword] = useState(false)
   const inputType = revealable && showPassword ? 'text' : type
@@ -249,6 +252,8 @@ function InputField({
           onChange={(e) => onChange(e.target.value)}
           autoComplete={autoComplete}
           required={required}
+          maxLength={maxLength}
+          minLength={minLength}
           className={`w-full ${Icon ? 'pl-11' : 'px-4'} ${revealable ? 'pr-11' : 'px-4'} py-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all duration-200`}
         />
         {revealable && (
@@ -272,7 +277,7 @@ function SocialLogin() {
   }
 
   return (
-    <div className="mt-6 flex flex-col gap-4">
+    <div className="mt-3 flex flex-col gap-3">
       <div className="relative flex items-center justify-center">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-slate-200 dark:border-slate-800/80"></div>
@@ -320,7 +325,7 @@ function SignInForm({ onLogin, onLoading, onError, onToggleMode, loading }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
       <InputField 
         label="Email"
         icon={Mail}
@@ -379,7 +384,7 @@ function SignInForm({ onLogin, onLoading, onError, onToggleMode, loading }) {
 
       <SocialLogin />
 
-      <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-6">
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-4">
         Don't have an account?{' '}
         <button
           type="button"
@@ -409,8 +414,8 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (form.password.length < 8) {
-      onError('Password must be at least 8 characters long.')
+    if (form.password.length < 6) {
+      onError('Password must be at least 6 characters long.')
       return
     }
     if (form.password !== form.confirmPassword) {
@@ -436,7 +441,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <InputField 
           label="First Name"
@@ -445,6 +450,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
           value={form.firstName}
           onChange={(val) => updateField('firstName', val)}
           autoComplete="given-name"
+          maxLength={50}
         />
         <InputField 
           label="Last Name"
@@ -453,6 +459,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
           value={form.lastName}
           onChange={(val) => updateField('lastName', val)}
           autoComplete="family-name"
+          maxLength={50}
         />
       </div>
 
@@ -464,6 +471,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
         value={form.email}
         onChange={(val) => updateField('email', val)}
         autoComplete="email"
+        maxLength={150}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -471,11 +479,12 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
           label="Password"
           icon={Lock}
           type="password"
-          placeholder="Min 8 chars"
+          placeholder="Min 6 chars"
           value={form.password}
           onChange={(val) => updateField('password', val)}
           autoComplete="new-password"
           revealable
+          minLength={6}
         />
         <InputField 
           label="Confirm"
@@ -492,7 +501,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
       <button
         type="submit"
         disabled={loading}
-        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/60 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 cursor-pointer disabled:cursor-not-allowed mt-3"
+        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/60 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 cursor-pointer disabled:cursor-not-allowed mt-2"
       >
         {loading ? (
           <>
@@ -506,7 +515,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
 
       <SocialLogin />
 
-      <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-6">
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-4">
         Already have an account?{' '}
         <button
           type="button"
