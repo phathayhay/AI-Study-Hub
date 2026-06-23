@@ -312,6 +312,7 @@ public class DocumentService {
                 .courseId(doc.getCourse() != null ? doc.getCourse().getId() : null)
                 .categoryId(doc.getCategory() != null ? doc.getCategory().getId() : null)
                 .tags(doc.getTags().stream().map(Tag::getTagName).collect(Collectors.toSet()))
+                .uploader(doc.getUser().getFullName())
                 .build();
     }
 }

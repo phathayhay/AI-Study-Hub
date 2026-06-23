@@ -12,7 +12,6 @@ public class AdminUserResponse {
     private Long id;
     private String fullName;
     private String email;
-    private String studentCode;
     private String verificationStatus;
     private String status;
     private String planName;

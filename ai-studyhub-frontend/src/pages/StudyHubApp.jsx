@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import AppLayout from '../components/layout/AppLayout'
 import { AdminApp } from './study-hub/admin'
-import { LoginPage, RegisterPage } from './study-hub/auth'
+import { LoginPage, RegisterPage, VerifyEmailPage } from './study-hub/auth'
 import { LibraryPage } from './study-hub/library'
 import { NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal } from './study-hub/modals'
 import {
@@ -60,6 +60,19 @@ export default function StudyHubApp() {
     }
     return () => {
       delete window.showToast
+    }
+  }, [])
+
+  useEffect(() => {
+    const path = window.location.pathname
+    if (path === '/verify-email') {
+      setRoute('verify-email')
+    } else if (path === '/login') {
+      setRoute('login')
+    } else if (path === '/register') {
+      setRoute('register')
+    } else if (path === '/pricing') {
+      setRoute('pricing')
     }
   }, [])
 
@@ -226,7 +239,7 @@ export default function StudyHubApp() {
 
   useEffect(() => {
     if (guest) {
-      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
+      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'verify-email']
       if (!publicRoutes.includes(route)) {
         setRoute('login')
       }
@@ -404,6 +417,7 @@ export default function StudyHubApp() {
 
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
   if (route === 'register') return <RegisterPage onRegister={handleRegister} onNavigate={navigate} />
+  if (route === 'verify-email') return <VerifyEmailPage onNavigate={navigate} />
   if (route.startsWith('admin-')) return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />
 
   const activeRoute = ['explore', 'folder-detail', 'doc-detail'].includes(route) ? 'explore'

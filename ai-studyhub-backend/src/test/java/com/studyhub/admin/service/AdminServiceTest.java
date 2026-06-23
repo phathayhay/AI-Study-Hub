@@ -71,8 +71,8 @@ class AdminServiceTest {
         mockUser = User.builder()
                 .id(1L)
                 .email("student@fpt.edu.vn")
-                .fullName("FPT Student")
-                .studentCode("SE160001")
+                .firstName("Student")
+                .lastName("FPT")
                 .status(UserStatus.INACTIVE)
                 .verificationStatus(VerificationStatus.PENDING)
                 .role(new Role(null, "USER"))
@@ -81,7 +81,8 @@ class AdminServiceTest {
         mockAdmin = User.builder()
                 .id(2L)
                 .email("admin@fpt.edu.vn")
-                .fullName("System Admin")
+                .firstName("Admin")
+                .lastName("System")
                 .role(new Role(null, "ADMIN"))
                 .build();
 

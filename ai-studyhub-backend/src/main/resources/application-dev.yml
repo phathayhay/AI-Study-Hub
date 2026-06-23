@@ -8,9 +8,9 @@ spring:
         format_sql: true
 
   datasource:
-    url: jdbc:mysql://localhost:3306/ai_studyhub?useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
-    username: root
-    password: root123
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ai_studyhub}?useSSL=${DB_SSL:false}&verifyServerCertificate=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root123}
 
 logging:
   level:

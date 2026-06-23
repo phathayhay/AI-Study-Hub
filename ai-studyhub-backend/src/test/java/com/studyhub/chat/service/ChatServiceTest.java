@@ -57,8 +57,8 @@ class ChatServiceTest {
         mockUser = User.builder()
                 .id(1L)
                 .email("test@fpt.edu.vn")
-                .fullName("Test User")
-                .studentCode("SE123456")
+                .firstName("User")
+                .lastName("Test")
                 .build();
 
         mockDocument = Document.builder()

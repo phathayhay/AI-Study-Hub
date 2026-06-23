@@ -62,10 +62,6 @@ public class AuthService {
     public void register(RegisterRequest request) {
         log.info("Registering user with email: {}", request.getEmail());
 
-        // 0. Validate Password Confirmation
-        if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
-            throw new IllegalArgumentException("Mật khẩu xác nhận không trùng khớp");
-        }
 
         // 1. Determine Verification Status based on Email Domain
         String email = request.getEmail().trim().toLowerCase();
@@ -74,20 +70,9 @@ public class AuthService {
             initialVerificationStatus = VerificationStatus.APPROVED;
         }
 
-        // 2. Validate Student Code format (e.g. SE160000, MC160000, MKT16000)
-        String studentCode = request.getStudentCode().trim().toUpperCase();
-        if (!studentCode.matches("^[A-Z]{2,4}\\d{5,7}$")) {
-            throw new IllegalArgumentException("Mã sinh viên không đúng định dạng (Ví dụ: SE160000)");
-        }
-
-        // 3. Validate Email Uniqueness
+        // 2. Validate Email Uniqueness
         if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("Email is already in use");
-        }
-
-        // 4. Validate Student Code Uniqueness
-        if (userRepository.existsByStudentCode(studentCode)) {
-            throw new IllegalArgumentException("Student code is already in use");
         }
 
         // Lấy hoặc tạo vai trò USER mặc định
@@ -109,8 +94,8 @@ public class AuthService {
                 });
 
         User user = User.builder()
-                .studentCode(studentCode)
-                .fullName(request.getFullName().trim())
+                .firstName(request.getFirstName().trim())
+                .lastName(request.getLastName().trim())
                 .email(email)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .campus(Campus.HCM)
@@ -121,14 +106,18 @@ public class AuthService {
                 .status(UserStatus.INACTIVE) // Requires email verification
                 .verificationStatus(initialVerificationStatus)
                 .build();
-
-        userRepository.save(user);
-
-        // Generate email verification token and send verification email
-        String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
-        String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
-        emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
-    }
+ 
+         userRepository.save(user);
+ 
+         // Generate email verification token and send verification email
+         try {
+             String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
+             String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
+             emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
+         } catch (Exception e) {
+             log.warn("Failed to send verification email to {}: {}. Registration will proceed, but user must be verified manually in the database.", user.getEmail(), e.getMessage());
+         }
+     }
 
     /**
      * Đăng nhập vào hệ thống.
@@ -162,8 +151,9 @@ public class AuthService {
                 .refreshToken(refreshToken)
                 .email(user.getEmail())
                 .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
                 .fullName(user.getFullName())
-                .studentCode(user.getStudentCode())
                 .build();
     }
 
@@ -217,8 +207,9 @@ public class AuthService {
                 .refreshToken(newRefreshToken)
                 .email(user.getEmail())
                 .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
                 .fullName(user.getFullName())
-                .studentCode(user.getStudentCode())
                 .build();
     }
 
