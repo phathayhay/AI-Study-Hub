@@ -2,6 +2,7 @@ export const ROUTES = {
   HOME: '/',
   LOGIN: '/login',
   REGISTER: '/register',
+  VERIFY_EMAIL: '/verify-email',
   EXPLORE: '/explore',
   LIBRARY: '/library',
   LIBRARY_SHARED: '/library/shared',

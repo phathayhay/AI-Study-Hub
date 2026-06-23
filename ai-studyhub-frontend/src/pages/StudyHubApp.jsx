@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import AppLayout from '../components/layout/AppLayout'
 import { AdminApp } from './study-hub/admin'
-import { LoginPage, RegisterPage } from './study-hub/auth'
+import { LoginPage, RegisterPage, VerifyEmailPage } from './study-hub/auth'
 import { LibraryPage } from './study-hub/library'
 import { NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal } from './study-hub/modals'
 import {
@@ -135,6 +135,19 @@ export default function StudyHubApp() {
   }, [])
 
   useEffect(() => {
+    const path = window.location.pathname
+    if (path === '/verify-email') {
+      setRoute('verify-email')
+    } else if (path === '/login') {
+      setRoute('login')
+    } else if (path === '/register') {
+      setRoute('register')
+    } else if (path === '/pricing') {
+      setRoute('pricing')
+    }
+  }, [])
+
+  useEffect(() => {
     window.scrollTo(0, 0)
     const body = document.querySelector('.app-shell__body')
     if (body) body.scrollTop = 0
@@ -161,7 +174,7 @@ export default function StudyHubApp() {
     const fetchBreadcrumbs = async () => {
       try {
         let folderId = studyFile.folderId
-        
+
         // If folderId is not present, fetch document details first
         if (folderId === undefined || folderId === null) {
           const docRes = await getDocument(studyFile.id)
@@ -220,7 +233,7 @@ export default function StudyHubApp() {
         const folderId = currentDoc.folderId
         const path = []
         let currentFolderId = folderId
-        
+
         while (currentFolderId) {
           const folderRes = await getFolder(currentFolderId)
           const folder = folderRes?.data || folderRes
@@ -234,7 +247,7 @@ export default function StudyHubApp() {
             break
           }
         }
-        
+
         if (isMounted) {
           setDocBreadcrumbs(path)
         }
@@ -342,8 +355,10 @@ export default function StudyHubApp() {
     const savedTheme = localStorage.getItem('theme')
     if (savedTheme === 'dark') {
       document.body.classList.add('dark-theme')
+      document.documentElement.classList.add('dark')
     } else {
       document.body.classList.remove('dark-theme')
+      document.documentElement.classList.remove('dark')
     }
   }, [])
 
@@ -351,7 +366,7 @@ export default function StudyHubApp() {
   useEffect(() => {
     const isAdminRoute = route.startsWith('admin-')
     if (guest) {
-      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
+      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'verify-email']
       if (!publicRoutes.includes(route)) {
         setRoute('login')
         pushPath('login', {}, true)
@@ -464,7 +479,7 @@ export default function StudyHubApp() {
         if (Array.isArray(guestItems) && guestItems.length > 0) {
           const userSaved = localStorage.getItem(userKey)
           const userItems = userSaved ? JSON.parse(userSaved) : []
-          
+
           // Merge guest items into user items, avoiding duplicates
           const merged = [...userItems]
           guestItems.forEach(gItem => {
@@ -473,11 +488,11 @@ export default function StudyHubApp() {
               merged.push(gItem)
             }
           })
-          
+
           const updated = merged
             .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
             .slice(0, 10)
-            
+
           localStorage.setItem(userKey, JSON.stringify(updated))
         }
       }
@@ -510,7 +525,7 @@ export default function StudyHubApp() {
 
   const handleLogout = async () => {
     await authLogout()
-    try { localStorage.removeItem('recentItems_guest') } catch (e) {}
+    try { localStorage.removeItem('recentItems_guest') } catch (e) { }
     navigate('explore')
   }
 
@@ -559,27 +574,25 @@ export default function StudyHubApp() {
 
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
   if (route === 'register') return <RegisterPage onRegister={handleRegister} onNavigate={navigate} />
-  if (route.startsWith('admin-')) {
-    if (role !== 'admin') return null
-    return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />
-  }
+  if (route === 'verify-email') return <VerifyEmailPage onNavigate={navigate} />
+  if (route.startsWith('admin-')) return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />
 
   const activeRoute = ['explore', 'folder-detail', 'doc-detail'].includes(route) ? 'explore'
     : route === 'library' ? (libraryTab === 'shared' ? 'library-shared' : libraryTab === 'folders' ? 'library-folders' : libraryTab === 'favorites' ? 'library-favorites' : 'library')
-    : route
+      : route
 
   const appTitle = route === 'doc-detail' ? (currentDoc?.title || 'Loading document...')
     : route === 'folder-detail' ? (currentFolder?.folderName || currentFolder?.name || 'Loading folder...')
-    : route === 'study' ? studyFile?.name
-    : null
+      : route === 'study' ? studyFile?.name
+        : null
 
   const appBreadcrumbs = route === 'folder-detail'
     ? [{ id: 'explore', name: 'Explore' }]
     : route === 'doc-detail'
-    ? [{ id: 'explore', name: 'Explore' }, ...docBreadcrumbs]
-    : route === 'study'
-    ? [{ id: 'library', name: 'Library' }, ...studyBreadcrumbs]
-    : []
+      ? [{ id: 'explore', name: 'Explore' }, ...docBreadcrumbs]
+      : route === 'study'
+        ? [{ id: 'library', name: 'Library' }, ...studyBreadcrumbs]
+        : []
 
   return (
     <AppLayout
@@ -603,7 +616,7 @@ export default function StudyHubApp() {
           const localRenames = JSON.parse(localStorage.getItem('renamedDocs') || '{}')
           localRenames[studyFile.id] = newName
           localStorage.setItem('renamedDocs', JSON.stringify(localRenames))
-          
+
           setStudyFile(prev => ({ ...prev, name: newName }))
           window.showToast?.('Document renamed successfully', 'success')
         } catch (e) {
@@ -616,11 +629,11 @@ export default function StudyHubApp() {
 
       {route === 'explore' && <ExplorePage guest={guest} onNavigate={navigate} onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail', { documentId: id }) }} onOpenFolder={(id) => { setSelectedFolderId(id); navigate('folder-detail', { folderId: id }) }} />}
       {route === 'folder-detail' && (
-        <FolderDetailPage 
-          id={selectedFolderId} 
+        <FolderDetailPage
+          id={selectedFolderId}
           guest={guest}
-          onNavigate={navigate} 
-          onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail', { documentId: id }) }}
+          onNavigate={navigate}
+          onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail') }}
           onLoad={(folder) => {
             setCurrentFolder(folder)
             addRecentItem({
@@ -634,20 +647,20 @@ export default function StudyHubApp() {
         />
       )}
       {route === 'library' && (
-      <LibraryPage
-        activeTab={libraryTab}
-        onNavigate={navigate}
-        onOpenFile={openStudyFile}
-        onTabChange={setLibraryTab}
-        user={user}
-        onRemoveRecentItem={removeRecentItem}
-        onPurgeStaleRecent={purgeStaleRecentItems}
-        initialFolderId={initialFolderId}
-        onClearInitialFolderId={() => setInitialFolderId(null)}
-      />
+        <LibraryPage
+          activeTab={libraryTab}
+          onNavigate={navigate}
+          onOpenFile={openStudyFile}
+          onTabChange={setLibraryTab}
+          user={user}
+          onRemoveRecentItem={removeRecentItem}
+          onPurgeStaleRecent={purgeStaleRecentItems}
+          initialFolderId={initialFolderId}
+          onClearInitialFolderId={() => setInitialFolderId(null)}
+        />
       )}
       {route === 'upload' && <UploadPage mode={uploadMode} onStudyFileUploaded={handleStudyUpload} onNavigate={navigate} />}
-      {route === 'profile' && <ProfilePage />}
+      {route === 'profile' && <ProfilePage user={user} />}
       {route === 'pricing' && <PricingPage onNavigate={navigate} />}
       {route === 'doc-detail' && (
         <DocumentDetailPage
@@ -719,7 +732,7 @@ export default function StudyHubApp() {
             {toast.type === 'error' ? '×' : '✓'}
           </span>
           <span style={{ whiteSpace: 'nowrap' }}>{toast.message}</span>
-          <button 
+          <button
             onClick={() => setToast(null)}
             style={{
               background: 'none',

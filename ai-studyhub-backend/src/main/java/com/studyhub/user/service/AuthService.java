@@ -59,14 +59,19 @@ public class AuthService {
      * Mặc định gán vai trò USER và gói dịch vụ FREE, mã hóa mật khẩu trước khi lưu.
      */
     @Transactional
-    public TokenResponse register(RegisterRequest request) {
+    public void register(RegisterRequest request) {
         log.info("Registering user with email: {}", request.getEmail());
 
-        if (request.getPassword() == null || !request.getPassword().equals(request.getConfirmPassword())) {
-            throw new IllegalArgumentException("Mật khẩu xác nhận không trùng khớp");
+
+        // 1. Determine Verification Status based on Email Domain
+        String email = request.getEmail().trim().toLowerCase();
+        VerificationStatus initialVerificationStatus = VerificationStatus.PENDING;
+        if (email.endsWith("@fpt.edu.vn") || email.endsWith("@fe.edu.vn")) {
+            initialVerificationStatus = VerificationStatus.APPROVED;
         }
 
-        if (userRepository.existsByEmail(request.getEmail())) {
+        // 2. Validate Email Uniqueness
+        if (userRepository.existsByEmail(email)) {
             throw new IllegalArgumentException("Email is already in use");
         }
 
@@ -89,24 +94,30 @@ public class AuthService {
                 });
 
         User user = User.builder()
-                .studentCode(request.getStudentCode())
-                .fullName(request.getFullName())
-                .email(request.getEmail())
+                .firstName(request.getFirstName().trim())
+                .lastName(request.getLastName().trim())
+                .email(email)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .campus(Campus.HCM)
                 .major(null)
                 .plan(freePlan)
                 .role(userRole)
                 .currentSemester(null)
-                .status(UserStatus.ACTIVE)
-                .verificationStatus(VerificationStatus.PENDING)
+                .status(UserStatus.INACTIVE) // Requires email verification
+                .verificationStatus(initialVerificationStatus)
                 .build();
-
-        userRepository.save(user);
-
-        // Tự động đăng nhập ngay sau khi đăng ký thành công
-        return login(new LoginRequest(request.getEmail(), request.getPassword()));
-    }
+ 
+         userRepository.save(user);
+ 
+         // Generate email verification token and send verification email
+         try {
+             String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
+             String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
+             emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
+         } catch (Exception e) {
+             log.warn("Failed to send verification email to {}: {}. Registration will proceed, but user must be verified manually in the database.", user.getEmail(), e.getMessage());
+         }
+     }
 
     /**
      * Đăng nhập vào hệ thống.
@@ -124,6 +135,10 @@ public class AuthService {
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new IllegalArgumentException("User not found after authentication"));
 
+        if (user.getStatus() == UserStatus.INACTIVE) {
+            throw new IllegalStateException("Please verify your email address before logging in");
+        }
+
         if (user.getStatus() == UserStatus.BANNED) {
             throw new IllegalStateException("Your account has been banned");
         }
@@ -136,8 +151,9 @@ public class AuthService {
                 .refreshToken(refreshToken)
                 .email(user.getEmail())
                 .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
                 .fullName(user.getFullName())
-                .studentCode(user.getStudentCode())
                 .build();
     }
 
@@ -162,6 +178,10 @@ public class AuthService {
         }
 
         User user = oldRefreshToken.getUser();
+        if (user.getStatus() == UserStatus.INACTIVE) {
+            throw new IllegalStateException("Please verify your email address before logging in");
+        }
+
         if (user.getStatus() == UserStatus.BANNED) {
             throw new IllegalStateException("Your account has been banned");
         }
@@ -187,8 +207,9 @@ public class AuthService {
                 .refreshToken(newRefreshToken)
                 .email(user.getEmail())
                 .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
                 .fullName(user.getFullName())
-                .studentCode(user.getStudentCode())
                 .build();
     }
 
@@ -277,5 +298,34 @@ public class AuthService {
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+    }
+
+    /**
+     * Xác thực tài khoản người dùng bằng email verification token.
+     */
+    @Transactional
+    public void verifyEmail(String token) {
+        log.info("Verifying email with token");
+        String email = jwtTokenProvider.validateEmailVerificationToken(token);
+        if (email == null) {
+            throw new IllegalArgumentException("Verification token is invalid or has expired");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("No account found associated with this token"));
+
+        if (user.getStatus() == UserStatus.ACTIVE) {
+            log.info("User {} is already active", email);
+            return;
+        }
+
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new IllegalStateException("Your account has been banned");
+        }
+
+        user.setStatus(UserStatus.ACTIVE);
+        user.setVerifiedAt(LocalDateTime.now());
+        userRepository.save(user);
+        log.info("User {} successfully activated", email);
     }
 }

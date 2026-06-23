@@ -8,18 +8,18 @@ import Badge from '../../components/ui/Badge'
 import { appUser, featuredDocuments, featuredFolders, recentActivities, majors, popularCourses, stats } from '../../data/studyHubData'
 import { pricingPlans } from './config'
 import { DocumentCardMini, ExploreFolderCard, InfoLine, PageTitle, SectionTitle } from './shared'
-import { 
+import {
   searchDocuments as getDocuments,
   getDocument,
   uploadDocument
 } from '../../features/documents/documentService'
-import { 
+import {
   addFavorite as favoriteDocument,
   removeFavorite as unfavoriteDocument,
   rateDocument,
   getUserFavorites as getFavoriteDocuments
 } from '../../services/communityService'
-import { 
+import {
   getComments as getDocumentComments,
   addComment as addDocumentComment
 } from '../../services/commentService'
@@ -51,7 +51,7 @@ const uploadSelectFields = [
 
 export function HomeScreen({ guest = false, onNavigate }) {
   return (
-    <main className="home-main">
+    <main className="home-main dark:bg-[#0f172a] dark:bg-none">
       <div className="home-container">
         <HeroSearch title={guest ? 'Study Materials for FPTU Students' : 'FPTU Study Materials'} />
         <StatsSummary />
@@ -132,26 +132,26 @@ function ExploreSkeleton() {
 
 function ExploreStats({ statsData, loading }) {
   if (loading) return null;
-  
+
   const iconColors = {
-    blue: 'bg-indigo-50 text-indigo-600',
-    green: 'bg-emerald-50 text-emerald-600',
-    purple: 'bg-purple-50 text-purple-600'
+    blue: 'bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400',
+    green: 'bg-emerald-50 dark:bg-slate-700 text-emerald-600 dark:text-emerald-400',
+    purple: 'bg-purple-50 dark:bg-slate-700 text-purple-600 dark:text-purple-400'
   }
 
   return (
     <section className="stats-grid grid grid-cols-1 md:grid-cols-3 gap-6 w-full" aria-label="Quick Stats">
       {statsData.map((stat) => (
-        <article 
-          className="stat-card flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-md cursor-pointer hover:-translate-y-0.5" 
+        <article
+          className="stat-card flex items-center gap-4 p-5 bg-white dark:bg-[#1e293b] rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-all duration-300 hover:shadow-md cursor-pointer hover:-translate-y-0.5"
           key={stat.id}
         >
-          <span className={`flex items-center justify-center w-11 h-11 rounded-xl flex-shrink-0 ${iconColors[stat.tone] || 'bg-slate-50 text-slate-600'}`}>
+          <span className={`flex items-center justify-center w-11 h-11 rounded-xl flex-shrink-0 ${iconColors[stat.tone] || 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
             <StudyHubIcon name={stat.icon === 'sparkle' ? 'sparkle' : stat.icon} size={20} />
           </span>
           <span className="flex flex-col">
-            <strong className="text-xl font-bold text-slate-900 leading-tight">{stat.value}</strong>
-            <small className="text-sm font-medium text-slate-500">{stat.label}</small>
+            <strong className="text-xl font-bold text-slate-900 dark:text-white leading-tight">{stat.value}</strong>
+            <small className="text-sm font-medium text-slate-500 dark:text-slate-400">{stat.label}</small>
           </span>
         </article>
       ))}
@@ -171,29 +171,29 @@ function ExploreSearchFilter({
   guest
 }) {
   return (
-    <section className="hero-section flex flex-col items-center text-center py-10 px-6 w-full bg-gradient-to-br from-indigo-50/60 via-purple-50/30 to-white border border-slate-100 rounded-3xl" aria-labelledby="home-title">
-      <h1 id="home-title" className="text-3xl md:text-5xl font-extrabold text-slate-950 tracking-tight leading-none mb-3">
+    <section className="hero-section flex flex-col items-center text-center py-10 px-6 w-full bg-transparent dark:bg-transparent border border-transparent dark:border-transparent rounded-3xl transition-all duration-300" aria-labelledby="home-title">
+      <h1 id="home-title" className="text-3xl md:text-5xl font-extrabold text-slate-950 dark:text-white tracking-tight leading-none mb-3">
         {guest ? 'Study Materials for FPTU Students' : 'FPTU Study Materials'}
       </h1>
-      <p className="text-slate-500 max-w-lg mb-8 text-sm md:text-base leading-relaxed">Search, share, and manage academic documents powered by Gemini AI</p>
+      <p className="text-slate-500 dark:text-slate-400 max-w-lg mb-8 text-sm md:text-base leading-relaxed">Search, share, and manage academic documents powered by Gemini AI</p>
 
       {/* Search Input Box */}
-      <div 
-        className="hero-search flex items-center gap-3 bg-white border border-slate-200/80 rounded-2xl w-full max-w-2xl px-5 py-3.5 transition-all duration-300 hover:border-indigo-300 hover:shadow-sm focus-within:border-indigo-500 focus-within:shadow-md focus-within:ring-2 focus-within:ring-indigo-100"
+      <div
+        className="hero-search flex items-center gap-3 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-800 rounded-2xl w-full max-w-2xl px-5 py-3.5 transition-all duration-300 hover:border-indigo-300 hover:shadow-sm focus-within:border-indigo-500 focus-within:shadow-md focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-slate-700"
         role="search"
       >
-        <StudyHubIcon name="search" size={20} className="text-slate-400" />
-        <input 
-          className="w-full text-slate-900 placeholder-slate-400 border-0 outline-none text-base bg-transparent font-medium"
-          placeholder="Search by course code, document title, or keyword..." 
+        <StudyHubIcon name="search" size={20} className="text-slate-400 dark:text-slate-500" />
+        <input
+          className="w-full text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 border-0 outline-none text-base bg-transparent font-medium"
+          placeholder="Search by course code, document title, or keyword..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
         {searchQuery && (
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => setSearchQuery('')}
-            className="text-slate-400 hover:text-slate-600 transition-colors text-lg px-2 bg-transparent border-0 outline-none cursor-pointer font-bold"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors text-lg px-2 bg-transparent border-0 outline-none cursor-pointer font-bold"
           >
             ×
           </button>
@@ -203,18 +203,17 @@ function ExploreSearchFilter({
       {/* Filter Row Section */}
       <div className="hero-filters w-full max-w-2xl mt-8 flex flex-col gap-4">
         {/* Major Filter */}
-        <div className="filter-row flex flex-wrap gap-2 items-center justify-center text-xs md:text-sm text-slate-500">
-          <span className="font-semibold text-slate-600 mr-1 flex items-center gap-1"><StudyHubIcon name="globe" size={14} /> Major:</span>
+        <div className="filter-row flex flex-wrap gap-2 items-center justify-center text-xs md:text-sm text-slate-500 dark:text-slate-400">
+          <span className="font-semibold text-slate-600 dark:text-slate-300 mr-1 flex items-center gap-1"><StudyHubIcon name="globe" size={14} /> Major:</span>
           {['ALL', ...majors].map((major) => {
             const isSelected = selectedMajor === major;
             return (
-              <button 
-                className={`px-3 py-1.5 rounded-full border text-xs font-semibold cursor-pointer transition-all duration-200 ${
-                  isSelected 
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
-                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
-                }`} 
-                key={major} 
+              <button
+                className={`px-3 py-1.5 rounded-full border text-xs font-semibold cursor-pointer transition-all duration-200 ${isSelected
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200'
+                  }`}
+                key={major}
                 type="button"
                 onClick={() => {
                   setSelectedMajor(major)
@@ -228,18 +227,17 @@ function ExploreSearchFilter({
         </div>
 
         {/* Course Filter */}
-        <div className="filter-row flex flex-wrap gap-2 items-center justify-center text-xs md:text-sm text-slate-500">
-          <span className="font-semibold text-slate-600 mr-1 flex items-center gap-1"><StudyHubIcon name="book" size={14} /> Course:</span>
+        <div className="filter-row flex flex-wrap gap-2 items-center justify-center text-xs md:text-sm text-slate-500 dark:text-slate-400">
+          <span className="font-semibold text-slate-600 dark:text-slate-300 mr-1 flex items-center gap-1"><StudyHubIcon name="book" size={14} /> Course:</span>
           {popularCourses.map((course) => {
             const isSelected = selectedCourse === course;
             return (
-              <button 
-                className={`px-3 py-1.5 rounded-full border text-xs font-semibold cursor-pointer transition-all duration-200 ${
-                  isSelected 
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
-                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
-                }`} 
-                key={course} 
+              <button
+                className={`px-3 py-1.5 rounded-full border text-xs font-semibold cursor-pointer transition-all duration-200 ${isSelected
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200'
+                  }`}
+                key={course}
                 type="button"
                 onClick={() => setSelectedCourse(isSelected ? null : course)}
               >
@@ -283,13 +281,13 @@ function DocumentCard({ doc, onOpen, guest }) {
 
   // Define file type badge coloring
   const typeUpper = (doc.type || 'PDF').toUpperCase()
-  let typeBadgeBg = 'bg-slate-100 text-slate-600 border-slate-200'
+  let typeBadgeBg = 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600'
   if (typeUpper === 'PDF') {
-    typeBadgeBg = 'bg-red-50 text-red-600 border-red-100'
+    typeBadgeBg = 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-100 dark:border-red-900/50'
   } else if (typeUpper === 'DOCX' || typeUpper === 'DOC') {
-    typeBadgeBg = 'bg-blue-50 text-blue-600 border-blue-100'
+    typeBadgeBg = 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/50'
   } else if (typeUpper === 'PPTX' || typeUpper === 'PPT') {
-    typeBadgeBg = 'bg-amber-50 text-amber-600 border-amber-100'
+    typeBadgeBg = 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/50'
   }
 
   // Format date
@@ -304,9 +302,9 @@ function DocumentCard({ doc, onOpen, guest }) {
   }
 
   return (
-    <article 
+    <article
       onClick={onOpen}
-      className="group flex flex-col justify-between bg-white border border-slate-100 hover:border-indigo-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer h-[210px] relative hover:-translate-y-0.5"
+      className="group flex flex-col justify-between bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-800 hover:border-indigo-100 dark:hover:border-indigo-500 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer h-[210px] relative hover:-translate-y-0.5"
     >
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
@@ -315,28 +313,28 @@ function DocumentCard({ doc, onOpen, guest }) {
               <StudyHubIcon name={getFileIconName(typeUpper)} size={12} className="flex-shrink-0" />
               {typeUpper}
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-slate-50 border border-slate-100 text-slate-500 text-[11px] font-semibold">
+            <span className="px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 text-slate-500 dark:text-slate-400 text-[11px] font-semibold">
               {doc.code}
             </span>
           </div>
           <button
             onClick={handleToggleFavorite}
             type="button"
-            className={`p-1.5 rounded-full border border-slate-100 hover:border-red-100 hover:bg-red-50/50 transition-colors bg-transparent ${favorite ? 'text-red-500 border-red-50' : 'text-slate-400'}`}
+            className={`p-1.5 rounded-full border border-slate-100 dark:border-slate-700 hover:border-red-100 hover:bg-red-50/50 transition-colors bg-transparent ${favorite ? 'text-red-500 border-red-50' : 'text-slate-400 dark:text-slate-500'}`}
           >
             <StudyHubIcon name="heart" size={15} className={favorite ? 'fill-current' : ''} />
           </button>
         </div>
-        
-        <h3 className="text-[14.5px] font-bold text-slate-800 line-clamp-2 leading-snug group-hover:text-indigo-600 transition-colors mt-1">
+
+        <h3 className="text-[14.5px] font-bold text-slate-800 dark:text-white line-clamp-2 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors mt-1">
           {doc.title}
         </h3>
-        <p className="text-slate-500 text-xs line-clamp-2 leading-relaxed">
+        <p className="text-slate-500 dark:text-slate-400 text-xs line-clamp-2 leading-relaxed">
           {doc.description || 'No detailed description available.'}
         </p>
       </div>
 
-      <div className="pt-3 border-t border-slate-50 flex items-center justify-between text-[11.5px] text-slate-400 font-medium">
+      <div className="pt-3 border-t border-slate-50 dark:border-slate-800 flex items-center justify-between text-[11.5px] text-slate-400 dark:text-slate-500 font-medium">
         <span className="flex items-center gap-1"><StudyHubIcon name="download" size={13} /> {doc.downloads} downloads</span>
         <span>{formatDocDate(doc.createdAt)}</span>
       </div>
@@ -379,10 +377,10 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
     const fetchRealFolders = async () => {
       try {
         const rootFolders = await getRootFolders()
-        const folderList = Array.isArray(rootFolders) 
-          ? rootFolders 
+        const folderList = Array.isArray(rootFolders)
+          ? rootFolders
           : (rootFolders?.data || rootFolders?.content || [])
-        
+
         const detailedFolders = await Promise.all(
           folderList.map(async (f) => {
             try {
@@ -390,10 +388,10 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
               const folderData = detail?.data || detail
               const docsCount = folderData?.documents?.length || 0
               const downloadsCount = folderData?.documents?.reduce((acc, doc) => acc + (doc.totalDownloads || 0), 0) || 0
-              
+
               const codeMatch = (f.folderName || '').match(/^([A-Z]{3}\d{3})/i)
               const code = codeMatch ? codeMatch[1].toUpperCase() : 'FPTU'
-              
+
               return {
                 id: f.id,
                 code: code,
@@ -465,7 +463,7 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
     }
   }, [searchQuery, selectedMajor, selectedCourse])
 
-  const filteredFolders = realFolders.filter(f => 
+  const filteredFolders = realFolders.filter(f =>
     (selectedMajor === 'ALL' || (f.code && f.code.startsWith(selectedMajor))) &&
     (!searchQuery || f.title.toLowerCase().includes(searchQuery.toLowerCase()))
   )
@@ -498,11 +496,11 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
   const isFiltered = searchQuery || selectedCourse || selectedMajor !== 'ALL'
 
   return (
-    <main className="home-main" style={{ overflowY: 'auto', flex: 1, padding: '0 24px' }}>
+    <main className="home-main dark:bg-[#0f172a] dark:bg-none" style={{ overflowY: 'auto', flex: 1, padding: '0 24px' }}>
       <div className="home-container" style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px', padding: '24px 0 40px' }}>
-        
+
         {/* Search & Filter Component */}
-        <ExploreSearchFilter 
+        <ExploreSearchFilter
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           selectedMajor={selectedMajor}
@@ -529,14 +527,14 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
               <div className="flex flex-col gap-10">
                 <section>
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                       <span>🔍</span> Found Documents
                     </h2>
                     <span className="text-xs text-slate-400 font-semibold">{documents.length} items</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {documents.map((doc) => (
-                      <DocumentCard 
+                      <DocumentCard
                         key={doc.id}
                         doc={{
                           id: doc.id,
@@ -559,7 +557,7 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
                 {/* Featured Folders Section */}
                 <section className="border-t border-slate-100 pt-8 mb-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                       <span>📁</span> Featured Study Folders
                     </h2>
                   </div>
@@ -572,14 +570,14 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
                 {trendingDocs.length > 0 && (
                   <section>
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
+                      <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                         <span>🔥</span> Trending This Week
                       </h2>
                       <span className="text-xs text-slate-400 font-semibold">Most downloaded</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {trendingDocs.map((doc) => (
-                        <DocumentCard 
+                        <DocumentCard
                           key={`trending-${doc.id}`}
                           doc={{
                             id: doc.id,
@@ -604,14 +602,14 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
                 {recommendedDocs.length > 0 && (
                   <section>
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
+                      <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                         <span>✨</span> Recommended for You
                       </h2>
                       <span className="text-xs text-slate-400 font-semibold">Based on your activity</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {recommendedDocs.map((doc) => (
-                        <DocumentCard 
+                        <DocumentCard
                           key={`rec-${doc.id}`}
                           doc={{
                             id: doc.id,
@@ -636,14 +634,14 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
                 {recentlyAddedDocs.length > 0 && (
                   <section>
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
+                      <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                         <span>🕒</span> Recently Added
                       </h2>
                       <span className="text-xs text-slate-400 font-semibold">Latest updates</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {recentlyAddedDocs.map((doc) => (
-                        <DocumentCard 
+                        <DocumentCard
                           key={`recent-${doc.id}`}
                           doc={{
                             id: doc.id,
@@ -667,7 +665,7 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
                 {/* Featured Folders Section */}
                 <section className="border-t border-slate-100 pt-8 mb-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg md:text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                       <span>📁</span> Featured Study Folders
                     </h2>
                   </div>
@@ -682,6 +680,27 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
     </main>
   )
 }
+const UPLOAD_COURSE_MAP = {
+  'CEA201': 1,
+  'PRF192': 2,
+  'DBI202': 3,
+  'SWP391': 4,
+  'PRO192': 5,
+  'CSD201': 6,
+  'JPD316': 7,
+  'MAS291': 15
+}
+
+const UPLOAD_CATEGORY_MAP = {
+  'Slide': 1,
+  'Notes': 6,
+  'Assignment': 2,
+  'Lab': 3,
+  'Exam': 4,
+  'Source Code': 5,
+  'Project': 5
+}
+
 export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
@@ -689,6 +708,10 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [uploadSuccess, setUploadSuccess] = useState(false)
+  const [selectedMajor, setSelectedMajor] = useState('')
+  const [selectedSemester, setSelectedSemester] = useState('')
+  const [selectedCourse, setSelectedCourse] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('')
   const fileInputRef = useRef(null)
   const titleRef = useRef(null)
   const descRef = useRef(null)
@@ -730,6 +753,10 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
     setReadStatus('')
     setUploadError('')
     setUploadSuccess(false)
+    setSelectedMajor('')
+    setSelectedSemester('')
+    setSelectedCourse('')
+    setSelectedCategory('')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -749,11 +776,35 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
     const visibility = visibilityRef.current?.value || 'PRIVATE'
     const tagsRaw = tagsRef.current?.value?.trim() || ''
     const tags = tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : []
+
+    if (visibility === 'PUBLIC') {
+      if (!selectedCourse) {
+        setUploadError('Course Code is required for public documents.')
+        window.showToast?.('Course Code is required for public documents', 'error')
+        return
+      }
+      if (!selectedCategory) {
+        setUploadError('Document Type is required for public documents.')
+        window.showToast?.('Document Type is required for public documents', 'error')
+        return
+      }
+    }
+
+    const courseId = UPLOAD_COURSE_MAP[selectedCourse] || null
+    const categoryId = UPLOAD_CATEGORY_MAP[selectedCategory] || null
+
     setUploading(true)
     setUploadError('')
     setUploadSuccess(false)
     try {
-      const res = await uploadDocument(selectedUploadFile, { title, description, visibility, tags })
+      const res = await uploadDocument(selectedUploadFile, {
+        title,
+        description,
+        visibility,
+        tags,
+        courseId,
+        categoryId
+      })
       const doc = res?.data || res
       setUploadSuccess(true)
       window.showToast?.('Document uploaded successfully', 'success')
@@ -826,15 +877,36 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
             <label>Document Title *<input ref={titleRef} defaultValue={selectedUploadFile.name} placeholder="Enter document title" /></label>
             <label>Description<textarea ref={descRef} placeholder="Brief description of the document..." /></label>
             <div className="upload-form__grid">
-              {uploadSelectFields.map((field) => (
-                <label key={field.label}>
-                  {field.label} {field.hint && <small>{field.hint}</small>}
-                  <select defaultValue="">
-                    <option disabled value="">{field.placeholder}</option>
-                    {field.options.map((option) => <option key={option}>{option}</option>)}
-                  </select>
-                </label>
-              ))}
+              {uploadSelectFields.map((field) => {
+                let value = ''
+                let onChange = () => {}
+                if (field.label.startsWith('Major')) {
+                  value = selectedMajor
+                  onChange = (e) => setSelectedMajor(e.target.value)
+                } else if (field.label.startsWith('Semester')) {
+                  value = selectedSemester
+                  onChange = (e) => setSelectedSemester(e.target.value)
+                } else if (field.label.startsWith('Course Code')) {
+                  value = selectedCourse
+                  onChange = (e) => setSelectedCourse(e.target.value)
+                } else if (field.label.startsWith('Document Type')) {
+                  value = selectedCategory
+                  onChange = (e) => setSelectedCategory(e.target.value)
+                }
+                return (
+                  <label key={field.label}>
+                    {field.label} {field.hint && <small>{field.hint}</small>}
+                    <select value={value} onChange={onChange}>
+                      <option disabled value="">{field.placeholder}</option>
+                      {field.options.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )
+              })}
               <label>Visibility<select ref={visibilityRef} defaultValue="PRIVATE">
                 <option value="PUBLIC">Public</option><option value="PRIVATE">Private</option>
               </select></label>
@@ -853,15 +925,20 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
   )
 }
 
-export function ProfilePage() {
-  const [user, setUser] = useState(() => {
+export function ProfilePage({ user: propUser }) {
+  const [localUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('user') || 'null') } catch { return null }
   })
+  const user = propUser || localUser
 
   return (
     <main className="page-surface profile-page">
       <section className="profile-card">
-        <div className="profile-avatar">{user?.fullName?.[0] || 'SV'}</div>
+        {user?.avatarUrl ? (
+          <img src={user.avatarUrl} alt="Avatar" className="profile-avatar" style={{ objectFit: 'cover' }} />
+        ) : (
+          <div className="profile-avatar">{user?.fullName?.[0] || 'SV'}</div>
+        )}
         <div>
           <h1>{user?.fullName || appUser.name} <button type="button"><StudyHubIcon name="edit" size={16} /> Edit</button></h1>
           <p><StudyHubIcon name="mail" size={16} /> {user?.email || appUser.email}</p>
@@ -938,15 +1015,15 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
   const docCount = f.documents?.length || 0
 
   return (
-    <main className="page-surface bg-slate-50 min-h-screen py-6 !px-4 md:!px-6 lg:!px-8 xl:!px-10" style={{ overflowY: 'auto', flex: 1 }}>
+    <main className="page-surface bg-slate-50 dark:bg-[#0f172a] min-h-screen py-6 !px-4 md:!px-6 lg:!px-8 xl:!px-10 transition-colors duration-300 ease-in-out" style={{ overflowY: 'auto', flex: 1 }}>
       <div className="max-w-[1536px] w-full mx-auto flex flex-col gap-6">
         <div className="flex flex-col gap-2">
-          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight m-0">{folderName}</h1>
-          <p className="text-sm text-slate-600 m-0 leading-relaxed whitespace-pre-line">{f.description || 'Study Document Folder'}</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white leading-tight m-0">{folderName}</h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 m-0 leading-relaxed whitespace-pre-line">{f.description || 'Study Document Folder'}</p>
         </div>
 
-        <section className="folder-hero-card flex flex-wrap items-center gap-4 bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
-          <span className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+        <section className="folder-hero-card flex flex-wrap items-center gap-4 bg-white dark:bg-[#1e293b] p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors duration-300 ease-in-out">
+          <span className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-slate-700 text-blue-600 dark:text-blue-400 flex items-center justify-center">
             <StudyHubIcon name="folder" size={24} />
           </span>
           <div className="flex flex-col gap-1">
@@ -959,8 +1036,8 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
               <span className="flex items-center gap-1"><StudyHubIcon name="download" size={14} /> 0 download{0 !== 1 ? 's' : ''}</span>
             </div>
           </div>
-          <button 
-            className="ml-auto py-2.5 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border-0 shadow-sm flex items-center gap-1.5" 
+          <button
+            className="ml-auto py-2.5 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border-0 shadow-sm flex items-center gap-1.5"
             type="button"
           >
             <StudyHubIcon name="download" size={14} /> Download Entire Folder
@@ -968,11 +1045,11 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
         </section>
 
         <SectionTitle icon="file" title="Documents in Folder" count={docCount} />
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-2">
           {docCount > 0 ? (
             f.documents.map((doc) => (
-              <DocumentCard 
+              <DocumentCard
                 key={doc.id}
                 doc={{
                   id: doc.id,
@@ -1046,31 +1123,31 @@ function DocumentViewer({ doc, onBack }) {
   const viewCount = doc.views || doc.totalViews || 0;
 
   return (
-    <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col gap-5">
+    <section className="bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-5 transition-colors duration-300 ease-in-out">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap gap-2">
           <Badge tone="blue">{doc.code || doc.id?.toString().slice(-6)}</Badge>
           <Badge>{doc.fileType || doc.type}</Badge>
         </div>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight tracking-tight mt-1">
+        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white leading-tight tracking-tight mt-1">
           {doc.title}
         </h1>
-        <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-line">{doc.description}</p>
-        
-        <div className="flex items-center gap-4 text-xs font-semibold text-slate-500 mt-2">
+        <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed whitespace-pre-line">{doc.description}</p>
+
+        <div className="flex items-center gap-4 text-xs font-semibold text-slate-500 dark:text-slate-400 mt-2">
           <span className="flex items-center gap-1"><StudyHubIcon name="download" size={14} /> {downloadCount} download{downloadCount !== 1 ? 's' : ''}</span>
           <span className="flex items-center gap-1"><StudyHubIcon name="eye" size={14} /> {viewCount} view{viewCount !== 1 ? 's' : ''}</span>
           <span className="rating flex items-center gap-1 text-amber-500">★ {doc.rating || doc.averageRating || 0} </span>
         </div>
       </div>
 
-      <hr className="border-slate-100 my-1" />
+      <hr className="border-slate-100 dark:border-slate-800 my-1" />
 
       <div>
-        <h2 className="text-lg font-bold text-slate-800 mb-3">Document Preview</h2>
+        <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-3">Document Preview</h2>
         {fileUrl ? (
           isPdf ? (
-            <div className="document-preview-container w-full h-[650px] md:h-[750px] lg:h-[800px] rounded-2xl overflow-hidden border border-slate-200">
+            <div className="document-preview-container w-full h-[650px] md:h-[750px] lg:h-[800px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 transition-colors duration-300">
               <iframe
                 src={fileUrl}
                 width="100%"
@@ -1080,13 +1157,13 @@ function DocumentViewer({ doc, onBack }) {
               />
             </div>
           ) : isLocal ? (
-            <div className="p-8 border border-slate-200 rounded-2xl text-center bg-slate-50 text-slate-600 flex flex-col items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-red-100 text-red-500 flex items-center justify-center">
+            <div className="p-8 border border-slate-200 dark:border-slate-800 rounded-2xl text-center bg-slate-50 dark:bg-[#1e293b] text-slate-600 dark:text-slate-400 flex flex-col items-center gap-4 transition-colors duration-300">
+              <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-950/40 text-red-500 dark:text-red-400 flex items-center justify-center">
                 <StudyHubIcon name="file" size={24} />
               </div>
               <div>
-                <h4 className="text-base font-bold text-slate-900 mb-1">Unable to preview file on localhost</h4>
-                <p className="text-sm text-slate-500 max-w-md leading-relaxed mx-auto">
+                <h4 className="text-base font-bold text-slate-900 dark:text-white mb-1 transition-colors duration-300">Unable to preview file on localhost</h4>
+                <p className="text-sm text-slate-500 dark:text-slate-450 max-w-md leading-relaxed mx-auto transition-colors duration-300">
                   Google Docs Viewer cannot load files from localhost. Please download the file to view it.
                 </p>
               </div>
@@ -1099,7 +1176,7 @@ function DocumentViewer({ doc, onBack }) {
               </a>
             </div>
           ) : (
-            <div className="document-preview-container w-full h-[650px] md:h-[750px] lg:h-[800px] rounded-2xl overflow-hidden border border-slate-200">
+            <div className="document-preview-container w-full h-[650px] md:h-[750px] lg:h-[800px] rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 transition-colors duration-300">
               <iframe
                 src={`https://docs.google.com/gview?url=${encodeURIComponent(fileUrl)}&embedded=true`}
                 width="100%"
@@ -1110,11 +1187,11 @@ function DocumentViewer({ doc, onBack }) {
             </div>
           )
         ) : (
-          <div className="p-12 border border-dashed border-slate-300 rounded-2xl text-center text-slate-500 flex flex-col items-center justify-center gap-3 bg-slate-50">
+          <div className="p-12 border border-dashed border-slate-300 dark:border-slate-800 rounded-2xl text-center text-slate-500 dark:text-slate-400 flex flex-col items-center justify-center gap-3 bg-slate-50 dark:bg-[#1e293b] transition-colors duration-300">
             <StudyHubIcon name="file" size={48} className="text-slate-400" />
             <div>
-              <p className="font-semibold text-slate-700 m-0 mb-1">No file available to preview</p>
-              <small className="text-xs text-slate-400">This document does not have any attached content</small>
+              <p className="font-semibold text-slate-700 dark:text-slate-300 m-0 mb-1">No file available to preview</p>
+              <small className="text-xs text-slate-400 dark:text-slate-500">This document does not have any attached content</small>
             </div>
           </div>
         )}
@@ -1134,17 +1211,17 @@ function CommentSection({
   return (
     <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col gap-6 mt-6">
       <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 m-0">
-        <StudyHubIcon name="message" size={20} className="text-slate-600" /> 
+        <StudyHubIcon name="message" size={20} className="text-slate-600" />
         Comments ({comments.length})
       </h2>
-      
+
       {/* Comments List */}
       <div className="comments-list flex flex-col gap-4 max-h-[400px] overflow-y-auto pr-2">
         {comments.length > 0 ? (
           comments.map((comment) => {
             const userName = comment.user?.fullName || comment.userName || 'Student';
             const initial = userName[0].toUpperCase();
-            const dateStr = comment.createdAt 
+            const dateStr = comment.createdAt
               ? new Date(comment.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
               : 'Just now';
             return (
@@ -1207,14 +1284,14 @@ function DocumentSidebar({
   onNavigate
 }) {
   const uploader = doc.uploader || doc.user?.fullName || 'Anonymous User';
-  const uploadDate = doc.createdAt 
+  const uploadDate = doc.createdAt
     ? new Date(doc.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
     : (doc.date || 'N/A');
 
   return (
-    <aside className="doc-info-card bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col gap-6 sticky top-6">
+    <aside className="doc-info-card bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-6 sticky top-6 transition-colors duration-305 ease-in-out">
       <div>
-        <h2 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2 m-0">Document Info</h2>
+        <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-4 border-b border-slate-100 dark:border-slate-800 pb-2 m-0">Document Info</h2>
         <div className="flex flex-col gap-3">
           <InfoLine icon="user" label="Uploaded by" value={uploader} />
           <InfoLine icon="calendar" label="Upload Date" value={uploadDate} />
@@ -1222,7 +1299,7 @@ function DocumentSidebar({
         </div>
       </div>
 
-      <hr className="border-slate-100 my-0" />
+      <hr className="border-slate-100 dark:border-slate-800 my-0" />
 
       {/* Synchronized Buttons Column */}
       <div className="flex flex-col gap-3">
@@ -1241,38 +1318,37 @@ function DocumentSidebar({
             <StudyHubIcon name="download" size={16} /> Download Document
           </button>
         )}
-        
-        <button 
-          className="w-full py-2.5 px-4 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border-0" 
-          type="button" 
+
+        <button
+          className="w-full py-2.5 px-4 bg-purple-50 dark:bg-slate-700 hover:bg-purple-100 dark:hover:bg-slate-600 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-slate-600 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border-0"
+          type="button"
           onClick={onStudyWithAI}
         >
           <StudyHubIcon name="message" size={16} /> Chat with AI
         </button>
 
-        <button 
-          className={`w-full py-2.5 px-4 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 flex items-center justify-center gap-2 border cursor-pointer ${
-            isFavorite 
-              ? 'bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-200 border-0' 
-              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 border-0'
-          }`}
-          type="button" 
+        <button
+          className={`w-full py-2.5 px-4 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 flex items-center justify-center gap-2 border cursor-pointer ${isFavorite
+            ? 'bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50 border-0'
+            : 'bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 border-0'
+            }`}
+          type="button"
           onClick={onToggleFavorite}
         >
-          <StudyHubIcon name="heart" size={16} /> 
+          <StudyHubIcon name="heart" size={16} />
           {isFavorite ? 'Favorited' : 'Favorite'}
         </button>
 
-        <button 
-          className="w-full py-2.5 px-4 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border-0" 
-          type="button" 
+        <button
+          className="w-full py-2.5 px-4 bg-slate-50 dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-xl text-sm font-bold shadow-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border-0"
+          type="button"
           onClick={() => guest ? onNavigate?.('login') : window.showToast?.('Share link copied', 'success')}
         >
           <StudyHubIcon name="share" size={16} /> Share
         </button>
 
         <button
-          className="w-full py-2.5 px-4 bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+          className="w-full py-2.5 px-4 bg-white dark:bg-[#1e293b] hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
           onClick={() => guest ? onNavigate?.('login') : onReport?.()}
           type="button"
         >
@@ -1280,15 +1356,15 @@ function DocumentSidebar({
         </button>
       </div>
 
-      <hr className="border-slate-100 my-0" />
+      <hr className="border-slate-100 dark:border-slate-800 my-0" />
 
       {/* Document Rating */}
       <div className="flex flex-col items-center gap-2">
-        <span className="text-xs font-semibold text-slate-500">Your rating</span>
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Your rating</span>
         <div className="rating-row flex gap-1.5 cursor-pointer text-2xl text-amber-400">
           {[1, 2, 3, 4, 5].map((star) => (
-            <span 
-              key={star} 
+            <span
+              key={star}
               onClick={() => onRate(star)}
               onMouseEnter={() => setHoverRating(star)}
               onMouseLeave={() => setHoverRating(0)}
@@ -1433,13 +1509,13 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
 
   if (error) {
     return (
-      <main className="page-surface py-12 text-center flex flex-col items-center justify-center gap-4 bg-slate-50 min-h-screen">
+      <main className="page-surface py-12 text-center flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-[#0f172a] min-h-screen transition-colors duration-300 ease-in-out">
         <div className="w-16 h-16 rounded-full bg-red-100 text-red-500 flex items-center justify-center text-3xl mx-auto">
           ⚠️
         </div>
-        <h2 className="text-xl font-bold text-slate-800">Document Not Found</h2>
-        <p className="text-sm text-slate-500 max-w-md mx-auto">{error}</p>
-        <button 
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Document Not Found</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">{error}</p>
+        <button
           onClick={onBack}
           className="mt-2 py-2 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold border-0 cursor-pointer"
         >
@@ -1450,13 +1526,13 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
   }
 
   return (
-    <main className="page-surface bg-slate-50 min-h-screen py-6 !px-4 md:!px-6 lg:!px-8 xl:!px-10" style={{ overflowY: 'auto', flex: 1 }}>
+    <main className="page-surface bg-slate-50 dark:bg-[#0f172a] min-h-screen py-6 !px-4 md:!px-6 lg:!px-8 xl:!px-10 transition-colors duration-300 ease-in-out" style={{ overflowY: 'auto', flex: 1 }}>
       <div className="max-w-[1536px] w-full mx-auto flex flex-col lg:flex-row gap-8 items-start">
         {/* Left Column (Main Content) */}
         <div className="flex-1 w-full min-w-0">
           <DocumentViewer doc={d} onBack={onBack} />
-          
-          <CommentSection 
+
+          <CommentSection
             comments={comments}
             commentContent={commentContent}
             setCommentContent={setCommentContent}
@@ -1468,7 +1544,7 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
 
         {/* Right Column (Sticky Sidebar) */}
         <div className="w-full lg:w-[320px] shrink-0">
-          <DocumentSidebar 
+          <DocumentSidebar
             doc={d}
             guest={guest}
             isFavorite={isFavorite}

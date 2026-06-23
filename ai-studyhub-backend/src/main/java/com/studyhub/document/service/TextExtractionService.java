@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.sl.extractor.SlideShowExtractor;
+import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,7 @@ public class TextExtractionService {
             return switch (extension) {
                 case "pdf" -> extractTextFromPdf(inputStream);
                 case "docx" -> extractTextFromDocx(inputStream);
+                case "pptx" -> extractTextFromPptx(inputStream);
                 case "txt" -> extractTextFromTxt(inputStream);
                 default -> throw new IllegalArgumentException("Unsupported file type: " + extension);
             };
@@ -51,6 +54,7 @@ public class TextExtractionService {
                 return switch (extension) {
                     case "pdf" -> extractTextFromPdf(inputStream);
                     case "docx" -> extractTextFromDocx(inputStream);
+                    case "pptx" -> extractTextFromPptx(inputStream);
                     case "txt" -> extractTextFromTxt(inputStream);
                     default -> throw new IllegalArgumentException("Unsupported file type: " + extension);
                 };
@@ -87,6 +91,18 @@ public class TextExtractionService {
         } catch (Exception e) {
             log.error("Failed to extract text from TXT: {}", e.getMessage());
             throw new IOException("Failed to parse Text file", e);
+        }
+    }
+
+    public String extractTextFromPptx(InputStream inputStream) throws IOException {
+        try (XMLSlideShow ppt = new XMLSlideShow(inputStream);
+             SlideShowExtractor<?, ?> extractor = new SlideShowExtractor<>(ppt)) {
+            extractor.setSlidesByDefault(true);
+            extractor.setNotesByDefault(true);
+            return extractor.getText();
+        } catch (Exception e) {
+            log.error("Failed to extract text from PPTX document: {}", e.getMessage());
+            throw new IOException("Failed to parse PPTX file", e);
         }
     }
 }

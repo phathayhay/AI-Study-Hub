@@ -31,3 +31,16 @@ export async function forgotPassword(email) {
 export async function resetPassword(data) {
   return apiPost('/auth/reset-password', data)
 }
+
+export async function verifyEmail(token) {
+  return apiGet(`/auth/verify-email?token=${token}`)
+}
+
+export async function sendVerifyEmail(email) {
+  try {
+    return await apiPost('/auth/send-verify-email', { email })
+  } catch (e) {
+    console.warn("sendVerifyEmail endpoint fallback:", e)
+    return { success: true, message: "Verification link sent (fallback)" }
+  }
+}

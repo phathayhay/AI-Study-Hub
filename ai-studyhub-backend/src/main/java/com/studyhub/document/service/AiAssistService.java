@@ -83,6 +83,12 @@ public class AiAssistService {
         return summaryRepository.save(summary);
     }
 
+    @Transactional(readOnly = true)
+    public DocumentSummary getSummaryForDocument(Long documentId) {
+        return summaryRepository.findByDocument_Id(documentId)
+                .orElseThrow(() -> new IllegalArgumentException("Summary not found for this document"));
+    }
+
     @Transactional
     public QuizResponse generateQuiz(Long documentId, DifficultyLevel difficulty, String userEmail) throws IOException {
         Document doc = documentRepository.findById(documentId)

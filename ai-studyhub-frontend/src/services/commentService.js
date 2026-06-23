@@ -1,16 +1,23 @@
-import { apiDelete, apiGet, apiPost, apiPut } from './api'
+import { apiGet, apiPost, apiPut, apiDelete } from './api'
 
 /**
- * Update a comment
- * Edits the content of an existing comment. Only the author can perform this action.
+ * Add a comment to a document
+ * Creates a new comment (or reply to an existing parent comment) on the specified document.
+ * Method: POST
+ * Path: /api/documents/{documentId}/comments
+ * @param {any} documentId - Path parameter
+ * @param {any} body - Request body
  */
-export function updateComment(commentId, body) {
-  return apiPut(`/comments/${commentId}`, body);
+export function addComment(documentId, body) {
+  return apiPost(`/documents/${documentId}/comments`, body);
 }
 
 /**
  * Delete a comment
  * Performs soft delete on a comment. Can be performed by author or document owner.
+ * Method: DELETE
+ * Path: /api/comments/{commentId}
+ * @param {any} commentId - Path parameter
  */
 export function deleteComment(commentId) {
   return apiDelete(`/comments/${commentId}`);
@@ -19,15 +26,22 @@ export function deleteComment(commentId) {
 /**
  * Get document threaded comments
  * Retrieves a list of root-level comments with recursively populated child replies.
+ * Method: GET
+ * Path: /api/documents/{documentId}/comments
+ * @param {any} documentId - Path parameter
  */
 export function getComments(documentId) {
   return apiGet(`/documents/${documentId}/comments`);
 }
 
 /**
- * Add a comment to a document
- * Creates a new comment (or reply to an existing parent comment) on the specified document.
+ * Update a comment
+ * Edits the content of an existing comment. Only the author can perform this action.
+ * Method: PUT
+ * Path: /api/comments/{commentId}
+ * @param {any} commentId - Path parameter
+ * @param {any} body - Request body
  */
-export function addComment(documentId, body) {
-  return apiPost(`/documents/${documentId}/comments`, body);
+export function updateComment(commentId, body) {
+  return apiPut(`/comments/${commentId}`, body);
 }
