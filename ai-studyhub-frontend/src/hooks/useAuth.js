@@ -16,6 +16,9 @@ export default function useAuth() {
         if (cachedAvatar) {
           u.avatarUrl = cachedAvatar
         }
+        if (!u.fullName && (u.firstName || u.lastName)) {
+          u.fullName = `${u.lastName || ''} ${u.firstName || ''}`.trim()
+        }
         setUser(u)
       } catch (e) {
         console.error('Error parsing cached user:', e)
@@ -36,6 +39,10 @@ export default function useAuth() {
       const cachedAvatar = localStorage.getItem(`avatarUrl_${u.email}`)
       if (cachedAvatar) {
         u.avatarUrl = cachedAvatar
+      }
+
+      if (!u.fullName && (u.firstName || u.lastName)) {
+        u.fullName = `${u.lastName || ''} ${u.firstName || ''}`.trim()
       }
 
       localStorage.setItem('user', JSON.stringify(u))
@@ -73,6 +80,9 @@ export default function useAuth() {
       setUser((prev) => {
         const next = newUser(prev)
         if (next) {
+          if (!next.fullName && (next.firstName || next.lastName)) {
+            next.fullName = `${next.lastName || ''} ${next.firstName || ''}`.trim()
+          }
           if (next.avatarUrl) {
             localStorage.setItem(`avatarUrl_${next.email}`, next.avatarUrl)
           }
@@ -83,15 +93,19 @@ export default function useAuth() {
         return next
       })
     } else {
-      setUser(newUser)
-      if (newUser) {
-        if (newUser.avatarUrl) {
-          localStorage.setItem(`avatarUrl_${newUser.email}`, newUser.avatarUrl)
+      let u = newUser
+      if (u) {
+        if (!u.fullName && (u.firstName || u.lastName)) {
+          u.fullName = `${u.lastName || ''} ${u.firstName || ''}`.trim()
         }
-        localStorage.setItem('user', JSON.stringify(newUser))
+        if (u.avatarUrl) {
+          localStorage.setItem(`avatarUrl_${u.email}`, u.avatarUrl)
+        }
+        localStorage.setItem('user', JSON.stringify(u))
       } else {
         localStorage.removeItem('user')
       }
+      setUser(u)
     }
   }
 

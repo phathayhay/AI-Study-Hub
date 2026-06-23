@@ -579,7 +579,7 @@ export function LibraryPage({
       <main style={{ maxWidth: '1100px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px', padding: '28px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justify: 'space-between', gap: '16px' }}>
           <h1 className="text-slate-900 dark:text-white transition-colors duration-300 ease-in-out" style={{ fontSize: '22px', fontWeight: 600, margin: 0, whiteSpace: 'nowrap' }}>
-            Hello, <span style={{ fontWeight: 700 }}>{user?.fullName || 'Student!'}</span>
+            Hello, <span style={{ fontWeight: 700 }}>{user?.firstName || 'Student!'}</span>
           </h1>
           
           <div className="bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out" style={{ flex: 1, maxWidth: '520px', display: 'flex', alignItems: 'center', borderRadius: '8px', padding: '0 14px', height: '38px', gap: '8px' }}>

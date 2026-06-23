@@ -278,22 +278,21 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
                 </div>
               </div>
 
-              <div className="settings-input-group">
-                <label className="text-slate-600 dark:text-slate-400">Full Name</label>
-                <input value={user?.fullName || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
+              <div className="settings-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="settings-input-group">
+                  <label className="text-slate-600 dark:text-slate-400">Họ và tên đệm</label>
+                  <input value={user?.lastName || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
+                </div>
+                <div className="settings-input-group">
+                  <label className="text-slate-600 dark:text-slate-400">Tên</label>
+                  <input value={user?.firstName || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
+                </div>
               </div>
 
-              <div className="settings-input-group">
-                <label className="text-slate-600 dark:text-slate-400">Registered Email</label>
+              <div className="settings-input-group" style={{ marginTop: '16px' }}>
+                <label className="text-slate-600 dark:text-slate-400">Email đăng ký</label>
                 <input value={user?.email || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
               </div>
-
-              {user?.studentCode && (
-                <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">Student ID</label>
-                  <input value={user.studentCode} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
-                </div>
-              )}
             </>
           )}
 
