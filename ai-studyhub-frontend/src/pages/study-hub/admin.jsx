@@ -58,10 +58,10 @@ function AdminSidebar({ active, onNavigate, onLogout }) {
       </nav>
       <div className="admin-profile">
         <span>A</span>
-        <div><strong>Admin FPTU</strong><small>admin@fpt.edu.vn</small></div>
+        <div><strong>FPTU Admin</strong><small>admin@fpt.edu.vn</small></div>
       </div>
       <button className="admin-logout" onClick={onLogout} type="button">
-        <StudyHubIcon name="logout" size={18} /> Đăng xuất
+        <StudyHubIcon name="logout" size={18} /> Log Out
       </button>
     </aside>
   )
@@ -71,7 +71,7 @@ function AdminTopbar() {
   return (
     <header className="admin-topbar">
       <Badge tone="purple">Admin</Badge>
-      <strong>Admin FPTU</strong>
+      <strong>FPTU Admin</strong>
     </header>
   )
 }
@@ -81,9 +81,9 @@ function AdminOverview() {
     <main className="admin-page admin-page--dashboard">
       <div className="admin-stat-grid">
         {[
-          ['users', '567', 'Tổng người dùng', '+12%', 'users'],
-          ['documents', '1,234', 'Tổng tài liệu', '+8%', 'file'],
-          ['downloads', '45,678', 'Lượt tải xuống', '+23%', 'download'],
+          ['users', '567', 'Total Users', '+12%', 'users'],
+          ['documents', '1,234', 'Total Documents', '+8%', 'file'],
+          ['downloads', '45,678', 'Downloads', '+23%', 'download'],
           ['sessions', '2,456', 'AI Chat Sessions', '+15%', 'message'],
         ].map(([id, value, label, change, icon]) => (
           <article className="admin-stat-card" key={id}>
@@ -95,7 +95,7 @@ function AdminOverview() {
         ))}
       </div>
       <section className="admin-card recent-users">
-        <h2><StudyHubIcon name="users" size={20} /> Người dùng mới</h2>
+        <h2><StudyHubIcon name="users" size={20} /> New Users</h2>
         {adminUsers.slice(0, 3).map((user) => (
           <div className="admin-user-mini" key={user.email}>
             <span>{user.initial}</span>
@@ -106,16 +106,16 @@ function AdminOverview() {
         ))}
       </section>
       <div className="admin-chart-grid">
-        <AdminChart title="Xu hướng tải lên/tải xuống" type="line" />
-        <AdminChart title="Phân bổ tài liệu theo môn học" type="pie" />
-        <AdminChart title="Người dùng hoạt động theo ngày" type="bars" />
+        <AdminChart title="Upload/Download Trends" type="line" />
+        <AdminChart title="Document Distribution by Subject" type="pie" />
+        <AdminChart title="Active Users by Day" type="bars" />
         <AdminChart title="AI Chat Usage (24h)" type="curve" />
       </div>
       <section className="admin-card system-activity">
-        <h2><StudyHubIcon name="trend" size={18} /> Hoạt động hệ thống</h2>
-        <AdminLogItem tone="blue" title="Người dùng mới đăng ký" text="Nguyễn Văn A đã tham gia - 2 giờ trước" />
-        <AdminLogItem tone="green" title="Tài liệu được duyệt" text="CEA201 - Chapter 5 đã được phê duyệt - 5 giờ trước" />
-        <AdminLogItem tone="orange" title="Báo cáo mới" text="Nội dung vi phạm được báo cáo - 1 ngày trước" />
+        <h2><StudyHubIcon name="trend" size={18} /> System Activities</h2>
+        <AdminLogItem tone="blue" title="New User Registration" text="Nguyen Van A joined - 2 hours ago" />
+        <AdminLogItem tone="green" title="Document Approved" text="CEA201 - Chapter 5 approved - 5 hours ago" />
+        <AdminLogItem tone="orange" title="New Report" text="Inappropriate content reported - 1 day ago" />
       </section>
     </main>
   )
@@ -125,11 +125,11 @@ function AdminUsers({ onOpenUser }) {
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
-        <AdminSectionHeader icon="users" title="Quản lý người dùng">
-          <AdminSearch placeholder="Tìm kiếm người dùng..." />
+        <AdminSectionHeader icon="users" title="User Management">
+          <AdminSearch placeholder="Search users..." />
         </AdminSectionHeader>
         <table className="admin-table">
-          <thead><tr><th>Người dùng</th><th>Email</th><th>Tham gia</th><th>Tài liệu</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
+          <thead><tr><th>User</th><th>Email</th><th>Joined</th><th>Documents</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             {adminUsers.map((user) => (
               <tr key={user.email}>
@@ -155,12 +155,12 @@ function AdminDocuments() {
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
-        <AdminSectionHeader icon="file" title="Quản lý tài liệu">
+        <AdminSectionHeader icon="file" title="Document Management">
           <input className="admin-filter-input" />
-          <AdminSearch placeholder="Tìm kiếm tài liệu..." />
+          <AdminSearch placeholder="Search documents..." />
         </AdminSectionHeader>
         <table className="admin-table">
-          <thead><tr><th>Tiêu đề</th><th>Người tải</th><th>Ngày tải</th><th>Lượt tải</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
+          <thead><tr><th>Title</th><th>Uploader</th><th>Upload Date</th><th>Downloads</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             {adminDocuments.map(([title, owner, date, downloads, status]) => (
               <tr key={title}>
@@ -179,11 +179,11 @@ function AdminCourses({ onAdd, onEdit }) {
   return (
     <main className="admin-page">
       <section className="admin-card admin-course-card">
-        <AdminSectionHeader icon="book" title="Quản lý môn học">
-          <button className="admin-primary" onClick={onAdd} type="button"><StudyHubIcon name="plus" size={18} /> Thêm môn học</button>
+        <AdminSectionHeader icon="book" title="Subject Management">
+          <button className="admin-primary" onClick={onAdd} type="button"><StudyHubIcon name="plus" size={18} /> Add Subject</button>
         </AdminSectionHeader>
         <div className="admin-search-row">
-          <AdminSearch placeholder="Tìm kiếm môn học..." />
+          <AdminSearch placeholder="Search subjects..." />
           <input />
         </div>
         <div className="course-grid">
@@ -198,7 +198,7 @@ function AdminCourses({ onAdd, onEdit }) {
                 <button type="button"><StudyHubIcon name="archive" size={16} /></button>
               </div>
               <div><Badge tone="purple">{semester}</Badge><Badge tone="blue">{major}</Badge></div>
-              <footer><span>{count} tài liệu</span><button type="button">Xem →</button></footer>
+              <footer><span>{count} documents</span><button type="button">View →</button></footer>
             </article>
           ))}
         </div>
@@ -211,33 +211,33 @@ function AdminStorage() {
   return (
     <main className="admin-page">
       <div className="storage-summary">
-        <StorageMetric tone="blue" label="Tổng dung lượng" value="500 GB" />
-        <StorageMetric tone="green" label="Đã sử dụng" value="287 GB" sub="57.4%" />
-        <StorageMetric tone="purple" label="Còn trống" value="213 GB" sub="42.6%" />
+        <StorageMetric tone="blue" label="Total Storage" value="500 GB" />
+        <StorageMetric tone="green" label="Used" value="287 GB" sub="57.4%" />
+        <StorageMetric tone="purple" label="Free" value="213 GB" sub="42.6%" />
       </div>
       <div className="admin-chart-grid">
         <section className="admin-card storage-bars">
-          <h2>Phân bổ dung lượng</h2>
+          <h2>Storage Allocation</h2>
           {[
             ['PDF', '125 GB (43%)', 78, 'red'],
             ['Word/PowerPoint', '89 GB (31%)', 56, 'blue'],
             ['ZIP/RAR', '56 GB (19%)', 34, 'green'],
-            ['Khác', '17 GB (7%)', 14, 'gray'],
+            ['Others', '17 GB (7%)', 14, 'gray'],
           ].map(([label, value, width, tone]) => (
             <div className="storage-row" key={label}><span>{label}</span><small>{value}</small><i className={tone} style={{ width: `${width}%` }} /></div>
           ))}
         </section>
-        <AdminChart title="Xu hướng sử dụng (30 ngày)" type="area" />
+        <AdminChart title="Usage Trend (30 Days)" type="area" />
       </div>
       <section className="admin-card admin-table-card">
-        <h2>File lớn nhất</h2>
+        <h2>Largest Files</h2>
         <table className="admin-table">
-          <thead><tr><th>Tên file</th><th>Người tải</th><th>Kích thước</th><th>Loại</th></tr></thead>
+          <thead><tr><th>File Name</th><th>Uploader</th><th>Size</th><th>Type</th></tr></thead>
           <tbody>
             {[
-              ['SWP391-Complete-Project.zip', 'Nguyễn Văn A', '245 MB', 'ZIP'],
-              ['CEA201-Full-Course-Slides.pdf', 'Trần Thị B', '189 MB', 'PDF'],
-              ['PRF192-Video-Lectures.zip', 'Lê Văn C', '167 MB', 'ZIP'],
+              ['SWP391-Complete-Project.zip', 'Nguyen Van A', '245 MB', 'ZIP'],
+              ['CEA201-Full-Course-Slides.pdf', 'Tran Thi B', '189 MB', 'PDF'],
+              ['PRF192-Video-Lectures.zip', 'Le Van C', '167 MB', 'ZIP'],
             ].map(([name, owner, size, type]) => <tr key={name}><td>{name}</td><td>{owner}</td><td>{size}</td><td><Badge tone="blue">{type}</Badge></td></tr>)}
           </tbody>
         </table>
@@ -248,20 +248,20 @@ function AdminStorage() {
 
 function AdminReports() {
   const rows = [
-    ['Nguyễn Văn A', 'Trần Thị B', 'Nội dung không phù hợp', '28/5/2024', 'pending'],
-    ['Lê Văn C', 'Phạm Văn D', 'Vi phạm bản quyền', '27/5/2024', 'rejected'],
-    ['Hoàng Thị E', 'Nguyễn Văn F', 'Spam', '26/5/2024', 'approved'],
-    ['Trần Văn G', 'Lê Thị H', 'Quấy rối', '25/5/2024', 'rejected'],
+    ['Nguyen Van A', 'Tran Thi B', 'Inappropriate content', '28/5/2024', 'pending'],
+    ['Le Van C', 'Pham Van D', 'Copyright infringement', '27/5/2024', 'rejected'],
+    ['Hoang Thi E', 'Nguyen Van F', 'Spam', '26/5/2024', 'approved'],
+    ['Tran Van G', 'Le Thị H', 'Harassment', '25/5/2024', 'rejected'],
   ]
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
-        <AdminSectionHeader icon="flag" title="Báo cáo vi phạm">
+        <AdminSectionHeader icon="flag" title="Reports">
           <input className="admin-filter-input" />
-          <AdminSearch placeholder="Tìm kiếm báo cáo..." />
+          <AdminSearch placeholder="Search reports..." />
         </AdminSectionHeader>
         <table className="admin-table">
-          <thead><tr><th>Người báo cáo</th><th>Người vi phạm</th><th>Loại vi phạm</th><th>Ngày báo cáo</th><th>Trạng thái</th><th>Hành động</th></tr></thead>
+          <thead><tr><th>Reporter</th><th>Violator</th><th>Violation Type</th><th>Report Date</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>{rows.map(([a, b, type, date, status]) => <tr key={type}><td><AdminNameCell name={a} /></td><td><AdminNameCell name={b} orange /></td><td><Badge tone="orange">{type}</Badge></td><td>{date}</td><td><AdminStatus status={status} /></td><td className="admin-actions"><button><StudyHubIcon name="eye" size={15} /></button><button><StudyHubIcon name="check" size={15} /></button><button><StudyHubIcon name="x" size={15} /></button></td></tr>)}</tbody>
         </table>
       </section>
@@ -277,13 +277,13 @@ function AdminLogs() {
           <input className="admin-filter-input" />
           <button className="admin-primary" type="button">Export</button>
         </AdminSectionHeader>
-        <AdminLogItem tone="blue" title="Người dùng mới đăng ký" text="Nguyễn Văn A (studenta@fpt.edu.vn)" time="2 phút trước" />
-        <AdminLogItem tone="green" title="Tài liệu mới được tải lên" text="CEA201 - Chapter 5: Cache Memory" time="15 phút trước" />
-        <AdminLogItem tone="green" title="Tài liệu được duyệt" text="PRF192 - Assignment Solution" time="1 giờ trước" />
-        <AdminLogItem tone="red" title="Người dùng bị suspend" text="Lê Văn C - Vi phạm chính sách" time="2 giờ trước" />
-        <AdminLogItem tone="purple" title="Backup hệ thống hoàn tất" text="Database backup - 287GB" time="3 giờ trước" />
-        <AdminLogItem tone="orange" title="Tài liệu bị từ chối" text="PRO192 - Plagiarized content detected" time="5 giờ trước" />
-        <AdminLogItem tone="blue" title="Admin đăng nhập" text="Admin Dashboard access" time="8 giờ trước" />
+        <AdminLogItem tone="blue" title="New User Registration" text="Nguyen Van A (studenta@fpt.edu.vn)" time="2 minutes ago" />
+        <AdminLogItem tone="green" title="New Document Uploaded" text="CEA201 - Chapter 5: Cache Memory" time="15 minutes ago" />
+        <AdminLogItem tone="green" title="Document Approved" text="PRF192 - Assignment Solution" time="1 hour ago" />
+        <AdminLogItem tone="red" title="User Suspended" text="Le Van C - Policy Violation" time="2 hours ago" />
+        <AdminLogItem tone="purple" title="System Backup Completed" text="Database backup - 287GB" time="3 hours ago" />
+        <AdminLogItem tone="orange" title="Document Rejected" text="PRO192 - Plagiarized content detected" time="5 hours ago" />
+        <AdminLogItem tone="blue" title="Admin Logged In" text="Admin Dashboard access" time="8 hours ago" />
       </section>
     </main>
   )
@@ -293,19 +293,19 @@ function AdminSettings() {
   return (
     <main className="admin-page settings-page">
       <section className="admin-card settings-card">
-        <h2><StudyHubIcon name="sparkle" size={18} /> Cài đặt chung</h2>
-        <label>Tên hệ thống<input defaultValue="AI Study Hub" /></label>
-        <label>Email liên hệ<input defaultValue="admin@aistudyhub.com" /></label>
-        <label>Kích thước file tối đa (MB)<input defaultValue="50" /></label>
-        <SettingToggle title="Tự động duyệt tài liệu" text="Bỏ qua quy trình kiểm duyệt thủ công" />
-        <SettingToggle title="Cho phép đăng ký mới" text="Người dùng có thể tạo tài khoản mới" active />
-        <button className="admin-primary" type="button"><StudyHubIcon name="file" size={16} /> Lưu cài đặt</button>
+        <h2><StudyHubIcon name="sparkle" size={18} /> General Settings</h2>
+        <label>System Name<input defaultValue="AI Study Hub" /></label>
+        <label>Contact Email<input defaultValue="admin@aistudyhub.com" /></label>
+        <label>Max File Size (MB)<input defaultValue="50" /></label>
+        <SettingToggle title="Auto-approve documents" text="Bypass manual review process" />
+        <SettingToggle title="Allow new registrations" text="Users can create new accounts" active />
+        <button className="admin-primary" type="button"><StudyHubIcon name="file" size={16} /> Save Settings</button>
       </section>
       <section className="admin-card settings-card">
-        <h2><StudyHubIcon name="lock" size={18} /> Bảo mật</h2>
-        <SettingAction title="Đổi mật khẩu admin" text="Cập nhật mật khẩu đăng nhập" icon="edit" />
-        <SettingAction title="Quản lý phiên đăng nhập" text="Xem và đăng xuất các phiên hoạt động" icon="eye" />
-        <SettingAction danger title="Xóa tất cả dữ liệu" text="Xóa vĩnh viễn toàn bộ dữ liệu hệ thống" icon="archive" />
+        <h2><StudyHubIcon name="lock" size={18} /> Security</h2>
+        <SettingAction title="Change Admin Password" text="Update login password" icon="edit" />
+        <SettingAction title="Session Management" text="View and sign out active sessions" icon="eye" />
+        <SettingAction danger title="Delete All Data" text="Permanently delete all system data" icon="archive" />
       </section>
     </main>
   )
@@ -316,7 +316,7 @@ function AdminChart({ title, type }) {
     <section className={`admin-card admin-chart admin-chart--${type}`}>
       <h2>{title}</h2>
       {type === 'pie' ?<div className="fake-pie" /> : <div className="fake-chart">{[35, 48, 66, 60, 78, 56, 40].map((height, index) => <span key={index} style={{ height: `${height}%` }} />)}</div>}
-      <small>{type === 'pie' ? 'CEA201 19% · PRF192 16% · Khác 30%' : 'Tải lên → Tải xuống'}</small>
+      <small>{type === 'pie' ? 'CEA201 19% · PRF192 16% · Others 30%' : 'Uploads → Downloads'}</small>
     </section>
   )
 }
@@ -330,7 +330,7 @@ function AdminSearch({ placeholder }) {
 }
 
 function AdminStatus({ status }) {
-  const labels = { active: 'Hoạt động', blocked: 'Bị cấm', suspended: 'Suspended', pending: 'Chờ duyệt', approved: 'Đã duyệt', rejected: 'Từ chối' }
+  const labels = { active: 'Active', blocked: 'Banned', suspended: 'Suspended', pending: 'Pending', approved: 'Approved', rejected: 'Rejected' }
   return <span className={`admin-status admin-status--${status}`}>{labels[status] ?? status}</span>
 }
 
@@ -359,16 +359,16 @@ function AdminUserModal({ onClose, user }) {
     <div className="admin-modal-backdrop">
       <section className="admin-user-modal">
         <button className="admin-modal-close" onClick={onClose} type="button">×</button>
-        <h2>Chi tiết tài khoản</h2>
-        <div className="admin-user-profile"><span>{user.initial}</span><div><h3>{user.name}</h3><p>Tham gia: {user.joined}</p></div></div>
+        <h2>Account Details</h2>
+        <div className="admin-user-profile"><span>{user.initial}</span><div><h3>{user.name}</h3><p>Joined: {user.joined}</p></div></div>
         <div className="admin-detail-grid">
           <InfoBlock label="Email" value={user.email} />
-          <InfoBlock label="Số điện thoại" value="0912345678" />
-          <InfoBlock label="Giới tính" value="Nam" />
-          <InfoBlock label="Ngày sinh" value="15/03/2002" />
-          <InfoBlock label="Địa chỉ" value="123 Nguyễn Huệ, Q.1, TP.HCM" />
+          <InfoBlock label="Phone Number" value="0912345678" />
+          <InfoBlock label="Gender" value="Male" />
+          <InfoBlock label="Date of Birth" value="15/03/2002" />
+          <InfoBlock label="Address" value="123 Nguyen Hue, Dist.1, HCMC" />
         </div>
-        <footer><p><small>Trạng thái tài khoản</small><strong className="green-text">Hoạt động</strong></p><p><small>Tổng tài liệu</small><strong className="purple-text">{user.docs}</strong></p></footer>
+        <footer><p><small>Account Status</small><strong className="green-text">Active</strong></p><p><small>Total Documents</small><strong className="purple-text">{user.docs}</strong></p></footer>
       </section>
     </div>
   )
@@ -380,12 +380,12 @@ function AdminCourseModal({ mode, onClose }) {
     <div className="admin-modal-backdrop">
       <section className="admin-course-modal">
         <button className="admin-modal-close" onClick={onClose} type="button">×</button>
-        <h2>{edit ? 'Chỉnh sửa môn học' : 'Thêm môn học mới'}</h2>
-        <label>Mã môn học<input placeholder="VD: CEA201" defaultValue={edit ? 'CEA201' : ''} /></label>
-        <label>Tên môn học<input placeholder="VD: Computer Architecture" defaultValue={edit ? 'Computer Architecture' : ''} /></label>
-        <label>Học kỳ<input placeholder="VD: Kỳ 3" defaultValue={edit ? 'Kỳ 3' : ''} /></label>
-        <label>Ngành<input placeholder="VD: SE" defaultValue={edit ? 'SE' : ''} /></label>
-        <footer><button onClick={onClose} type="button">Hủy</button><button className="dark-button" type="button">{edit ? 'Cập nhật' : 'Thêm môn học'}</button></footer>
+        <h2>{edit ? 'Edit Subject' : 'Add New Subject'}</h2>
+        <label>Course Code<input placeholder="e.g. CEA201" defaultValue={edit ? 'CEA201' : ''} /></label>
+        <label>Course Name<input placeholder="e.g. Computer Architecture" defaultValue={edit ? 'Computer Architecture' : ''} /></label>
+        <label>Semester<input placeholder="e.g. Semester 3" defaultValue={edit ? 'Semester 3' : ''} /></label>
+        <label>Major<input placeholder="e.g. SE" defaultValue={edit ? 'SE' : ''} /></label>
+        <footer><button onClick={onClose} type="button">Cancel</button><button className="dark-button" type="button">{edit ? 'Update' : 'Add Subject'}</button></footer>
       </section>
     </div>
   )

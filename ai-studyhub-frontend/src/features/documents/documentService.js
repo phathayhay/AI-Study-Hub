@@ -33,9 +33,14 @@ export function moveDocument(id, folderId) {
 }
 
 export function uploadDocument(file, metadata) {
+  if (file instanceof FormData) {
+    return apiPost('/documents/upload', file)
+  }
   const form = new FormData()
   form.append('file', file)
-  form.append('request', JSON.stringify(metadata))
+  if (metadata) {
+    form.append('request', JSON.stringify(metadata))
+  }
   return apiPost('/documents/upload', form)
 }
 

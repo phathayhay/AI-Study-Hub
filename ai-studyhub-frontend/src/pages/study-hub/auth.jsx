@@ -1,345 +1,611 @@
 import { useEffect, useRef, useState } from 'react'
+import { 
+  Mail, Lock, User, ArrowLeft, MailOpen, Loader2, Sparkles, 
+  MessageSquare, CheckSquare, FileText, AlertCircle, Eye, EyeOff, ClipboardList, Check, Layers
+} from 'lucide-react'
 import Brand from '../../components/layout/Brand'
-import StudyHubIcon from '../../components/icons/StudyHubIcons'
-import { login, register, verifyEmail } from '../../features/auth/authService'
+import { login as apiLogin, register as apiRegister } from '../../services/authService'
+import { sendVerifyEmail, verifyEmail } from '../../features/auth/authService'
 
 export function LoginPage({ onLogin, onNavigate }) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(true)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const transition = useAuthTransition(onNavigate)
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setLoading(true)
-    setError('')
-    try {
-      onLogin(await login({ email: email.trim(), password }, remember))
-    } catch (requestError) {
-      setError(requestError.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
-    <AuthShell
-      description="Tiếp tục hành trình học tập của bạn với tài liệu, flashcard và trợ lý AI."
-      leaving={transition.leaving}
-      onBack={() => transition.to('explore')}
-      subtitle="Chào mừng trở lại!"
-      title="Đăng nhập"
-    >
-      <AuthCard onSubmit={handleSubmit}>
-        <Field
-          autoComplete="email"
-          icon="mail"
-          label="Email"
-          onChange={setEmail}
-          placeholder="name@fpt.edu.vn"
-          type="email"
-          value={email}
-        />
-        <Field
-          autoComplete="current-password"
-          icon="lock"
-          label="Mật khẩu"
-          onChange={setPassword}
-          placeholder="Nhập mật khẩu"
-          revealable
-          type="password"
-          value={password}
-        />
-        <div className="auth-row">
-          <label className="auth-checkbox">
-            <input
-              id="remember"
-              name="remember"
-              checked={remember}
-              onChange={(event) => setRemember(event.target.checked)}
-              type="checkbox"
-            />
-            <span>Ghi nhớ đăng nhập</span>
-          </label>
-        </div>
-        {error && (
-          <p className="auth-error" role="alert">
-            <StudyHubIcon name="help" size={16} /> {error}
-          </p>
-        )}
-        <button className="auth-submit" disabled={loading} type="submit">
-          {loading ? (
-            <>
-              <span className="auth-spinner" /> Đang đăng nhập...
-            </>
-          ) : (
-            <>
-              Đăng nhập <span aria-hidden="true">→</span>
-            </>
-          )}
-        </button>
-        <p className="auth-switch">
-          Chưa có tài khoản?
-          <button onClick={() => transition.to('register')} type="button">
-            Đăng ký ngay
-          </button>
-        </p>
-      </AuthCard>
-    </AuthShell>
+    <AuthLayout 
+      initialMode="signin" 
+      onLogin={onLogin} 
+      onNavigate={onNavigate} 
+    />
   )
 }
 
 export function RegisterPage({ onNavigate, onRegister }) {
-  const [form, setForm] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const transition = useAuthTransition(onNavigate)
-
-  const setField = (name, value) => {
-    setForm((current) => ({ ...current, [name]: value }))
-  }
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    if (form.password !== form.confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp.')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-    try {
-      const session = await register({
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        email: form.email.trim(),
-        password: form.password,
-      })
-      onRegister(session)
-    } catch (requestError) {
-      setError(requestError.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
-    <AuthShell
-      compact
-      description="Tạo không gian học tập cá nhân và bắt đầu khai thác sức mạnh của AI."
-      leaving={transition.leaving}
-      onBack={() => transition.to('explore')}
-      subtitle="Bắt đầu hành trình học tập thông minh"
-      title="Tạo tài khoản"
-    >
-      <AuthCard compact onSubmit={handleSubmit}>
-        <div className="auth-form-grid">
-          <Field
-            autoComplete="family-name"
-            icon="user"
-            label="Họ và tên đệm"
-            onChange={(value) => setField('lastName', value)}
-            placeholder="Nguyễn Văn"
-            value={form.lastName}
-          />
-          <Field
-            autoComplete="given-name"
-            icon="user"
-            label="Tên"
-            onChange={(value) => setField('firstName', value)}
-            placeholder="A"
-            value={form.firstName}
-          />
-        </div>
-        <Field
-          autoComplete="email"
-          icon="mail"
-          label="Email"
-          onChange={(value) => setField('email', value)}
-          placeholder="name@fpt.edu.vn"
-          type="email"
-          value={form.email}
-        />
-        <div className="auth-form-grid">
-          <Field
-            autoComplete="new-password"
-            icon="lock"
-            label="Mật khẩu"
-            onChange={(value) => setField('password', value)}
-            placeholder="Tối thiểu 8 ký tự"
-            revealable
-            type="password"
-            value={form.password}
-          />
-          <Field
-            autoComplete="new-password"
-            icon="lock"
-            label="Xác nhận mật khẩu"
-            onChange={(value) => setField('confirmPassword', value)}
-            placeholder="Nhập lại mật khẩu"
-            revealable
-            type="password"
-            value={form.confirmPassword}
-          />
-        </div>
-        {error && (
-          <p className="auth-error" role="alert">
-            <StudyHubIcon name="help" size={16} /> {error}
-          </p>
-        )}
-        <button className="auth-submit" disabled={loading} type="submit">
-          {loading ? (
-            <>
-              <span className="auth-spinner" /> Đang đăng ký...
-            </>
-          ) : (
-            <>
-              Tạo tài khoản <span aria-hidden="true">→</span>
-            </>
-          )}
-        </button>
-        <p className="auth-switch">
-          Đã có tài khoản?
-          <button onClick={() => transition.to('login')} type="button">
-            Đăng nhập
-          </button>
-        </p>
-      </AuthCard>
-    </AuthShell>
+    <AuthLayout 
+      initialMode="signup" 
+      onNavigate={onNavigate} 
+      onRegister={onRegister}
+    />
   )
 }
 
-function AuthShell({ children, compact = false, description, leaving, onBack, subtitle, title }) {
-  return (
-    <main className={`auth-page ${compact ? 'auth-page--compact' : ''} ${leaving ? 'is-leaving' : ''}`}>
-      <div className="auth-orb auth-orb--one" />
-      <div className="auth-orb auth-orb--two" />
+export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
+  const [mode, setMode] = useState(initialMode) // 'signin', 'signup', 'verify-email'
+  const [emailUser, setEmailUser] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
-      <section className="auth-showcase" aria-hidden="true">
-        <div className="auth-showcase__brand">
-          <Brand compact />
+  const handleToggleMode = (newMode) => {
+    setError('')
+    setSuccess('')
+    setMode(newMode)
+    if (onNavigate) {
+      onNavigate(newMode === 'signup' ? 'register' : 'login')
+    }
+  }
+
+  return (
+    <main className="h-screen overflow-hidden bg-slate-50 dark:bg-[#0f172a] flex flex-col lg:flex-row font-sans transition-colors duration-300">
+      <style>{`
+        @keyframes authFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-auth-fade-in {
+          animation: authFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
+
+      {/* Hero Section (Left Column) */}
+      <section className="relative hidden lg:flex w-full lg:w-[42%] bg-[#0a0f1d] flex-col justify-between p-8 lg:p-10 text-white lg:h-full overflow-y-auto border-r border-slate-800/50">
+        {/* Glow Blobs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-[120px] animate-pulse duration-[8000ms]" />
+          <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-600/15 rounded-full blur-[120px] animate-pulse duration-[6000ms]" />
+          <div className="absolute top-1/3 left-1/4 w-80 h-80 bg-violet-600/10 rounded-full blur-[100px]" />
         </div>
-        <div className="auth-showcase__content">
-          <span className="auth-eyebrow">
-            <StudyHubIcon name="sparkle" size={16} /> Học thông minh hơn mỗi ngày
+
+        {/* Brand Header */}
+        <div className="relative z-10">
+          <Brand compact={false} />
+        </div>
+
+        {/* Main Marketing / Showcase Content */}
+        <div className="relative z-10 my-auto py-8 lg:py-0 flex flex-col gap-6 max-w-lg">
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300 tracking-wide w-fit">
+            <Sparkles className="w-3.5 h-3.5" /> Learn smarter every day
           </span>
-          <h2>
-            Biến tài liệu thành<br />
-            <strong>kiến thức của bạn.</strong>
+
+          <h2 className="text-3xl lg:text-4xl font-jakarta font-extrabold leading-tight text-white select-none">
+            Turn documents into<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-300 to-white">
+              your knowledge.
+            </span>
           </h2>
-          <p>{description}</p>
-          <div className="auth-feature-list">
-            <span>
-              <StudyHubIcon name="message" size={18} /> Trò chuyện với tài liệu bằng AI
-            </span>
-            <span>
-              <StudyHubIcon name="card" size={18} /> Tạo flashcard và quiz tức thì
-            </span>
-            <span>
-              <StudyHubIcon name="folder" size={18} /> Quản lý học liệu tập trung
-            </span>
+          
+          <p className="text-slate-400 text-sm lg:text-base leading-relaxed">
+            Create a personal study space powered by advanced AI. Chat with documents, auto-generate quizzes, and review using smart flashcards.
+          </p>
+
+          <div className="flex flex-col gap-4 mt-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm text-slate-200">Interactive AI Tutor</h4>
+                <p className="text-xs text-slate-400 mt-0.5">Ask questions and get instant summaries from any paper or presentation.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3.5">
+              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm text-slate-200">Automatic Study Materials</h4>
+                <p className="text-xs text-slate-400 mt-0.5">Generate high-quality multiple choice questions and review decks with one click.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3.5">
+              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 shrink-0">
+                <Layers className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm text-slate-200">Smart Storage Hub</h4>
+                <p className="text-xs text-slate-400 mt-0.5">Keep all your slides, notes, and references organized in custom folders.</p>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="auth-showcase__quote">
-          <span>"</span>
-          <p>Mỗi phiên học đều có thể trở nên rõ ràng và thú vị hơn.</p>
+
+        {/* Footer Quote */}
+        <div className="relative z-10 border-t border-slate-800/40 pt-4 hidden lg:block">
+          <p className="text-xs text-slate-500 italic">
+            "Every study session can become clearer, faster, and more engaging."
+          </p>
         </div>
       </section>
 
-      <section className="auth-panel">
-        <div className="auth-panel__inner">
-          <div className="auth-mobile-brand">
-            <Brand compact />
+      {/* Form / Interactive Section (Right Column) */}
+      <section className="w-full lg:w-[58%] flex flex-col justify-center overflow-y-auto h-full py-6 px-6 lg:px-16 xl:px-24">
+        <div className="w-full max-w-md mx-auto animate-auth-fade-in">
+          
+          {/* Header section (switches based on mode) */}
+          <div className="mb-5">
+            {mode === 'signin' && (
+              <>
+                <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Sign In</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Welcome back! Access your smart study workspace.</p>
+              </>
+            )}
+            {mode === 'signup' && (
+              <>
+                <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Create Account</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Start your smart learning journey today.</p>
+              </>
+            )}
+            {mode === 'verify-email' && (
+              <>
+                <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Check your inbox</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Verify your email to complete registration.</p>
+              </>
+            )}
           </div>
-          <header className="auth-heading">
-            <span className="auth-heading__icon">
-              <StudyHubIcon name="book" size={22} />
-            </span>
-            <h1>{title}</h1>
-            <p>{subtitle}</p>
-          </header>
-          {children}
-          <button className="auth-back" onClick={onBack} type="button">
-            <StudyHubIcon name="arrow-left" size={16} /> Quay về trang chủ
-          </button>
+
+          {/* Feedback alerts */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 rounded-xl text-red-600 dark:text-red-400 text-sm flex gap-3 items-start animate-[shake_0.4s_ease-in-out]">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/30 rounded-xl text-emerald-600 dark:text-emerald-400 text-sm flex gap-3 items-start">
+              <Check className="w-5 h-5 shrink-0 mt-0.5" />
+              <span>{success}</span>
+            </div>
+          )}
+
+          {/* Forms switcher */}
+          {mode === 'signin' && (
+            <SignInForm 
+              onLogin={onLogin}
+              onLoading={setLoading}
+              onError={setError}
+              onToggleMode={handleToggleMode}
+              loading={loading}
+            />
+          )}
+
+          {mode === 'signup' && (
+            <SignUpForm 
+              onRegisterSuccess={(email) => {
+                setEmailUser(email)
+                setMode('verify-email')
+              }}
+              onLoading={setLoading}
+              onError={setError}
+              onToggleMode={handleToggleMode}
+              loading={loading}
+            />
+          )}
+
+          {mode === 'verify-email' && (
+            <VerifyEmailView 
+              email={emailUser}
+              onBack={() => handleToggleMode('signin')}
+              onError={setError}
+              onSuccess={setSuccess}
+            />
+          )}
+
+          {/* Back Home link */}
+          <div className="mt-4 border-t border-slate-100 dark:border-slate-800/60 pt-4 text-center">
+            <button 
+              onClick={() => onNavigate?.('explore')}
+              className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Home
+            </button>
+          </div>
+
         </div>
       </section>
     </main>
   )
 }
 
-function AuthCard({ children, compact = false, onSubmit }) {
+/* INPUT FIELD SUB-COMPONENT */
+function InputField({
+  label,
+  icon: Icon,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+  autoComplete,
+  required = true,
+  revealable = false,
+  maxLength,
+  minLength
+}) {
+  const [showPassword, setShowPassword] = useState(false)
+  const inputType = revealable && showPassword ? 'text' : type
+
   return (
-    <form className={`auth-card ${compact ? 'auth-card--compact' : ''}`} onSubmit={onSubmit}>
-      {children}
+    <div className="flex flex-col gap-1.5 w-full">
+      <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+        {label}
+      </label>
+      <div className="relative flex items-center">
+        {Icon && (
+          <span className="absolute left-4 text-slate-400 dark:text-slate-500 pointer-events-none">
+            <Icon className="w-4.5 h-4.5" />
+          </span>
+        )}
+        <input
+          type={inputType}
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete={autoComplete}
+          required={required}
+          maxLength={maxLength}
+          minLength={minLength}
+          className={`w-full ${Icon ? 'pl-11' : 'px-4'} ${revealable ? 'pr-11' : 'px-4'} py-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all duration-200`}
+        />
+        {revealable && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+          >
+            {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* SOCIAL LOGIN (GOOGLE) */
+function SocialLogin() {
+  const handleGoogleClick = () => {
+    window.showToast?.('Google authentication is integrated in production mode.', 'info')
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-3">
+      <div className="relative flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-slate-200 dark:border-slate-800/80"></div>
+        </div>
+        <span className="relative px-3 bg-white dark:bg-[#0f172a] text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">
+          or check in with
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={handleGoogleClick}
+        className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-medium text-sm hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200 shadow-sm"
+      >
+        <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+        </svg>
+        <span>Continue with Google</span>
+      </button>
+    </div>
+  )
+}
+
+/* SIGN IN FORM SUB-COMPONENT */
+function SignInForm({ onLogin, onLoading, onError, onToggleMode, loading }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(true)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    onLoading(true)
+    onError('')
+    try {
+      const response = await apiLogin({ email: email.trim(), password })
+      onLogin(response, remember)
+    } catch (err) {
+      onError(err.message || 'Incorrect email or password.')
+    } finally {
+      onLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+      <InputField 
+        label="Email"
+        icon={Mail}
+        type="email"
+        placeholder="name@fpt.edu.vn"
+        value={email}
+        onChange={setEmail}
+        autoComplete="email"
+      />
+
+      <InputField 
+        label="Password"
+        icon={Lock}
+        type="password"
+        placeholder="Enter your password"
+        value={password}
+        onChange={setPassword}
+        autoComplete="current-password"
+        revealable
+      />
+
+      <div className="flex items-center justify-between mt-1">
+        <label className="flex items-center gap-2 select-none cursor-pointer">
+          <input 
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            className="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500/20"
+          />
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Remember me</span>
+        </label>
+        
+        <button 
+          type="button" 
+          onClick={() => window.showToast?.('Please contact support to reset your password.', 'info')}
+          className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+        >
+          Forgot password?
+        </button>
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/60 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 cursor-pointer disabled:cursor-not-allowed"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Signing In...</span>
+          </>
+        ) : (
+          <span>Sign In</span>
+        )}
+      </button>
+
+      <SocialLogin />
+
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-4">
+        Don't have an account?{' '}
+        <button
+          type="button"
+          onClick={() => onToggleMode('signup')}
+          className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+        >
+          Sign up now
+        </button>
+      </p>
     </form>
   )
 }
 
-function Field({
-  autoComplete,
-  icon,
-  label,
-  onChange,
-  placeholder,
-  revealable = false,
-  type = 'text',
-  value,
-}) {
-  const [visible, setVisible] = useState(false)
-  const inputType = revealable && visible ? 'text' : type
+/* SIGN UP FORM SUB-COMPONENT */
+function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loading }) {
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  })
+
+  const updateField = (key, val) => {
+    setForm(prev => ({ ...prev, [key]: val }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (form.password.length < 6) {
+      onError('Password must be at least 6 characters long.')
+      return
+    }
+    if (form.password !== form.confirmPassword) {
+      onError('Passwords do not match.')
+      return
+    }
+
+    onLoading(true)
+    onError('')
+    try {
+      await apiRegister({
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        password: form.password
+      })
+      onRegisterSuccess(form.email.trim())
+    } catch (err) {
+      onError(err.message || 'Email already exists or invalid data.')
+    } finally {
+      onLoading(false)
+    }
+  }
 
   return (
-    <label className="field">
-      <span className="field__label">{label}</span>
-      <span className="field__control">
-        <StudyHubIcon name={icon} size={18} />
-        <input
-          id={autoComplete}
-          name={autoComplete}
-          autoComplete={autoComplete}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          required
-          type={inputType}
-          value={value}
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <InputField 
+          label="First Name"
+          icon={User}
+          placeholder="John"
+          value={form.firstName}
+          onChange={(val) => updateField('firstName', val)}
+          autoComplete="given-name"
+          maxLength={50}
         />
-        {revealable && (
-          <button
-            aria-label={visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-            className="field__reveal"
-            onClick={() => setVisible((current) => !current)}
-            type="button"
-          >
-            <StudyHubIcon name="eye" size={18} />
-          </button>
+        <InputField 
+          label="Last Name"
+          icon={User}
+          placeholder="Doe"
+          value={form.lastName}
+          onChange={(val) => updateField('lastName', val)}
+          autoComplete="family-name"
+          maxLength={50}
+        />
+      </div>
+
+      <InputField 
+        label="Email Address"
+        icon={Mail}
+        type="email"
+        placeholder="name@fpt.edu.vn"
+        value={form.email}
+        onChange={(val) => updateField('email', val)}
+        autoComplete="email"
+        maxLength={150}
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <InputField 
+          label="Password"
+          icon={Lock}
+          type="password"
+          placeholder="Min 6 chars"
+          value={form.password}
+          onChange={(val) => updateField('password', val)}
+          autoComplete="new-password"
+          revealable
+          minLength={6}
+        />
+        <InputField 
+          label="Confirm"
+          icon={Lock}
+          type="password"
+          placeholder="Re-enter password"
+          value={form.confirmPassword}
+          onChange={(val) => updateField('confirmPassword', val)}
+          autoComplete="new-password"
+          revealable
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/60 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 cursor-pointer disabled:cursor-not-allowed mt-2"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Creating account...</span>
+          </>
+        ) : (
+          <span>Create Account</span>
         )}
-      </span>
-    </label>
+      </button>
+
+      <SocialLogin />
+
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-4">
+        Already have an account?{' '}
+        <button
+          type="button"
+          onClick={() => onToggleMode('signin')}
+          className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+        >
+          Sign In
+        </button>
+      </p>
+    </form>
   )
 }
 
-function useAuthTransition(onNavigate) {
-  const [leaving, setLeaving] = useState(false)
-  const timerRef = useRef(null)
+/* EMAIL VERIFICATION SUB-COMPONENT */
+function VerifyEmailView({ email, onBack, onError, onSuccess }) {
+  const [timer, setTimer] = useState(60)
+  const [resending, setResending] = useState(false)
 
-  useEffect(() => () => window.clearTimeout(timerRef.current), [])
+  useEffect(() => {
+    let interval = null
+    if (timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1)
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [timer])
 
-  const to = (route) => {
-    if (leaving) return
-    setLeaving(true)
-    timerRef.current = window.setTimeout(() => onNavigate(route), 240)
+  const handleResend = async () => {
+    if (timer > 0 || resending) return
+    setResending(true)
+    onError('')
+    onSuccess('')
+    try {
+      await sendVerifyEmail(email)
+      onSuccess(`A fresh verification link has been sent to ${email}`)
+      setTimer(60)
+    } catch (err) {
+      onError(err.message || 'Failed to resend verification link.')
+    } finally {
+      setResending(false)
+    }
   }
 
-  return { leaving, to }
+  return (
+    <div className="flex flex-col text-center py-4">
+      <div className="mx-auto w-16 h-16 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-6 shadow-inner relative">
+        <div className="absolute inset-0 rounded-2xl bg-indigo-400/10 dark:bg-indigo-400/5 animate-ping duration-1500" />
+        <MailOpen className="w-8 h-8 relative z-10" />
+      </div>
+
+      <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+        Check your inbox
+      </h3>
+      
+      <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mx-auto mb-8">
+        We've dispatched a secure verification link to:<br />
+        <strong className="text-slate-800 dark:text-slate-200 break-all">{email || 'your email'}</strong>.<br />
+        Please click the link to activate your student workspace.
+      </p>
+
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={timer > 0 || resending}
+          className="w-full flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-200 disabled:text-slate-400 dark:disabled:text-slate-600 disabled:bg-slate-50/50 dark:disabled:bg-slate-950/20 py-3 px-4 rounded-xl font-semibold text-sm transition-all cursor-pointer disabled:cursor-not-allowed"
+        >
+          {resending ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+              <span>Resending link...</span>
+            </>
+          ) : timer > 0 ? (
+            <span>Resend Link in {timer}s</span>
+          ) : (
+            <span>Resend Link</span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={onBack}
+          className="w-full bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all cursor-pointer"
+        >
+          Back to Sign In
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export function VerifyEmailPage({ onNavigate }) {
@@ -371,90 +637,109 @@ export function VerifyEmailPage({ onNavigate }) {
       })
   }, [])
 
-  const transition = useAuthTransition(onNavigate)
-
   return (
-    <AuthShell
-      description="Cảm ơn bạn đã lựa chọn AI Study Hub FPT. Hãy kích hoạt tài khoản để tiếp tục."
-      leaving={transition.leaving}
-      onBack={() => transition.to('explore')}
-      subtitle="Xác thực tài khoản của bạn"
-      title="Xác nhận Email"
-    >
-      <div className="auth-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
-        {status === 'loading' && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-            <span className="auth-spinner" style={{ width: '40px', height: '40px', borderWidth: '4px' }} />
-            <p style={{ color: 'var(--text-secondary, #475569)', fontSize: '15px' }}>
-              Đang xác thực tài khoản của bạn, vui lòng đợi trong giây lát...
-            </p>
-          </div>
-        )}
+    <main className="h-screen overflow-hidden bg-slate-50 dark:bg-[#0f172a] flex flex-col lg:flex-row font-sans transition-colors duration-300">
+      <style>{`
+        @keyframes authFadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-auth-fade-in {
+          animation: authFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
 
-        {status === 'success' && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: '#dcfce7',
-              color: '#15803d',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '32px'
-            }}>
-              ✓
+      {/* Hero Section (Left Column) */}
+      <section className="relative hidden lg:flex w-full lg:w-[42%] bg-[#0a0f1d] flex-col justify-between p-8 lg:p-10 text-white lg:h-full overflow-y-auto border-r border-slate-800/50">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-[120px]" />
+          <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-blue-600/15 rounded-full blur-[120px]" />
+        </div>
+        <div className="relative z-10">
+          <Brand compact={false} />
+        </div>
+        <div className="relative z-10 my-auto py-8 flex flex-col gap-6 max-w-lg">
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300 tracking-wide w-fit">
+            <Sparkles className="w-3.5 h-3.5" /> Learn smarter every day
+          </span>
+          <h2 className="text-3xl lg:text-4xl font-jakarta font-extrabold leading-tight text-white">
+            Verify your<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-300 to-white">
+              account activation.
+            </span>
+          </h2>
+          <p className="text-slate-400 text-sm">
+            You're just one step away from joining your personal study space powered by advanced AI.
+          </p>
+        </div>
+        <div className="relative z-10 border-t border-slate-800/40 pt-4 hidden lg:block">
+          <p className="text-xs text-slate-500 italic">
+            "Every study session can become clearer, faster, and more engaging."
+          </p>
+        </div>
+      </section>
+
+      {/* Form / Interactive Section (Right Column) */}
+      <section className="w-full lg:w-[58%] flex flex-col justify-center overflow-y-auto h-full py-6 px-6 lg:px-16 xl:px-24">
+        <div className="w-full max-w-md mx-auto animate-auth-fade-in text-center">
+          
+          {status === 'loading' && (
+            <div className="flex flex-col items-center gap-4 py-8">
+              <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Verifying account...</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Please wait a moment while we verify your email.
+              </p>
             </div>
-            <h3 style={{ color: 'var(--text-primary, #0f172a)', fontSize: '18px', fontWeight: 600 }}>
-              Xác thực thành công!
-            </h3>
-            <p style={{ color: 'var(--text-secondary, #475569)', fontSize: '14px', lineHeight: 1.5 }}>
-              {message}
-            </p>
-            <button
-              className="auth-submit"
-              onClick={() => transition.to('login')}
-              type="button"
-              style={{ marginTop: '10px', width: '100%' }}
+          )}
+
+          {status === 'success' && (
+            <div className="flex flex-col items-center gap-5 py-8">
+              <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 shadow-inner">
+                <Check className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Verification successful!</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                {message || 'Your account has been successfully verified.'}
+              </p>
+              <button
+                onClick={() => onNavigate('login')}
+                className="w-full mt-4 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all shadow-md cursor-pointer"
+              >
+                Sign In Now →
+              </button>
+            </div>
+          )}
+
+          {status === 'error' && (
+            <div className="flex flex-col items-center gap-5 py-8">
+              <div className="w-16 h-16 bg-red-50 dark:bg-red-950/40 rounded-2xl flex items-center justify-center text-red-600 dark:text-red-400 shadow-inner">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Verification failed</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                {message || 'The verification link is invalid or expired.'}
+              </p>
+              <button
+                onClick={() => onNavigate('explore')}
+                className="w-full mt-4 flex items-center justify-center bg-slate-950 hover:bg-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all shadow-md cursor-pointer"
+              >
+                Back to Home
+              </button>
+            </div>
+          )}
+
+          <div className="mt-8 border-t border-slate-100 dark:border-slate-800/60 pt-4 text-center">
+            <button 
+              onClick={() => onNavigate('explore')}
+              className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
             >
-              Đăng nhập ngay <span aria-hidden="true">→</span>
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to Home
             </button>
           </div>
-        )}
 
-        {status === 'error' && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: '#fee2e2',
-              color: '#b91c1c',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '32px'
-            }}>
-              ×
-            </div>
-            <h3 style={{ color: 'var(--text-primary, #0f172a)', fontSize: '18px', fontWeight: 600 }}>
-              Xác thực thất bại
-            </h3>
-            <p style={{ color: '#b91c1c', fontSize: '14px', lineHeight: 1.5 }}>
-              {message}
-            </p>
-            <button
-              className="auth-submit"
-              onClick={() => transition.to('explore')}
-              type="button"
-              style={{ marginTop: '10px', width: '100%', backgroundColor: 'var(--text-secondary, #475569)' }}
-            >
-              Quay lại Trang chủ
-            </button>
-          </div>
-        )}
-      </div>
-    </AuthShell>
+        </div>
+      </section>
+    </main>
   )
 }

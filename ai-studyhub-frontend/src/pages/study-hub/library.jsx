@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import StudyHubIcon from '../../components/icons/StudyHubIcons'
+import StudyHubIcon, { getFileIconName, getFileIconColor } from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { libraryTabs } from './config'
 import { 
@@ -44,11 +44,7 @@ function getItemGroup(dateStr) {
 
 function mapDoc(doc) {
   const dateObj = doc.createdAt ? new Date(doc.createdAt) : new Date()
-  const monthNames = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
-  const month = monthNames[dateObj.getMonth()];
-  const day = dateObj.getDate();
-  const year = dateObj.getFullYear();
-  const displayDate = `${month} ${day < 10 ? '0' + day : day}, ${year}`;
+  const displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
 
   let docName = doc.title || doc.fileName || 'Untitled';
   try {
@@ -71,6 +67,7 @@ function mapDoc(doc) {
     time: displayDate,
     shared: doc.visibility === 'PUBLIC',
     public: doc.visibility === 'PUBLIC',
+    visibility: doc.visibility,
     favorite: false,
     fileUrl: doc.fileUrl || '',
     folderId: doc.folderId,
@@ -137,11 +134,7 @@ export function LibraryPage({
       
       const mappedFolders = folderList.map(f => {
         const dateObj = f.createdAt ? new Date(f.createdAt) : new Date()
-        const monthNames = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
-        const month = monthNames[dateObj.getMonth()];
-        const day = dateObj.getDate();
-        const year = dateObj.getFullYear();
-        const displayDate = `${month} ${day < 10 ? '0' + day : day}, ${year}`;
+        const displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
         return {
           id: f.id,
           name: f.folderName || f.name || 'Untitled Folder',
@@ -181,7 +174,7 @@ export function LibraryPage({
 
   useEffect(() => {
     if (initialFolderId) {
-      handleSelectFolder({ id: initialFolderId, name: 'Đang tải...' })
+      handleSelectFolder({ id: initialFolderId, name: 'Loading...' })
       onClearInitialFolderId?.()
     }
   }, [initialFolderId])
@@ -220,36 +213,36 @@ export function LibraryPage({
   }
 
   const handleAddFolder = () => {
-    const name = window.prompt('Nhập tên thư mục mới:')?.trim()
+    const name = window.prompt('Enter new folder name:')?.trim()
     if (!name) return
     setLoading(true)
     createFolder(name)
       .then(() => {
         loadLibraryData()
         onTabChange('folders')
-        window.showToast?.('Đã tạo thư mục mới thành công', 'success')
+        window.showToast?.('Folder created successfully', 'success')
       })
       .catch((err) => {
         console.error(err)
         setLoading(false)
-        window.showToast?.('Tạo thư mục thất bại', 'error')
+        window.showToast?.('Failed to create folder', 'error')
       })
   }
 
   const handleAddSubfolder = (parentFolder) => {
-    const name = window.prompt(`Nhập tên thư mục con trong "${parentFolder.name}":`)
+    const name = window.prompt(`Enter subfolder name in "${parentFolder.name}":`)
     if (!name?.trim()) return
     setFolderLoading(true)
     createFolder(name.trim(), parentFolder.id)
       .then(() => {
         handleSelectFolder(parentFolder)
         loadLibraryData()
-        window.showToast?.('Đã tạo thư mục con thành công', 'success')
+        window.showToast?.('Subfolder created successfully', 'success')
       })
       .catch((err) => {
         console.error(err)
         setFolderLoading(false)
-        window.showToast?.('Tạo thư mục con thất bại', 'error')
+        window.showToast?.('Failed to create subfolder', 'error')
       })
   }
 
@@ -260,10 +253,10 @@ export function LibraryPage({
       const next = new Set(prev)
       if (next.has(key)) {
         next.delete(key)
-        window.showToast?.('Đã bỏ ghim tài nguyên', 'success')
+        window.showToast?.('Item unpinned successfully', 'success')
       } else {
         next.add(key)
-        window.showToast?.('Đã ghim tài nguyên thành công', 'success')
+        window.showToast?.('Item pinned successfully', 'success')
       }
       localStorage.setItem('pinnedItems', JSON.stringify([...next]))
       return next
@@ -273,7 +266,7 @@ export function LibraryPage({
   const handleShareItem = (item) => {
     const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
     if (isFolder) {
-      window.showToast?.('Không hỗ trợ chia sẻ thư mục', 'info')
+      window.showToast?.('Sharing folders is not supported', 'info')
       return
     }
     setShareItem(item)
@@ -281,7 +274,7 @@ export function LibraryPage({
 
   const handleRenameItem = (item) => {
     const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
-    const nextName = window.prompt(`Nhập tên ${isFolder ? 'thư mục' : 'tài liệu'} mới:`, item.name)?.trim()
+    const nextName = window.prompt(`Enter new ${isFolder ? 'folder' : 'document'} name:`, item.name)?.trim()
     if (!nextName) return
 
     if (isFolder) {
@@ -292,12 +285,12 @@ export function LibraryPage({
           if (selectedFolder && selectedFolder.id === item.id) {
             setSelectedFolder({ ...selectedFolder, name: nextName })
           }
-          window.showToast?.('Đổi tên thư mục thành công', 'success')
+          window.showToast?.('Folder renamed successfully', 'success')
         })
         .catch((err) => {
           console.error(err)
           setLoading(false)
-          window.showToast?.('Đổi tên thư mục thất bại', 'error')
+          window.showToast?.('Failed to rename folder', 'error')
         })
     } else {
       try {
@@ -309,10 +302,10 @@ export function LibraryPage({
         if (selectedFolder) {
           handleSelectFolder(selectedFolder)
         }
-        window.showToast?.('Đổi tên tài liệu thành công', 'success')
+        window.showToast?.('Document renamed successfully', 'success')
       } catch (err) {
         console.error('Failed to rename document locally', err)
-        window.showToast?.('Đổi tên tài liệu thất bại', 'error')
+        window.showToast?.('Failed to rename document', 'error')
       }
     }
     setOpenFileMenuId(null)
@@ -320,7 +313,7 @@ export function LibraryPage({
   }
 
   const handleDeleteFolder = (folder) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa thư mục "${folder.name}" không?`)) return
+    if (!window.confirm(`Are you sure you want to delete the folder "${folder.name}"?`)) return
     setLoading(true)
     deleteFolder(folder.id)
       .then(() => {
@@ -330,18 +323,23 @@ export function LibraryPage({
           setSelectedFolder(null)
           setSelectedFolderDetails(null)
         }
-        window.showToast?.('Đã xóa thư mục thành công', 'success')
+        window.showToast?.('Folder deleted successfully', 'success')
       })
       .catch((err) => {
         console.error(err)
         setLoading(false)
-        window.showToast?.('Xóa thư mục thất bại', 'error')
+        window.showToast?.('Failed to delete folder', 'error')
       })
     setOpenFolderMenuId(null)
   }
 
   const handleDeleteLibraryFile = (file) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${file.name}" không?`)) return
+    setOpenFileMenuId(null)
+    if (!file.id) {
+      window.showToast?.('Cannot delete: document ID is missing', 'error')
+      return
+    }
+    if (!window.confirm(`Are you sure you want to delete the document "${file.name}"?`)) return
     setLoading(true)
     deleteDocument(file.id)
       .then(() => {
@@ -350,32 +348,37 @@ export function LibraryPage({
         if (selectedFolder) {
           handleSelectFolder(selectedFolder)
         }
-        window.showToast?.('Đã xóa tài liệu thành công', 'success')
+        window.showToast?.('Document deleted successfully', 'success')
       })
       .catch((err) => {
-        console.error(err)
+        console.error('[Delete Document Error]', err)
         setLoading(false)
-        window.showToast?.('Xóa tài liệu thất bại', 'error')
+        const msg = err?.data?.message || err?.message || 'Failed to delete document'
+        window.showToast?.(`${msg}`, 'error')
       })
-    setOpenFileMenuId(null)
   }
 
   const handleDeleteFolderFile = (folder, file) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa tài liệu "${file.name}" khỏi thư mục không?`)) return
+    setOpenFileMenuId(null)
+    if (!file.id) {
+      window.showToast?.('Cannot delete: document ID is missing', 'error')
+      return
+    }
+    if (!window.confirm(`Are you sure you want to delete the document "${file.name}"?`)) return
     setLoading(true)
     deleteDocument(file.id)
       .then(() => {
         onRemoveRecentItem?.(file.id)
         handleSelectFolder(folder)
         loadLibraryData()
-        window.showToast?.('Đã xóa tài liệu thành công', 'success')
+        window.showToast?.('Document deleted successfully', 'success')
       })
       .catch((err) => {
-        console.error(err)
+        console.error('[Delete Document Error]', err)
         setLoading(false)
-        window.showToast?.('Xóa tài liệu khỏi thư mục thất bại', 'error')
+        const msg = err?.data?.message || err?.message || 'Failed to delete document'
+        window.showToast?.(`${msg}`, 'error')
       })
-    setOpenFileMenuId(null)
   }
 
   const handleDeleteItem = (item) => {
@@ -396,7 +399,7 @@ export function LibraryPage({
     const isFolder = moveItem.isFolder || moveItem.type === 'folder' || moveItem.kind === 'folder'
     
     if (isFolder && destFolderId === moveItem.id) {
-      window.showToast?.('Không thể di chuyển thư mục vào chính nó', 'error')
+      window.showToast?.('Cannot move folder into itself', 'error')
       return
     }
 
@@ -407,7 +410,7 @@ export function LibraryPage({
 
     movePromise
       .then(() => {
-        window.showToast?.('Di chuyển tài nguyên thành công', 'success')
+        window.showToast?.('Item moved successfully', 'success')
         setMoveItem(null)
         loadLibraryData()
         if (selectedFolder) {
@@ -416,7 +419,7 @@ export function LibraryPage({
       })
       .catch((err) => {
         console.error(err)
-        window.showToast?.('Di chuyển tài nguyên thất bại', 'error')
+        window.showToast?.('Failed to move item', 'error')
       })
       .finally(() => setLoading(false))
   }
@@ -432,6 +435,7 @@ export function LibraryPage({
         subject: item.subject || 'Document',
         content: '',
         fileUrl: item.fileUrl || '',
+        visibility: item.visibility,
       }
       onOpenFile?.(activeFile)
     }
@@ -541,6 +545,10 @@ export function LibraryPage({
       color: #4f46e5;
       background-color: #f0f0fb;
     }
+    .dark .hover-action-btn:hover {
+      color: #818cf8;
+      background-color: #334155;
+    }
     .file-action-menu button {
       display: flex;
       align-items: center;
@@ -566,26 +574,27 @@ export function LibraryPage({
   `
 
   return (
-    <div style={{ flex: 1, backgroundColor: '#fff', overflowY: 'auto' }}>
+    <div className="bg-white dark:bg-[#0f172a] transition-colors duration-300 ease-in-out" style={{ flex: 1, overflowY: 'auto' }}>
       <style>{customStyles}</style>
       <main style={{ maxWidth: '1100px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px', padding: '28px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justify: 'space-between', gap: '16px' }}>
-          <h1 style={{ fontSize: '22px', fontWeight: 600, color: '#0f172a', margin: 0, whiteSpace: 'nowrap' }}>
-            Hello, <span style={{ fontWeight: 700 }}>{user?.firstName || 'Sinh viên!'}</span>
+          <h1 className="text-slate-900 dark:text-white transition-colors duration-300 ease-in-out" style={{ fontSize: '22px', fontWeight: 600, margin: 0, whiteSpace: 'nowrap' }}>
+            Hello, <span style={{ fontWeight: 700 }}>{user?.firstName || 'Student!'}</span>
           </h1>
           
-          <div style={{ flex: 1, maxWidth: '520px', display: 'flex', alignItems: 'center', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0 14px', height: '38px', gap: '8px' }}>
+          <div className="bg-[#f8fafc] dark:bg-slate-800 border border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out" style={{ flex: 1, maxWidth: '520px', display: 'flex', alignItems: 'center', borderRadius: '8px', padding: '0 14px', height: '38px', gap: '8px' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             <input
               placeholder="Search by title or content type..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              style={{ border: 'none', outline: 'none', width: '100%', fontSize: '13.5px', color: '#0f172a', background: 'transparent' }}
+              className="text-slate-900 dark:text-white"
+              style={{ border: 'none', outline: 'none', width: '100%', fontSize: '13.5px', background: 'transparent' }}
             />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', whiteSpace: 'nowrap' }}>
-            <label style={{ fontSize: '13.5px', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <label className="text-slate-600 dark:text-slate-400" style={{ fontSize: '13.5px', display: 'flex', alignItems: 'center', gap: '4px' }}>
               Sort:&nbsp;
               <select
                 value={sortBy}
@@ -597,7 +606,7 @@ export function LibraryPage({
               </select>
             </label>
             {!selectedFolder && (
-              <button style={{ height: '34px', padding: '0 14px', backgroundColor: '#fff', color: '#4f46e5', border: '1.5px solid #818cf8', borderRadius: '8px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }} onClick={handleAddFolder} type="button">
+              <button className="bg-white dark:bg-[#1e293b] text-[#4f46e5] dark:text-[#a5b4fc] border border-[#818cf8] dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-300 ease-in-out" style={{ height: '34px', padding: '0 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }} onClick={handleAddFolder} type="button">
                 <StudyHubIcon name="plus" size={14} /> Folder
               </button>
             )}
@@ -607,7 +616,7 @@ export function LibraryPage({
         <div style={{ flex: 1 }}>
         {loading ? (
           <div style={{ padding: '64px', textAlign: 'center', color: '#64748b' }}>
-            Đang tải dữ liệu...
+            Loading data...
           </div>
         ) : activeTab === 'folders' ? (
           selectedFolder ? (
@@ -764,7 +773,7 @@ function FolderFilesView({
   if (loading) {
     return (
       <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-        Đang tải dữ liệu...
+        Loading data...
       </div>
     )
   }
@@ -772,11 +781,7 @@ function FolderFilesView({
   const combined = [
     ...subfolders.map(sf => {
       const dateObj = sf.createdAt ? new Date(sf.createdAt) : new Date()
-      const monthNames = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "Jun.", "Jul.", "Aug.", "Sep.", "Oct.", "Nov.", "Dec."];
-      const month = monthNames[dateObj.getMonth()];
-      const day = dateObj.getDate();
-      const year = dateObj.getFullYear();
-      const displayDate = `${month} ${day < 10 ? '0' + day : day}, ${year}`;
+      const displayDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
       return {
         id: sf.id,
         name: sf.folderName || sf.name || 'Untitled Folder',
@@ -818,13 +823,14 @@ function FolderFilesView({
           Home
         </button>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-        <span style={{ fontSize: '13.5px', fontWeight: 500, color: '#0f172a' }}>{folder.name}</span>
+        <span className="text-slate-900 dark:text-white" style={{ fontSize: '13.5px', fontWeight: 500 }}>{folder.name}</span>
         {onAddSubfolder && (
           <button
             onClick={onAddSubfolder}
             type="button"
-            title="Tạo thư mục con"
-            style={{ marginLeft: 'auto', height: '32px', padding: '0 12px', backgroundColor: '#fff', color: '#4f46e5', border: '1.5px solid #818cf8', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
+            title="Create subfolder"
+            className="bg-white dark:bg-slate-800 text-[#4f46e5] dark:text-[#a5b4fc] border border-[#818cf8] dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors duration-300 ease-in-out"
+            style={{ marginLeft: 'auto', height: '32px', padding: '0 12px', borderRadius: '8px', fontSize: '12.5px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
           >
             <StudyHubIcon name="plus" size={13} />
             Folder
@@ -833,16 +839,16 @@ function FolderFilesView({
       </div>
 
       {/* Content card */}
-      <div style={{ border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff' }}>
+      <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out">
         {combined.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
-            Thư mục này trống
+            This folder is empty
           </div>
         ) : (
           grouped.map(({ label, items }) => (
             <div key={label}>
               {/* Group header row - lavender like Mindgrasp */}
-              <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+              <div className="bg-[#f0f0fb] dark:bg-slate-900 text-[#6366f1] dark:text-indigo-400 transition-colors duration-300 ease-in-out" style={{ padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, letterSpacing: '0.02em' }}>
                 {label}
               </div>
               {items.map((item) => {
@@ -887,120 +893,121 @@ function ActionableFileRow({
   isPinned
 }) {
   const isActualFolder = isFolder || file.type === 'folder' || file.kind === 'folder';
-  const [hovered, setHovered] = useState(false)
+  const fileRef = file.name.includes('.') ? file.name : file.subject;
+  const iconName = isActualFolder ? 'folder' : getFileIconName(fileRef);
+  const iconColor = isActualFolder ? '#818cf8' : getFileIconColor(fileRef);
+
   return (
     <div
-      style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '100%', backgroundColor: (hovered || openFileMenuId === file.id) ? '#f4f4fc' : '#fff', transition: 'background 0.15s', borderBottom: '1px solid #f0f0f8' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setHovered(false)
-        if (openFileMenuId === file.id) {
-          onToggleFileMenu(null)
-        }
-      }}
+      onClick={() => onOpenFile(file)}
+      className="group flex items-center py-3 px-4 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors cursor-pointer relative"
     >
-      <FileRow file={file} isFolder={isActualFolder} onClick={() => onOpenFile(file)} hovered={hovered} />
-      
-      {/* Inline Hover Action Buttons */}
-      {hovered && openFileMenuId !== file.id && (
-        <div style={{ position: 'absolute', right: '40px', display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: '#f4f4fc', paddingLeft: '8px', zIndex: 10 }}>
-          <button 
-            className="hover-action-btn" 
-            onClick={(e) => { e.stopPropagation(); onPin(file) }} 
-            type="button" 
-            title={isPinned ? 'Unpin' : 'Pin'} 
-            style={isPinned ? { color: '#6366f1', backgroundColor: '#f0f0fb' } : undefined}
-          >
-            <StudyHubIcon name="pin" size={15} />
-          </button>
-          <button 
-            className="hover-action-btn" 
-            onClick={(e) => { e.stopPropagation(); onMove(file) }} 
-            type="button" 
-            title="Move"
-          >
-            <StudyHubIcon name="move" size={15} />
-          </button>
-          <button 
-            className="hover-action-btn" 
-            onClick={(e) => { e.stopPropagation(); onDelete(file) }} 
-            type="button" 
-            title="Delete"
-          >
-            <StudyHubIcon name="trash" size={15} />
-          </button>
-          {!isActualFolder && (
-            <button 
-              className="hover-action-btn" 
-              onClick={(e) => { e.stopPropagation(); onShare(file) }} 
-              type="button" 
-              title="Share"
-            >
-              <StudyHubIcon name="share" size={15} />
-            </button>
-          )}
-          <button 
-            className="hover-action-btn" 
-            onClick={(e) => { e.stopPropagation(); onRename(file) }} 
-            type="button" 
-            title="Rename"
-          >
-            <StudyHubIcon name="edit" size={15} />
-          </button>
+      {/* Cột 1: Tên tài liệu */}
+      <div className="flex-1 min-w-0 flex items-center gap-3 pr-4">
+        <div style={{ color: iconColor }} className="flex-shrink-0 flex items-center justify-center">
+          <StudyHubIcon name={iconName} size={20} />
         </div>
-      )}
+        <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
+          {file.name}
+        </span>
+      </div>
 
-      {/* Ellipsis Menu Trigger */}
-      <button
-        className="more-btn"
-        onMouseEnter={() => onToggleFileMenu(file.id)}
-        onClick={(e) => { e.stopPropagation(); onToggleFileMenu(openFileMenuId === file.id ? null : file.id) }}
-        type="button"
-        style={{ 
-          position: 'absolute', 
-          right: '12px', 
-          background: 'transparent', 
-          border: 'none', 
-          color: (hovered || openFileMenuId === file.id) ? '#6366f1' : '#94a3b8', 
-          cursor: 'pointer', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center', 
-          padding: '6px', 
-          borderRadius: '6px', 
-          transition: 'color 0.15s',
-          zIndex: 11
-        }}
+      {/* Cột 2: Loại tài liệu */}
+      <span className="w-20 shrink-0 text-left text-sm text-slate-400 dark:text-slate-500 capitalize">
+        {isActualFolder ? 'folder' : 'session'}
+      </span>
+
+      {/* Cột 3: Hover Actions */}
+      <div 
+        className="w-40 shrink-0 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={(e) => e.stopPropagation()}
       >
-        <StudyHubIcon name="more-vertical" size={18} />
-      </button>
+        <button 
+          className="hover-action-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors" 
+          onClick={() => onPin(file)} 
+          type="button" 
+          title={isPinned ? 'Unpin' : 'Pin'} 
+          style={isPinned ? { color: '#6366f1' } : undefined}
+        >
+          <StudyHubIcon name="pin" size={15} />
+        </button>
+        <button 
+          className="hover-action-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors" 
+          onClick={() => onMove(file)} 
+          type="button" 
+          title="Move"
+        >
+          <StudyHubIcon name="move" size={15} />
+        </button>
+        <button 
+          className="hover-action-btn p-1 text-slate-400 hover:text-red-600 dark:text-slate-500 dark:hover:text-red-400 transition-colors" 
+          onClick={() => onDelete(file)} 
+          type="button" 
+          title="Delete"
+        >
+          <StudyHubIcon name="trash" size={15} />
+        </button>
+        {!isActualFolder && (
+          <button 
+            className="hover-action-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors" 
+            onClick={() => onShare(file)} 
+            type="button" 
+            title="Share"
+          >
+            <StudyHubIcon name="share" size={15} />
+          </button>
+        )}
+        <button 
+          className="hover-action-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors" 
+          onClick={() => onRename(file)} 
+          type="button" 
+          title="Rename"
+        >
+          <StudyHubIcon name="edit" size={15} />
+        </button>
+      </div>
 
-      {/* Ellipsis Dropdown Menu */}
-      {openFileMenuId === file.id && (
-        <div className="file-action-menu" style={{ position: 'absolute', right: '12px', top: '100%', zIndex: 20, backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)', padding: '6px', display: 'flex', flexDirection: 'column', minWidth: '160px' }}>
-          <button onClick={() => { onPin(file); onToggleFileMenu(null); }} type="button">
-            <StudyHubIcon name="pin" size={14} style={{ color: isPinned ? '#6366f1' : 'inherit' }} /> {isPinned ? 'Unpin' : 'Pin'}
-          </button>
-          <button onClick={() => { onMove(file); onToggleFileMenu(null); }} type="button">
-            <StudyHubIcon name="move" size={14} /> Move
-          </button>
-          <button className="danger" onClick={() => { onDelete(file); onToggleFileMenu(null); }} type="button">
-            <StudyHubIcon name="trash" size={14} /> Delete
-          </button>
-          {!isActualFolder && (
-            <button onClick={() => { onShare(file); onToggleFileMenu(null); }} type="button">
-              <StudyHubIcon name="share" size={14} /> Share
+      {/* Cột 4: Ngày tải lên */}
+      <span className="w-28 shrink-0 text-right text-sm text-slate-400 dark:text-slate-500">
+        {file.time || ''}
+      </span>
+
+      {/* Cột 5: Nút 3 chấm / Menu */}
+      <div className="w-8 shrink-0 flex justify-end ml-4 relative" onClick={(e) => e.stopPropagation()}>
+        <button
+          className="more-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors"
+          onClick={() => onToggleFileMenu(openFileMenuId === file.id ? null : file.id)}
+          type="button"
+        >
+          <StudyHubIcon name="more-vertical" size={18} />
+        </button>
+
+        {openFileMenuId === file.id && (
+          <div className="file-action-menu bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out" style={{ position: 'absolute', right: '0', top: '100%', zIndex: 20, borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)', padding: '6px', display: 'flex', flexDirection: 'column', minWidth: '160px' }}>
+            <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onPin(file); onToggleFileMenu(null); }} type="button">
+              <StudyHubIcon name="pin" size={14} style={{ color: isPinned ? '#6366f1' : 'inherit' }} /> {isPinned ? 'Unpin' : 'Pin'}
             </button>
-          )}
-          <button onClick={() => { onRename(file); onToggleFileMenu(null); }} type="button">
-            <StudyHubIcon name="edit" size={14} /> Rename
-          </button>
-        </div>
-      )}
+            <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onMove(file); onToggleFileMenu(null); }} type="button">
+              <StudyHubIcon name="move" size={14} /> Move
+            </button>
+            <button className="danger hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => { onDelete(file); onToggleFileMenu(null); }} type="button">
+              <StudyHubIcon name="trash" size={14} /> Delete
+            </button>
+            {!isActualFolder && (
+              <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onShare(file); onToggleFileMenu(null); }} type="button">
+                <StudyHubIcon name="share" size={14} /> Share
+              </button>
+            )}
+            <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onRename(file); onToggleFileMenu(null); }} type="button">
+              <StudyHubIcon name="edit" size={14} /> Rename
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
-
+ 
 function GroupedFiles({ 
   files, 
   onDeleteFile, 
@@ -1015,14 +1022,14 @@ function GroupedFiles({
 }) {
   const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+    <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
       {groups.map((group) => {
         const groupFiles = files.filter((file) => file.group === group)
         if (groupFiles.length === 0) return null;
         return (
           <div key={group}>
             {/* Lavender group header — Mindgrasp style */}
-            <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+            <div className="bg-[#f0f0fb] dark:bg-slate-900 text-[#6366f1] dark:text-indigo-400 transition-colors duration-300 ease-in-out" style={{ padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, letterSpacing: '0.02em' }}>
               {group}
             </div>
             {groupFiles.map((file) => (
@@ -1046,7 +1053,7 @@ function GroupedFiles({
       })}
       {files.length === 0 && (
         <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-          Không tìm thấy tài nguyên nào
+          No items found
         </div>
       )}
     </div>
@@ -1067,14 +1074,14 @@ function GroupedFolders({
 }) {
   const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff' }}>
+    <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
       {groups.map((group) => {
         const groupFolders = folders.filter((folder) => folder.group === group)
         if (groupFolders.length === 0) return null;
         return (
           <div key={group}>
             {/* Lavender group header — Mindgrasp style */}
-            <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+            <div className="bg-[#f0f0fb] dark:bg-slate-900 text-[#6366f1] dark:text-indigo-400 transition-colors duration-300 ease-in-out" style={{ padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, letterSpacing: '0.02em' }}>
               {group}
             </div>
             {groupFolders.map((folder) => (
@@ -1098,7 +1105,7 @@ function GroupedFolders({
       })}
       {folders.length === 0 && (
         <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-          Không tìm thấy thư mục nào
+          No folders found
         </div>
       )}
     </div>
@@ -1120,14 +1127,14 @@ function SharedLibraryFiles({
   const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
   const files = allFiles || []
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0', border: '1px solid #e8e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff' }}>
+    <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
       {groups.map((group) => {
         const groupFiles = files.filter((file) => file.group === group)
         if (groupFiles.length === 0) return null;
         return (
           <div key={group}>
             {/* Lavender group header — Mindgrasp style */}
-            <div style={{ backgroundColor: '#f0f0fb', padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, color: '#6366f1', letterSpacing: '0.02em' }}>
+            <div className="bg-[#f0f0fb] dark:bg-slate-900 text-[#6366f1] dark:text-indigo-400 transition-colors duration-300 ease-in-out" style={{ padding: '8px 20px', fontSize: '12.5px', fontWeight: 600, letterSpacing: '0.02em' }}>
               {group}
             </div>
             {groupFiles.map((file) => (
@@ -1151,34 +1158,10 @@ function SharedLibraryFiles({
       })}
       {files.length === 0 && (
         <div style={{ padding: '64px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-          Không tìm thấy tài nguyên nào
+          No items found
         </div>
       )}
     </div>
-  )
-}
-
-function FileRow({ file, isFolder, onClick, hovered }) {
-  const isActualFolder = isFolder || file.type === 'folder' || file.kind === 'folder';
-  return (
-    <button
-      onClick={onClick}
-      type="button"
-      style={{ display: 'flex', alignItems: 'center', width: '100%', padding: '13px 20px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-    >
-      <div style={{ color: '#818cf8', marginRight: '14px', flexShrink: 0 }}>
-        <StudyHubIcon name={isActualFolder ? 'folder' : 'file'} size={20} />
-      </div>
-      <span style={{ flex: 1, fontSize: '13.5px', fontWeight: 500, color: '#4f46e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: hovered ? 'underline' : 'none' }}>
-        {file.name}
-      </span>
-      <span style={{ width: '110px', fontSize: '12.5px', color: '#94a3b8', flexShrink: 0 }}>
-        {isActualFolder ? 'folder' : 'session'}
-      </span>
-      <span style={{ width: '110px', fontSize: '12.5px', color: '#94a3b8', textAlign: 'right', paddingRight: '36px', flexShrink: 0, opacity: hovered ? 0 : 1, transition: 'opacity 0.15s' }}>
-        {file.time || ''}
-      </span>
-    </button>
   )
 }
 
@@ -1207,7 +1190,7 @@ function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
       })
       .catch((err) => {
         console.error(err)
-        window.showToast?.('Không thể tải thư mục con', 'error')
+        window.showToast?.('Unable to load subfolders', 'error')
       })
       .finally(() => setLoading(false))
   }
@@ -1240,58 +1223,58 @@ function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(4px)' }}>
-      <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', width: '90%', maxWidth: '480px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid #f1f5f9' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', margin: 0 }}>Di chuyển tài nguyên</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}>&times;</button>
+      <div className="bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out" style={{ borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', width: '90%', maxWidth: '480px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <header className="border-b border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px' }}>
+          <h3 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>Move item</h3>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}>&times;</button>
         </header>
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: '260px', maxHeight: '380px', overflowY: 'auto' }}>
-          <p style={{ fontSize: '13.5px', color: '#475569', margin: 0 }}>
-            Di chuyển <strong>{item.name}</strong> tới:
+          <p className="text-slate-600 dark:text-slate-300 transition-colors duration-300" style={{ fontSize: '13.5px', margin: 0 }}>
+            Move <strong>{item.name}</strong> to:
           </p>
           
           {/* Path Navigator / Breadcrumbs */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
-            <button onClick={() => { setCurrentFolder(null); setBreadcrumbs([]); setCurrentSubfolders(folders.filter(f => f.id !== item?.id)); }} style={{ background: 'none', border: 'none', padding: 0, fontSize: '13px', fontWeight: currentFolder === null ? 600 : 500, color: currentFolder === null ? '#4f46e5' : '#64748b', cursor: 'pointer' }}>Root</button>
+          <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300 ease-in-out" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', padding: '8px 12px', borderRadius: '8px' }}>
+            <button onClick={() => { setCurrentFolder(null); setBreadcrumbs([]); setCurrentSubfolders(folders.filter(f => f.id !== item?.id)); }} className={currentFolder === null ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-500 dark:text-slate-400 font-medium'} style={{ background: 'none', border: 'none', padding: 0, fontSize: '13px', cursor: 'pointer' }}>Root</button>
             {breadcrumbs.map((b, index) => (
-              <span key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748b' }}>
+              <span key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }} className="text-slate-400 dark:text-slate-500 transition-colors duration-300">
                 <span>&rsaquo;</span>
                 <button onClick={() => {
                   const nextB = breadcrumbs.slice(0, index + 1)
                   setBreadcrumbs(nextB)
                   navigateToFolder(b)
-                }} style={{ background: 'none', border: 'none', padding: 0, fontSize: '13px', fontWeight: index === breadcrumbs.length - 1 ? 600 : 500, color: index === breadcrumbs.length - 1 ? '#4f46e5' : '#64748b', cursor: 'pointer' }}>{b.name || b.folderName}</button>
+                }} className={index === breadcrumbs.length - 1 ? 'text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-500 dark:text-slate-400 font-medium'} style={{ background: 'none', border: 'none', padding: 0, fontSize: '13px', cursor: 'pointer' }}>{b.name || b.folderName}</button>
               </span>
             ))}
           </div>
 
           {/* Subfolders list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden', minHeight: '160px' }}>
+          <div className="border border-slate-200 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', flexDirection: 'column', gap: '2px', borderRadius: '10px', overflow: 'hidden', minHeight: '160px' }}>
             {breadcrumbs.length > 0 && (
-              <button onClick={navigateUp} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', border: 'none', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#4f46e5' }}>
-                <span>&larr; Quay lại thư mục cha</span>
+              <button onClick={navigateUp} className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 text-indigo-600 dark:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200" style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '10px 14px', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: '13px', fontWeight: 600 }}>
+                <span>&larr; Back to parent folder</span>
               </button>
             )}
             
             {loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: '#94a3b8', fontSize: '13px' }}>Đang tải thư mục con...</div>
+              <div className="text-slate-400 dark:text-slate-500 transition-colors duration-300" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', fontSize: '13px' }}>Loading subfolders...</div>
             ) : currentSubfolders.length === 0 ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', color: '#94a3b8', fontSize: '13px', fontStyle: 'italic' }}>Không có thư mục con nào ở đây</div>
+              <div className="text-slate-400 dark:text-slate-500 transition-colors duration-300" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px', fontSize: '13px', fontStyle: 'italic' }}>No subfolders here</div>
             ) : (
               currentSubfolders.map(sub => (
-                <button key={sub.id} onClick={() => navigateToFolder(sub)} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '10px 14px', border: 'none', background: '#fff', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' }} onMouseEnter={(e) => e.target.style.backgroundColor = '#f8fafc'} onMouseLeave={(e) => e.target.style.backgroundColor = '#fff'}>
+                <button key={sub.id} onClick={() => navigateToFolder(sub)} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 border-b border-slate-100 dark:border-slate-700 text-slate-700 dark:text-slate-300 transition-colors duration-150" style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}>
                   <span style={{ color: '#818cf8', display: 'flex', alignItems: 'center' }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
                   </span>
-                  <span style={{ fontSize: '13.5px', color: '#334155', fontWeight: 500 }}>{sub.folderName || sub.name}</span>
+                  <span style={{ fontSize: '13.5px', fontWeight: 500 }}>{sub.folderName || sub.name}</span>
                 </button>
               ))
             )}
           </div>
         </div>
-        <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '12px 20px', backgroundColor: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
-          <button onClick={onClose} style={{ height: '36px', padding: '0 16px', background: 'transparent', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>Hủy</button>
-          <button onClick={() => onMove(currentFolder?.id || null)} style={{ height: '36px', padding: '0 16px', backgroundColor: '#4f46e5', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: 'pointer' }}>Di chuyển tới đây</button>
+        <footer className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '12px 20px' }}>
+          <button onClick={onClose} className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200" style={{ height: '36px', padding: '0 16px', background: 'transparent', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={() => onMove(currentFolder?.id || null)} className="bg-[#4f46e5] hover:bg-indigo-700 text-white transition-colors duration-200" style={{ height: '36px', padding: '0 16px', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Move here</button>
         </footer>
       </div>
     </div>
@@ -1364,40 +1347,30 @@ function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSucc
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(4px)' }}>
-      <div style={{ backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', width: '90%', maxWidth: '460px', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '24px', gap: '20px', position: 'relative' }}>
+      <div className="bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-800 transition-colors duration-300 ease-in-out" style={{ borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', width: '90%', maxWidth: '460px', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: '24px', gap: '20px', position: 'relative' }}>
         
         {/* Close Button */}
-        <button onClick={onClose} style={{ position: 'absolute', right: '20px', top: '20px', background: 'none', border: 'none', fontSize: '22px', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', transition: 'color 0.2s' }} onMouseEnter={(e) => e.target.style.color = '#4f46e5'} onMouseLeave={(e) => e.target.style.color = '#94a3b8'}>
+        <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-200" style={{ position: 'absolute', right: '20px', top: '20px', background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px' }}>
           &times;
         </button>
 
         {/* Title */}
-        <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0f172a', margin: 0, paddingRight: '30px', lineHeight: 1.4 }}>
+        <h3 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '17px', fontWeight: 700, margin: 0, paddingRight: '30px', lineHeight: 1.4 }}>
           Share "{item.name}"
         </h3>
 
         {/* General Access */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span className="text-slate-600 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             General access
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {/* Toggle Button Segmented Control */}
-            <div style={{ display: 'flex', border: '1.5px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden', height: '36px', width: '80px', flexShrink: 0 }}>
+            <div className="border border-slate-200 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', height: '36px', width: '80px', flexShrink: 0 }}>
               <button 
                 type="button" 
                 onClick={() => setVisibility('PRIVATE')} 
-                style={{ 
-                  flex: 1, 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  border: 'none', 
-                  cursor: 'pointer', 
-                  backgroundColor: visibility === 'PRIVATE' ? '#4f46e5' : '#fff', 
-                  color: visibility === 'PRIVATE' ? '#fff' : '#94a3b8',
-                  transition: 'all 0.2s'
-                }}
+                className={`flex-1 flex items-center justify-center border-none cursor-pointer transition-all duration-200 ${visibility === 'PRIVATE' ? 'bg-[#4f46e5] text-white' : 'bg-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}
                 title="Restricted"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
@@ -1405,17 +1378,7 @@ function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSucc
               <button 
                 type="button" 
                 onClick={() => setVisibility('PUBLIC')} 
-                style={{ 
-                  flex: 1, 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  border: 'none', 
-                  cursor: 'pointer', 
-                  backgroundColor: visibility === 'PUBLIC' ? '#4f46e5' : '#fff', 
-                  color: visibility === 'PUBLIC' ? '#fff' : '#94a3b8',
-                  transition: 'all 0.2s'
-                }}
+                className={`flex-1 flex items-center justify-center border-none cursor-pointer transition-all duration-200 ${visibility === 'PUBLIC' ? 'bg-[#4f46e5] text-white' : 'bg-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}
                 title="Anyone with the link"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
@@ -1424,10 +1387,10 @@ function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSucc
 
             {/* Description Text */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+              <span className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '14px', fontWeight: 700 }}>
                 {visibility === 'PUBLIC' ? 'Anyone with the link' : 'Restricted'}
               </span>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>
+              <span className="text-slate-500 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '12px' }}>
                 {visibility === 'PUBLIC' 
                   ? 'Anyone on the internet with this link can view.' 
                   : 'Only the people you invite can view.'}
@@ -1438,7 +1401,7 @@ function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSucc
 
         {/* Add People */}
         <form onSubmit={handleAddPerson} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <label style={{ fontSize: '12px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <label className="text-slate-600 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Add people
           </label>
           <input
@@ -1447,29 +1410,25 @@ function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSucc
             placeholder="Enter email address to share with"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={{ width: '100%', height: '40px', padding: '0 14px', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '13.5px', outline: 'none', color: '#0f172a', transition: 'border-color 0.2s' }}
-            onFocus={(e) => e.target.style.borderColor = '#4f46e5'}
-            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+            className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200"
+            style={{ width: '100%', height: '40px', padding: '0 14px', borderRadius: '8px', fontSize: '13.5px' }}
           />
           <button 
             type="submit" 
             disabled={loading || !email.trim()}
-            style={{ width: '100%', height: '38px', backgroundColor: (loading || !email.trim()) ? '#94a3b8' : '#889ab5', border: 'none', borderRadius: '8px', fontSize: '13.5px', fontWeight: 600, color: '#fff', cursor: (loading || !email.trim()) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'background-color 0.2s' }}
-            onMouseEnter={(e) => { if (!loading && email.trim()) e.target.style.backgroundColor = '#6e829d' }}
-            onMouseLeave={(e) => { if (!loading && email.trim()) e.target.style.backgroundColor = '#889ab5' }}
+            className={`w-full h-[38px] rounded-lg text-[13.5px] font-semibold text-white flex items-center justify-center gap-1.5 transition-colors duration-200 ${(loading || !email.trim()) ? 'bg-slate-400 dark:bg-slate-600 cursor-not-allowed' : 'bg-[#4f46e5] hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 cursor-pointer'}`}
           >
             {loading ? 'Adding...' : 'Add'}
           </button>
         </form>
 
         {/* Footer Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', borderTop: '1px solid #f1f5f9', paddingTop: '16px' }}>
+        <div className="border-t border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', paddingTop: '16px' }}>
           <button 
             type="button" 
             onClick={handleCopyLink}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px', padding: '0 16px', background: 'transparent', border: '1.5px solid #6366f1', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#6366f1', cursor: 'pointer', transition: 'all 0.2s' }}
-            onMouseEnter={(e) => { e.target.style.backgroundColor = '#f0f2ff' }}
-            onMouseLeave={(e) => { e.target.style.backgroundColor = 'transparent' }}
+            className="hover:bg-indigo-50 dark:hover:bg-indigo-950/30 text-[#6366f1] dark:text-indigo-400 border border-[#6366f1] dark:border-indigo-400 transition-all duration-200"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '36px', padding: '0 16px', background: 'transparent', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
             {isCopied ? 'Copied' : 'Copy link'}
@@ -1479,9 +1438,7 @@ function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSucc
             type="button" 
             onClick={handleSaveVisibility}
             disabled={saveLoading}
-            style={{ height: '36px', padding: '0 20px', backgroundColor: saveLoading ? '#94a3b8' : '#889ab5', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', cursor: saveLoading ? 'default' : 'pointer', transition: 'background-color 0.2s' }}
-            onMouseEnter={(e) => { if (!saveLoading) e.target.style.backgroundColor = '#6e829d' }}
-            onMouseLeave={(e) => { if (!saveLoading) e.target.style.backgroundColor = '#889ab5' }}
+            className={`h-[36px] px-5 rounded-lg text-sm font-semibold text-white transition-colors duration-200 ${saveLoading ? 'bg-slate-400 dark:bg-slate-600 cursor-not-allowed' : 'bg-[#4f46e5] hover:bg-indigo-700 cursor-pointer'}`}
           >
             {saveLoading ? 'Saving...' : 'Save'}
           </button>

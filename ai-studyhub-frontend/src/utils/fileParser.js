@@ -11,7 +11,7 @@ export async function fetchFileAsText(url, fileName) {
   if (!url) return ''
   const ext = fileName?.split('.').pop()?.toLowerCase() || ''
   const res = await fetch(url)
-  if (!res.ok) throw new Error(`Không thể tải file (HTTP ${res.status})`)
+  if (!res.ok) throw new Error(`Unable to load file (HTTP ${res.status})`)
   const blob = await res.blob()
 
   if (ext === 'pdf') return parsePdf(blob)

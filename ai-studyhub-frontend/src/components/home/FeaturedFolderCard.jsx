@@ -2,43 +2,54 @@ import { useState } from 'react'
 import StudyHubIcon from '../icons/StudyHubIcons'
 import Badge from '../ui/Badge'
 
-export default function FeaturedFolderCard({ folder }) {
+export default function FeaturedFolderCard({ folder, onClick }) {
   const [favorite, setFavorite] = useState(Boolean(folder.favorite))
 
   return (
-    <article className={`folder-card ${folder.active ? 'is-highlighted' : ''}`}>
-      <div className="folder-card__icon">
-        <StudyHubIcon name="folder" size={28} />
-      </div>
-
-      <div className="folder-card__body">
-        <div className="folder-card__meta">
-          <Badge tone="blue">{folder.code}</Badge>
+    <article 
+      onClick={onClick} 
+      className="group flex flex-col justify-between bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:border-indigo-100 dark:hover:border-indigo-500 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer h-[210px] relative hover:-translate-y-0.5"
+    >
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0 transition-colors group-hover:bg-indigo-100">
+              <StudyHubIcon name="folder" size={20} />
+            </span>
+            <Badge tone="blue">{folder.code}</Badge>
+          </div>
           <button
-            className={`icon-button ${favorite ? 'is-active' : ''}`}
+            className={`p-1.5 rounded-full border border-slate-100 dark:border-slate-700 hover:border-red-100 hover:bg-red-50/50 transition-colors bg-transparent ${favorite ? 'text-red-500 border-red-50' : 'text-slate-400 dark:text-slate-500'}`}
             type="button"
-            aria-label={`Lưu ${folder.title}`}
+            aria-label={`Save ${folder.title}`}
             onClick={(event) => {
               event.stopPropagation()
               setFavorite((value) => !value)
             }}
           >
-            <StudyHubIcon name="heart" size={20} />
+            <StudyHubIcon name="heart" size={15} className={favorite ? 'fill-current' : ''} />
           </button>
         </div>
-        <h3>{folder.title}</h3>
-        <p>{folder.description}</p>
-        <div className="card-stats">
-          <span>
-            <StudyHubIcon name="file" size={16} />
-            {folder.files}
-          </span>
-          <span>
-            <StudyHubIcon name="download" size={16} />
-            {folder.downloads}
-          </span>
-        </div>
+        
+        <h3 className="text-[14.5px] font-bold text-slate-800 dark:text-white line-clamp-1 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors mt-2">
+          {folder.title}
+        </h3>
+        <p className="text-slate-500 dark:text-slate-400 text-xs line-clamp-2 leading-relaxed mt-0.5">
+          {folder.description || 'No detailed description available.'}
+        </p>
+      </div>
+
+      <div className="pt-3 border-t border-slate-50 dark:border-slate-700 flex items-center gap-4 text-[11.5px] text-slate-400 dark:text-slate-500 font-medium">
+        <span className="flex items-center gap-1">
+          <StudyHubIcon name="file" size={13} />
+          {folder.files}
+        </span>
+        <span className="flex items-center gap-1">
+          <StudyHubIcon name="download" size={13} />
+          {folder.downloads}
+        </span>
       </div>
     </article>
   )
 }
+

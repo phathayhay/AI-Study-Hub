@@ -7,7 +7,7 @@ import StatsSummary from '../components/home/StatsSummary'
 export default function Home() {
   return (
     <AppLayout>
-      <main className="home-main">
+      <main className="home-main dark:bg-[#0f172a] dark:bg-none">
         <div className="home-container">
           <HeroSearch />
           <StatsSummary />

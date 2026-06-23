@@ -27,3 +27,22 @@ export function getQuiz(quizId) {
 export function getFlashcardSet(setId) {
   return apiGet(`/ai/flashcards/${setId}`)
 }
+
+// ── AI CHATBOT APIs ──────────────────────────────────────────
+
+export function createChatSession(documentId = null, sessionTitle = null) {
+  return apiPost('/chat/sessions', { documentId, sessionTitle })
+}
+
+export function getUserChatSessions() {
+  return apiGet('/chat/sessions')
+}
+
+export function getChatSessionMessages(sessionId) {
+  return apiGet(`/chat/sessions/${sessionId}/messages`)
+}
+
+export function sendChatMessage(sessionId, content) {
+  return apiPost(`/chat/sessions/${sessionId}/messages`, { content })
+}
+

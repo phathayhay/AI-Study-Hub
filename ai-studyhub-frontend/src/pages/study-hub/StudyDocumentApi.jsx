@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import { studyTabs } from '../../data/studyHubData'
 import {
@@ -9,6 +9,10 @@ import {
   getDocumentQuizzes,
   getFlashcardSet,
   getQuiz,
+  createChatSession,
+  getUserChatSessions,
+  getChatSessionMessages,
+  sendChatMessage,
 } from '../../features/ai/aiService'
 
 export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange }) {
@@ -21,6 +25,182 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
   const [error, setError] = useState('')
   const [rightPanelWidth, setRightPanelWidth] = useState(380)
   const [isResizing, setIsResizing] = useState(false)
+
+  // ── AI CHATBOT STATES & HANDLERS ─────────────────────────────
+  const [chatSessions, setChatSessions] = useState([])
+  const [currentSessionId, setCurrentSessionId] = useState(null)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatMessagesLoading, setChatMessagesLoading] = useState(false)
+  const [chatSendLoading, setChatSendLoading] = useState(false)
+  const [chatInput, setChatInput] = useState('')
+  const [chatScope, setChatScope] = useState('document') // 'document' or 'general'
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+
+  const messagesEndRef = useRef(null)
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [chatMessages])
+
+  // Load sessions and history on mount or when context changes
+  useEffect(() => {
+    let active = true
+    setChatMessagesLoading(true)
+    setChatMessages([])
+    setCurrentSessionId(null)
+
+    getUserChatSessions()
+      .then((res) => {
+        if (!active) return
+        const list = res?.data || res || []
+        const isArr = Array.isArray(list)
+        setChatSessions(isArr ? list : [])
+        
+        let matchingSession = null
+        if (isArr) {
+          if (chatScope === 'document' && documentId) {
+            matchingSession = list.find(s => s.documentId === Number(documentId))
+          } else if (chatScope === 'general') {
+            matchingSession = list.find(s => s.documentId === null || s.documentId === undefined)
+          }
+        }
+
+        if (matchingSession) {
+          setCurrentSessionId(matchingSession.id)
+          return getChatSessionMessages(matchingSession.id)
+        }
+      })
+      .then((res) => {
+        if (!active || !res) return
+        const msgList = res?.data || res || []
+        setChatMessages(Array.isArray(msgList) ? msgList : [])
+      })
+      .catch((err) => {
+        console.error('Failed to load chat:', err)
+      })
+      .finally(() => {
+        if (active) setChatMessagesLoading(false)
+      })
+
+    return () => { active = false }
+  }, [documentId, chatScope])
+
+  const handleSendChatMessage = async (overrideContent = null) => {
+    const textToSend = (overrideContent || chatInput).trim()
+    if (!textToSend || chatSendLoading) return
+
+    setChatSendLoading(true)
+    if (!overrideContent) setChatInput('')
+
+    // Add optimistic user message
+    const userMsg = {
+      id: Date.now(),
+      senderType: 'USER',
+      messageContent: textToSend,
+      createdAt: new Date().toISOString()
+    }
+    setChatMessages(prev => [...prev, userMsg])
+
+    try {
+      let sessionId = currentSessionId
+      if (!sessionId) {
+        const docIdToLink = chatScope === 'document' ? documentId : null
+        const sessionTitle = chatScope === 'document' 
+          ? `Trò chuyện về: ${file?.name || file?.attachmentName || 'Tài liệu'}`
+          : 'Cuộc trò chuyện mới'
+        
+        const createRes = await createChatSession(docIdToLink, sessionTitle)
+        const newSession = createRes?.data || createRes
+        if (newSession && newSession.id) {
+          sessionId = newSession.id
+          setCurrentSessionId(sessionId)
+          setChatSessions(prev => [newSession, ...prev])
+        } else {
+          throw new Error('Không thể tạo phiên trò chuyện')
+        }
+      }
+
+      const sendRes = await sendChatMessage(sessionId, textToSend)
+      const aiReply = sendRes?.data || sendRes
+      if (aiReply) {
+        setChatMessages(prev => [...prev, aiReply])
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err)
+      window.showToast?.(err.message || 'Lỗi khi gửi tin nhắn', 'error')
+    } finally {
+      setChatSendLoading(false)
+    }
+  }
+
+  const handleSuggestionClick = (type) => {
+    let prompt = ''
+    if (type === 'summary') {
+      prompt = 'Tóm tắt nội dung chính của tài liệu này một cách ngắn gọn.'
+    } else if (type === 'concept') {
+      prompt = 'Giải thích các khái niệm quan trọng nhất xuất hiện trong tài liệu.'
+    } else if (type === 'compare') {
+      prompt = 'So sánh các luận điểm chính trong tài liệu này và rút ra kết luận.'
+    }
+    handleSendChatMessage(prompt)
+  }
+
+  const parseInline = (text) => {
+    const parts = text.split(/\*\*([^*]+)\*\*/g)
+    return parts.map((part, index) => {
+      if (index % 2 === 1) {
+        return <strong key={index} className="text-slate-900 dark:text-white" style={{ fontWeight: 600 }}>{part}</strong>
+      }
+      return part
+    })
+  }
+
+  const renderMarkdown = (text) => {
+    if (!text) return ''
+    const lines = text.split('\n')
+    return lines.map((line, idx) => {
+      const content = line.trim()
+      if (!content) return <div key={idx} style={{ height: '8px' }} />
+
+      if (content.startsWith('### ')) {
+        return <h4 key={idx} className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '15px', fontWeight: 700, margin: '8px 0 4px' }}>{parseInline(content.substring(4))}</h4>
+      }
+      if (content.startsWith('## ')) {
+        return <h3 key={idx} className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '16px', fontWeight: 700, margin: '12px 0 6px' }}>{parseInline(content.substring(3))}</h3>
+      }
+      if (content.startsWith('# ')) {
+        return <h2 key={idx} className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '18px', fontWeight: 700, margin: '16px 0 8px' }}>{parseInline(content.substring(2))}</h2>
+      }
+
+      if (content.startsWith('* ') || content.startsWith('- ')) {
+        return (
+          <li key={idx} className="text-slate-700 dark:text-slate-300 transition-colors duration-300" style={{ marginLeft: '16px', listStyleType: 'disc', margin: '4px 0', fontSize: '14px', lineHeight: 1.5 }}>
+            {parseInline(content.substring(2))}
+          </li>
+        )
+      }
+
+      const numListMatch = content.match(/^(\d+)\.\s(.*)/)
+      if (numListMatch) {
+        return (
+          <li key={idx} className="text-slate-700 dark:text-slate-300 transition-colors duration-300" style={{ marginLeft: '16px', listStyleType: 'decimal', margin: '4px 0', fontSize: '14px', lineHeight: 1.5 }}>
+            {parseInline(numListMatch[2])}
+          </li>
+        )
+      }
+
+      return (
+        <p key={idx} className="text-slate-700 dark:text-slate-300 transition-colors duration-300" style={{ fontSize: '14px', margin: '4px 0 8px', lineHeight: 1.5 }}>
+          {parseInline(content)}
+        </p>
+      )
+    })
+  }
+
 
   useEffect(() => {
     if (!isResizing) return undefined
@@ -117,7 +297,7 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
   }
 
   return (
-    <div className="study-shell" style={{ backgroundColor: '#f8fafc', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className="study-shell bg-slate-50 dark:bg-slate-900 transition-colors duration-300 ease-in-out" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <main className="study-main" style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column', width: '100%', overflow: 'hidden', userSelect: isResizing ? 'none' : 'auto' }}>
         <div style={{ display: 'flex', flex: 1, alignItems: 'stretch', overflow: 'hidden' }}>
           {/* LEFT COLUMN */}
@@ -131,20 +311,14 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
                     key={tab.id} 
                     onClick={() => onTabChange(tab.id)} 
                     type="button"
+                    className={`transition-all duration-200 text-sm font-semibold rounded-t-xl cursor-pointer ${
+                      isActive 
+                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 border-b-white dark:border-b-slate-800 font-bold py-3 px-6' 
+                        : 'bg-slate-50 dark:bg-slate-900 text-indigo-400 dark:text-indigo-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800/50 py-2.5 px-5 border-none'
+                    }`}
                     style={{
-                      padding: isActive ? '12px 24px' : '10px 20px',
-                      border: isActive ? '1px solid #e2e8f0' : 'none',
-                      borderBottom: isActive ? '2px solid #fff' : 'none',
-                      backgroundColor: isActive ? '#fff' : '#f8fafc',
-                      color: isActive ? '#0f172a' : '#818cf8',
-                      borderTopLeftRadius: '12px',
-                      borderTopRightRadius: '12px',
                       borderBottomLeftRadius: '0',
                       borderBottomRightRadius: '0',
-                      fontWeight: isActive ? 700 : 600,
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
                     }}
                   >
                     {tab.label}
@@ -153,7 +327,7 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
               </nav>
             </div>
 
-            <div style={{ flex: 1, backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', overflowY: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300 ease-in-out" style={{ flex: 1, borderRadius: '16px', overflowY: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
               {/* CONTENT AREA */}
               <div style={{ flex: 1, padding: activeTab === 'original' ? '0' : '24px', overflowY: activeTab === 'original' ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -162,8 +336,8 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
                 
                 <div style={{ display: activeTab === 'original' ? 'flex' : 'none', flex: 1, flexDirection: 'column', overflow: 'hidden' }}>
                   {/* SINGLE FILE HEADER */}
-                  <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '8px', alignItems: 'center', backgroundColor: '#fdfdff', flexShrink: 0 }}>
-                    <button style={{ width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', color: '#6366f1', cursor: 'pointer' }}>
+                  <div className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 transition-colors duration-300" style={{ padding: '12px 16px', display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+                    <button className="border border-indigo-500 bg-white dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors duration-200" style={{ width: '32px', height: '32px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                       <StudyHubIcon name="plus" size={16} />
                     </button>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 12px', backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>
@@ -177,11 +351,11 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
               {activeTab === 'summary' && (
                 summary ? <SummaryView summary={summary} /> : (
                   <div style={{ padding: '0', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: '16px', padding: '80px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.01)' }}>
-                      <h2 style={{ fontSize: '28px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500, margin: 0 }}>
-                        <span style={{ color: '#6366f1', fontWeight: 600 }}>AI</span> Summary
+                    <div className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition-colors duration-300" style={{ flex: 1, borderRadius: '16px', padding: '80px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                      <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '28px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500, margin: 0 }}>
+                        <span className="text-indigo-600 dark:text-indigo-400" style={{ fontWeight: 600 }}>AI</span> Summary
                       </h2>
-                      <p style={{ color: '#0f172a', marginTop: '16px', fontSize: '15px', fontWeight: 500, textAlign: 'center' }}>
+                      <p className="text-slate-700 dark:text-slate-300 transition-colors duration-300" style={{ marginTop: '16px', fontSize: '15px', fontWeight: 500, textAlign: 'center' }}>
                         Create a clear and easy-to-understand summary of your content
                       </p>
                       <button 
@@ -189,7 +363,20 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
                         disabled={!documentId || loading}
                         style={{ marginTop: '24px', backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', padding: '12px 32px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 600, cursor: 'pointer', border: 'none' }}
                       >
-                        <StudyHubIcon name="sparkles" size={16} /> Generate
+                        {loading ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <StudyHubIcon name="sparkles" size={16} />
+                            <span>Generate</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -199,9 +386,9 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
               {activeTab === 'flashcards' && (
                 flashcardSet
                   ? <FlashcardViewer set={flashcardSet} onRegenerate={regenerateFlashcards} loading={loading} />
-                  : <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', color: '#6366f1', padding: '48px' }}>
-                      <div style={{ width: '48px', height: '48px', border: '4px solid #e0e7ff', borderTopColor: '#6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                      <p style={{ fontSize: '15px', fontWeight: 500, color: '#475569', margin: 0 }}>{loading ? 'Generating flashcards...' : 'Loading flashcards...'}</p>
+                  : <div className="text-indigo-600 dark:text-indigo-400" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '48px' }}>
+                      <div className="border-4 border-indigo-100 dark:border-indigo-950/40 border-t-indigo-600 dark:border-t-indigo-400" style={{ width: '48px', height: '48px', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <p className="text-slate-600 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '15px', fontWeight: 500, margin: 0 }}>{loading ? 'Generating flashcards...' : 'Loading flashcards...'}</p>
                     </div>
               )}
               {activeTab === 'quizzes' && (quiz ? <QuizViewer onBack={() => setQuiz(null)} quiz={quiz} /> : <QuizPanel disabled={!documentId || loading} loading={loading} onCreate={handleQuiz} onOpen={openQuiz} quizzes={quizzes} />)}
@@ -221,54 +408,231 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
               flexShrink: 0
             }}
           >
-            <div style={{ 
-              width: '4px', 
-              height: '40px', 
-              backgroundColor: isResizing ? '#6366f1' : '#cbd5e1', 
-              borderRadius: '4px',
-              transition: 'all 0.2s',
-              opacity: isResizing ? 1 : 0.6
-            }} />
+            <div 
+              className={`w-1 h-10 rounded-full transition-all duration-200 ${
+                isResizing 
+                  ? 'bg-indigo-600 dark:bg-indigo-400 opacity-100' 
+                  : 'bg-slate-300 dark:bg-slate-600 opacity-60 hover:opacity-100'
+              }`}
+            />
           </div>
 
           {/* RIGHT COLUMN (AI TUTOR) */}
           <aside style={{ width: `${rightPanelWidth}px`, flexShrink: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'transparent', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', padding: '0 8px', flexShrink: 0 }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: '#475569' }}>AI Tutor</h3>
+                <h3 className="text-slate-600 dark:text-slate-300 transition-colors duration-300" style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>AI Tutor</h3>
               </div>
               
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300" style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: '16px', padding: '24px', overflow: 'hidden' }}>
                 
                 {/* Scrollable Content */}
                 <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', paddingRight: '8px', marginRight: '-8px' }}>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginBottom: '16px', marginTop: '32px' }}>
-                    <h4 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '12px', color: '#0f172a' }}>Have a Question about your import?</h4>
-                    <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '32px', lineHeight: 1.6, maxWidth: '280px' }}>You can ask questions about your imported content, and your answers will appear here</p>
-                    
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
-                      <button style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Write a paragraph...</button>
-                      <button style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Explain concept...</button>
-                      <button style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '24px', color: '#475569', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>Compare with...</button>
+                  {chatMessagesLoading ? (
+                    <div className="text-indigo-600 dark:text-indigo-400" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '48px' }}>
+                      <div className="border-3 border-indigo-100 dark:border-indigo-950/40 border-t-indigo-600 dark:border-t-indigo-400" style={{ width: '32px', height: '32px', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                      <p className="text-slate-500 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '13px', margin: 0 }}>Loading chat history...</p>
                     </div>
-                  </div>
+                  ) : chatMessages.length === 0 ? (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', marginBottom: '16px', marginTop: '32px' }}>
+                      <h4 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '16px', fontWeight: 700, marginBottom: '12px' }}>Have a Question about your import?</h4>
+                      <p className="text-slate-500 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '14px', marginBottom: '32px', lineHeight: 1.6, maxWidth: '280px' }}>You can ask questions about your imported content, and your answers will appear here</p>
+                      
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        <button onClick={() => handleSuggestionClick('summary')} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 shadow-sm" style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, borderRadius: '24px', cursor: 'pointer' }}>Write a paragraph...</button>
+                        <button onClick={() => handleSuggestionClick('concept')} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 shadow-sm" style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, borderRadius: '24px', cursor: 'pointer' }}>Explain concept...</button>
+                        <button onClick={() => handleSuggestionClick('compare')} className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200 shadow-sm" style={{ padding: '8px 16px', fontSize: '13px', fontWeight: 500, borderRadius: '24px', cursor: 'pointer' }}>Compare with...</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '16px' }}>
+                      {chatMessages.map((msg) => {
+                        const isUser = msg.senderType === 'USER'
+                        return (
+                          <div 
+                            key={msg.id} 
+                            className={`transition-colors duration-300 ${
+                              isUser 
+                                ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' 
+                                : 'text-slate-700 dark:text-slate-300'
+                            }`}
+                            style={{ 
+                              alignSelf: isUser ? 'flex-end' : 'flex-start',
+                              maxWidth: isUser ? '85%' : '100%',
+                              borderRadius: isUser ? '16px 16px 0 16px' : '0',
+                              padding: isUser ? '10px 16px' : '4px 0',
+                            }}
+                          >
+                            {isUser ? (
+                              <p style={{ fontSize: '14px', margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>{msg.messageContent}</p>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                {renderMarkdown(msg.messageContent)}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {chatSendLoading && (
+                        <div style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '13px', fontStyle: 'italic', padding: '4px 0' }}>
+                          <div style={{ width: '6px', height: '6px', backgroundColor: '#94a3b8', borderRadius: '50%', animation: 'pulse 1s infinite alternate' }} />
+                          <div style={{ width: '6px', height: '6px', backgroundColor: '#94a3b8', borderRadius: '50%', animation: 'pulse 1s infinite alternate 0.2s' }} />
+                          <div style={{ width: '6px', height: '6px', backgroundColor: '#94a3b8', borderRadius: '50%', animation: 'pulse 1s infinite alternate 0.4s' }} />
+                          AI is thinking...
+                        </div>
+                      )}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
                 </div>
 
                 {/* Chat Input */}
-                <div style={{ marginTop: '16px', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', flexShrink: 0 }}>
-                  <input 
-                    type="text" 
-                    placeholder="Ask AI assistant..." 
-                    style={{ width: '100%', border: 'none', padding: '16px', fontSize: '14px', outline: 'none', color: '#0f172a', minWidth: 0 }}
+                <div className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 transition-colors duration-300" style={{ marginTop: '16px', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.04)', flexShrink: 0 }}>
+                  <textarea 
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleSendChatMessage()
+                      }
+                    }}
+                    placeholder={chatScope === 'document' ? "Ask about this document..." : "Ask AI tutor anything..."} 
+                    rows={2}
+                    className="bg-transparent text-slate-900 dark:text-white placeholder-slate-400"
+                    style={{ 
+                      width: '100%', 
+                      border: 'none', 
+                      padding: '16px 16px 8px', 
+                      fontSize: '14px', 
+                      outline: 'none', 
+                      minWidth: 0,
+                      resize: 'none',
+                      fontFamily: 'inherit',
+                      lineHeight: '1.5'
+                    }}
                   />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px 16px', flexWrap: 'wrap', gap: '8px' }}>
-                    <div style={{ display: 'flex', gap: '16px', color: '#94a3b8' }}>
-                      <button style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: '#94a3b8' }}><StudyHubIcon name="file" size={20} /></button>
-                      <button style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, color: '#94a3b8' }}><StudyHubIcon name="mic" size={20} /></button>
+                    <div style={{ display: 'flex', gap: '16px', color: '#94a3b8', alignItems: 'center' }}>
+                      <button 
+                        type="button"
+                        className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-indigo-500 dark:text-indigo-400 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-200 shadow-sm"
+                        style={{ 
+                          cursor: 'pointer', 
+                          width: '38px', 
+                          height: '38px', 
+                          borderRadius: '50%', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                        }}
+                      >
+                        <StudyHubIcon name="image" size={18} />
+                      </button>
                     </div>
-                    <button style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#4f46e5', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(79, 70, 229, 0.3)' }}>
-                      <StudyHubIcon name="arrow-up" size={16} />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {/* Scope Selector Capsule */}
+                      <div style={{ position: 'relative' }}>
+                        <button 
+                          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                          type="button"
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white transition-all duration-200"
+                          style={{ 
+                            width: '38px', 
+                            height: '38px', 
+                            borderRadius: '50%', 
+                            border: 'none', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            cursor: 'pointer', 
+                            boxShadow: '0 2px 6px rgba(99, 102, 241, 0.25)',
+                          }}
+                          title={chatScope === 'document' ? 'This Session' : 'General Chat'}
+                        >
+                          <StudyHubIcon name={chatScope === 'document' ? 'file-text' : 'message'} size={18} />
+                        </button>
+                        
+                        {isDropdownOpen && (
+                          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg z-50" style={{ 
+                            position: 'absolute', 
+                            bottom: '100%', 
+                            right: 0, 
+                            marginBottom: '8px', 
+                            borderRadius: '12px', 
+                            width: '140px',
+                            overflow: 'hidden'
+                          }}>
+                            <button
+                              onClick={() => {
+                                setChatScope('document')
+                                setIsDropdownOpen(false)
+                              }}
+                              type="button"
+                              className={`w-full py-2.5 px-3.5 text-xs text-left cursor-pointer border-none transition-all duration-150 ${
+                                chatScope === 'document'
+                                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold'
+                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              This Session
+                            </button>
+                            <button
+                              onClick={() => {
+                                setChatScope('general')
+                                setIsDropdownOpen(false)
+                              }}
+                              type="button"
+                              className={`w-full py-2.5 px-3.5 text-xs text-left cursor-pointer border-none transition-all duration-150 ${
+                                chatScope === 'general'
+                                  ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 font-semibold'
+                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              General Chat
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <button 
+                        type="button"
+                        className="text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors duration-200"
+                        style={{ 
+                          border: 'none', 
+                          background: 'transparent', 
+                          cursor: 'pointer', 
+                          padding: 0, 
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '50%',
+                        }}
+                      >
+                        <StudyHubIcon name="mic" size={20} />
+                      </button>
+                      
+                      <button 
+                        onClick={() => handleSendChatMessage()}
+                        disabled={chatSendLoading}
+                        className="bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white transition-all duration-200 shadow-sm"
+                        style={{ 
+                          width: '38px', 
+                          height: '38px', 
+                          borderRadius: '50%', 
+                          border: 'none', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          cursor: 'pointer', 
+                          opacity: chatSendLoading ? 0.6 : 1,
+                        }}
+                      >
+                        <StudyHubIcon name="arrow-up" size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -376,8 +740,21 @@ function GeneratePanel({ disabled, label, loading, onGenerate }) {
     <section className="ai-generate-panel">
       <h2><span>AI</span> {label}</h2>
       <p>Generate content from the uploaded document using the backend AI service.</p>
-      <button className="ai-generate-button" disabled={disabled} onClick={onGenerate} type="button">
-        <StudyHubIcon name="sparkle" size={16} /> {loading ? 'Generating...' : 'Generate'}
+      <button className="ai-generate-button" disabled={disabled || loading} onClick={onGenerate} type="button">
+        {loading ? (
+          <>
+            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Generating...</span>
+          </>
+        ) : (
+          <>
+            <StudyHubIcon name="sparkle" size={16} />
+            <span>Generate</span>
+          </>
+        )}
       </button>
     </section>
   )
@@ -416,8 +793,8 @@ function SummaryView({ summary }) {
   return (
     <section>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 500, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ color: '#6366f1', fontWeight: 600 }}>AI</span> Summary
+        <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '24px', fontWeight: 500, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span className="text-indigo-600 dark:text-indigo-400" style={{ fontWeight: 600 }}>AI</span> Summary
         </h2>
 
         {/* Controls: A — slider — A  +  download */}
@@ -425,7 +802,8 @@ function SummaryView({ summary }) {
           {/* Small A */}
           <span
             onClick={() => setFontStep((s) => Math.max(0, s - 1))}
-            style={{ fontSize: '12px', fontWeight: 700, color: fontStep === 0 ? '#cbd5e1' : '#6366f1', cursor: fontStep === 0 ? 'default' : 'pointer', userSelect: 'none', lineHeight: 1 }}
+            className="text-indigo-600 dark:text-indigo-400"
+            style={{ fontSize: '12px', fontWeight: 700, cursor: fontStep === 0 ? 'default' : 'pointer', userSelect: 'none', lineHeight: 1, opacity: fontStep === 0 ? 0.4 : 1 }}
           >A</span>
 
           {/* Step slider */}
@@ -443,7 +821,7 @@ function SummaryView({ summary }) {
                 width: '80px',
                 height: '4px',
                 borderRadius: '2px',
-                background: `linear-gradient(to right, #6366f1 ${(fontStep / (FONT_STEPS.length - 1)) * 100}%, #e0e7ff ${(fontStep / (FONT_STEPS.length - 1)) * 100}%)`,
+                background: `linear-gradient(to right, #6366f1 ${(fontStep / (FONT_STEPS.length - 1)) * 100}%, var(--slider-track-color) ${(fontStep / (FONT_STEPS.length - 1)) * 100}%)`,
                 outline: 'none',
                 cursor: 'pointer',
               }}
@@ -453,28 +831,28 @@ function SummaryView({ summary }) {
           {/* Large A */}
           <span
             onClick={() => setFontStep((s) => Math.min(FONT_STEPS.length - 1, s + 1))}
-            style={{ fontSize: '18px', fontWeight: 700, color: fontStep === FONT_STEPS.length - 1 ? '#cbd5e1' : '#6366f1', cursor: fontStep === FONT_STEPS.length - 1 ? 'default' : 'pointer', userSelect: 'none', lineHeight: 1 }}
+            className="text-indigo-600 dark:text-indigo-400"
+            style={{ fontSize: '18px', fontWeight: 700, cursor: fontStep === FONT_STEPS.length - 1 ? 'default' : 'pointer', userSelect: 'none', lineHeight: 1, opacity: fontStep === FONT_STEPS.length - 1 ? 0.4 : 1 }}
           >A</span>
 
           {/* Divider */}
-          <div style={{ width: '1px', height: '20px', backgroundColor: '#e2e8f0', margin: '0 4px' }} />
+          <div className="bg-slate-200 dark:bg-slate-700" style={{ width: '1px', height: '20px', margin: '0 4px' }} />
 
           {/* Download */}
           <button
             onClick={handleDownload}
             type="button"
             title="Download summary"
-            style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '6px', transition: 'background 0.15s' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#e0e7ff' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}
+            className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors duration-150"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '6px' }}
           >
             <StudyHubIcon name="download" size={20} />
           </button>
         </div>
       </div>
 
-      <article style={{ border: '1px solid #e2e8f0', borderRadius: '16px', backgroundColor: '#fff', padding: '32px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' }}>
-        <div style={{ fontSize: `${fontSize}px`, color: '#334155', lineHeight: 1.7, transition: 'font-size 0.15s ease' }}>
+      <article className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition-colors duration-300" style={{ borderRadius: '16px', padding: '32px' }}>
+        <div className="text-slate-700 dark:text-slate-300 transition-colors duration-150" style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}>
           <p style={{ fontWeight: 600, marginBottom: '8px' }}>Short Summary</p>
           <p style={{ marginBottom: '20px' }}>{summary.shortSummary}</p>
           <p style={{ fontWeight: 600, marginBottom: '8px' }}>Detailed Summary</p>
@@ -498,7 +876,7 @@ function CollectionPanel({ buttonLabel, disabled, emptyLabel, items, loading, on
   return (
     <section>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>{title}</h2>
+        <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>{title}</h2>
         <button 
           disabled={disabled} 
           onClick={onCreate} 
@@ -518,7 +896,7 @@ function CollectionPanel({ buttonLabel, disabled, emptyLabel, items, loading, on
           ))}
         </div>
       ) : (
-        <div style={{ backgroundColor: '#f5f3ff', padding: '32px', borderRadius: '12px', textAlign: 'center', color: '#64748b', fontSize: '15px', fontWeight: 500 }}>
+        <div className="bg-indigo-50/50 dark:bg-indigo-950/20 text-slate-500 dark:text-slate-400 transition-colors duration-300" style={{ padding: '32px', borderRadius: '12px', textAlign: 'center', fontSize: '15px', fontWeight: 500 }}>
           {emptyLabel}
         </div>
       )}
@@ -540,28 +918,39 @@ function FlashcardViewer({ set, onRegenerate, loading }) {
     <section>
       {/* Header row: title + regenerate */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+        <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>
           {set.setName || 'Flashcards'}
         </h2>
         <button
           onClick={onRegenerate}
           disabled={loading}
           type="button"
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', backgroundColor: loading ? '#e0e7ff' : '#6366f1', color: loading ? '#6366f1' : '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: loading ? 'default' : 'pointer', transition: 'all 0.2s' }}
+          className={`flex items-center gap-1.5 py-2 px-4 border-none rounded-lg text-xs font-semibold cursor-pointer transition-all duration-200 ${
+            loading 
+              ? 'bg-indigo-100 dark:bg-indigo-950/40 text-indigo-500 dark:text-indigo-400' 
+              : 'bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white shadow-sm'
+          }`}
         >
-          <StudyHubIcon name="refresh" size={14} />
+          {loading ? (
+            <svg className="animate-spin h-3.5 w-3.5 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : (
+            <StudyHubIcon name="refresh" size={14} />
+          )}
           {loading ? 'Generating...' : 'Regenerate'}
         </button>
       </div>
 
-      <article onClick={() => setFlipped((value) => !value)} style={{ border: '1px solid #6366f1', borderRadius: '12px', padding: '32px', minHeight: '340px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', cursor: 'pointer', backgroundColor: '#fff', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.08)' }}>
-        <div style={{ position: 'absolute', top: '16px', left: '16px', fontSize: '12px', color: '#64748b', fontWeight: 500 }}>{flipped ? 'Answer' : 'Question'}</div>
+      <article onClick={() => setFlipped((value) => !value)} className="border border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-all duration-300" style={{ borderRadius: '12px', padding: '32px', minHeight: '340px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', cursor: 'pointer' }}>
+        <div className="text-slate-500 dark:text-slate-400" style={{ position: 'absolute', top: '16px', left: '16px', fontSize: '12px', fontWeight: 500 }}>{flipped ? 'Answer' : 'Question'}</div>
         <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '12px', color: '#eab308' }}>
           <StudyHubIcon name="star" size={16} />
-          <span style={{ color: '#6366f1' }}><StudyHubIcon name="edit" size={16} /></span>
+          <span className="text-indigo-500 dark:text-indigo-400"><StudyHubIcon name="edit" size={16} /></span>
         </div>
-        <h3 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', textAlign: 'center', maxWidth: '80%' }}>{card ? flipped ? card.backContent : card.frontContent : 'No cards'}</h3>
-        <div style={{ position: 'absolute', bottom: '16px', fontSize: '12px', color: '#64748b' }}>Click to flip</div>
+        <h3 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '24px', fontWeight: 700, textAlign: 'center', maxWidth: '80%' }}>{card ? flipped ? card.backContent : card.frontContent : 'No cards'}</h3>
+        <div className="text-slate-500 dark:text-slate-400" style={{ position: 'absolute', bottom: '16px', fontSize: '12px' }}>Click to flip</div>
       </article>
       
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '32px', marginTop: '24px' }}>
@@ -577,40 +966,50 @@ function QuizPanel({ disabled, loading, onCreate, onOpen, quizzes }) {
   return (
     <section>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>Your Quizzes</h2>
+        <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>Your Quizzes</h2>
         <button 
-          disabled={disabled} 
+          disabled={disabled || loading} 
           onClick={() => onCreate('MEDIUM')} 
           type="button"
-          style={{ backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+          style={{ backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', padding: '10px 24px', fontSize: '14px', fontWeight: 600, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
         >
-          {loading ? 'Generating...' : 'Create Quiz'}
+          {loading ? (
+            <>
+              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Generating...</span>
+            </>
+          ) : (
+            'Create Quiz'
+          )}
         </button>
       </header>
       {quizzes.length ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {quizzes.map((item) => (
-            <div key={item.id} style={{ border: '1px solid #f1f5f9', borderRadius: '12px', padding: '24px', backgroundColor: '#fdfdff', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+            <div key={item.id} className="border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 hover:border-slate-300 dark:hover:border-slate-700 transition-colors duration-300 shadow-sm" style={{ borderRadius: '12px', padding: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#0f172a', margin: 0 }}>{item.quizTitle || `Quiz #${item.id}`}</h3>
+                <h3 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>{item.quizTitle || `Quiz #${item.id}`}</h3>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <button onClick={() => onOpen(item.id)} style={{ background: 'none', border: 'none', color: '#6366f1', fontWeight: 500, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <button onClick={() => onOpen(item.id)} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-350 transition-colors" style={{ background: 'none', border: 'none', fontWeight: 500, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <StudyHubIcon name="refresh" size={14} /> Take Quiz
                   </button>
-                  <span style={{ fontSize: '13px', color: '#0f172a', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>0 attempts <StudyHubIcon name="chevron" size={12} style={{ transform: 'rotate(90deg)' }} /></span>
+                  <span className="text-slate-800 dark:text-slate-200 transition-colors" style={{ fontSize: '13px', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '4px' }}>0 attempts <StudyHubIcon name="chevron" size={12} style={{ transform: 'rotate(90deg)' }} /></span>
                   <button style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                     <StudyHubIcon name="more-vertical" size={16} />
                   </button>
                 </div>
               </div>
-              <div style={{ fontSize: '13px', color: '#0f172a', fontWeight: 600 }}>
-                {item.totalQuestions || 6} Topics: <span style={{ color: '#64748b', fontWeight: 400 }}>Record of Changes &bull; Table of Contents &bull; Overview &bull; System Functions &bull; <span style={{ color: '#6366f1', cursor: 'pointer' }}>Show 2 more topics</span></span>
+              <div className="text-slate-800 dark:text-slate-200" style={{ fontSize: '13px', fontWeight: 600 }}>
+                {item.totalQuestions || 6} Topics: <span className="text-slate-500 dark:text-slate-400 font-normal">Record of Changes &bull; Table of Contents &bull; Overview &bull; System Functions &bull; <span className="text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer" style={{ fontWeight: 500 }}>Show 2 more topics</span></span>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div style={{ backgroundColor: '#f5f3ff', padding: '32px', borderRadius: '12px', textAlign: 'center', color: '#64748b', fontSize: '15px', fontWeight: 500 }}>
+        <div className="bg-indigo-50/50 dark:bg-indigo-950/20 text-slate-500 dark:text-slate-400 transition-colors duration-300" style={{ padding: '32px', borderRadius: '12px', textAlign: 'center', fontSize: '15px', fontWeight: 500 }}>
           No quizzes found
         </div>
       )}
@@ -661,24 +1060,23 @@ function QuizViewer({ onBack, quiz }) {
       display: 'flex', alignItems: 'center', gap: '12px',
       padding: '16px 20px', borderRadius: '10px', border: '1.5px solid',
       cursor: currentRevealed ? 'default' : 'pointer', fontSize: '14px', fontWeight: 500,
-      textAlign: 'left', transition: 'all 0.15s', background: '#fff',
+      textAlign: 'left', transition: 'all 0.15s', background: 'var(--quiz-opt-bg)',
       width: '100%',
     }
     if (!currentRevealed) {
       return {
         ...base,
-        borderColor: '#e2e8f0',
-        backgroundColor: '#fff',
-        color: '#334155',
+        borderColor: 'var(--quiz-opt-border)',
+        color: 'var(--quiz-opt-color)',
       }
     }
     if (key === question.correctOption) {
-      return { ...base, borderColor: '#22c55e', backgroundColor: '#f0fdf4', color: '#15803d', boxShadow: '0 0 0 3px rgba(34,197,94,0.12)' }
+      return { ...base, borderColor: 'var(--quiz-opt-correct-border)', backgroundColor: 'var(--quiz-opt-correct-bg)', color: 'var(--quiz-opt-correct-color)', boxShadow: '0 0 0 3px rgba(34,197,94,0.12)' }
     }
     if (currentSelected === key && key !== question.correctOption) {
-      return { ...base, borderColor: '#ef4444', backgroundColor: '#fef2f2', color: '#b91c1c', boxShadow: '0 0 0 3px rgba(239,68,68,0.12)' }
+      return { ...base, borderColor: 'var(--quiz-opt-incorrect-border)', backgroundColor: 'var(--quiz-opt-incorrect-bg)', color: 'var(--quiz-opt-incorrect-color)', boxShadow: '0 0 0 3px rgba(239,68,68,0.12)' }
     }
-    return { ...base, borderColor: '#e2e8f0', color: '#94a3b8' }
+    return { ...base, borderColor: 'var(--quiz-opt-border)', color: '#94a3b8' }
   }
 
   return (
@@ -691,7 +1089,8 @@ function QuizViewer({ onBack, quiz }) {
           <button
             onClick={onBack}
             type="button"
-            style={{ padding: '8px 20px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#475569', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}
+            className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold transition-colors duration-250"
+            style={{ padding: '8px 20px', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}
           >
             Quit
           </button>
@@ -705,7 +1104,8 @@ function QuizViewer({ onBack, quiz }) {
               disabled={pageStart === 0}
               onClick={() => move(pageStart - 1)}
               type="button"
-              style={{ background: 'none', border: 'none', color: pageStart === 0 ? '#cbd5e1' : '#6366f1', cursor: pageStart === 0 ? 'default' : 'pointer', padding: '4px', fontSize: '16px', fontWeight: 700 }}
+              className="text-indigo-600 dark:text-indigo-400 disabled:text-slate-300 dark:disabled:text-slate-700 font-bold"
+              style={{ background: 'none', border: 'none', cursor: pageStart === 0 ? 'default' : 'pointer', padding: '4px', fontSize: '16px' }}
             >‹</button>
 
             {/* Page numbers */}
@@ -714,9 +1114,9 @@ function QuizViewer({ onBack, quiz }) {
               const status = answers[n] // 'correct' | 'incorrect' | 'skipped'
 
               // Default styles
-              let bg = '#f8fafc'
-              let border = '1.5px solid #e2e8f0'
-              let color = '#475569'
+              let bg = 'var(--quiz-num-bg)'
+              let border = '1.5px solid var(--quiz-num-border)'
+              let color = 'var(--quiz-num-color)'
               let boxShadow = 'none'
 
               if (status === 'correct') {
@@ -737,7 +1137,7 @@ function QuizViewer({ onBack, quiz }) {
                 border = '2px solid #6366f1'
                 boxShadow = '0 0 0 3px rgba(99,102,241,0.15)'
                 if (!status) {
-                  bg = '#fff'
+                  bg = 'var(--quiz-num-active-bg)'
                   color = '#6366f1'
                 }
               }
@@ -767,11 +1167,12 @@ function QuizViewer({ onBack, quiz }) {
               disabled={pageEnd >= total}
               onClick={() => move(pageEnd)}
               type="button"
-              style={{ background: 'none', border: 'none', color: pageEnd >= total ? '#cbd5e1' : '#6366f1', cursor: pageEnd >= total ? 'default' : 'pointer', padding: '4px', fontSize: '16px', fontWeight: 700 }}
+              className="text-indigo-600 dark:text-indigo-400 disabled:text-slate-300 dark:disabled:text-slate-700 font-bold"
+              style={{ background: 'none', border: 'none', cursor: pageEnd >= total ? 'default' : 'pointer', padding: '4px', fontSize: '16px' }}
             >›</button>
           </div>
 
-          <span style={{ fontSize: '12px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+          <span className="text-slate-400 dark:text-slate-500" style={{ fontSize: '12px', whiteSpace: 'nowrap' }}>
             Showing {pageStart + 1}–{pageEnd} of {total} questions
           </span>
         </div>
@@ -782,14 +1183,14 @@ function QuizViewer({ onBack, quiz }) {
 
       {/* QUESTION CARD */}
       {question ? (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#fff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '32px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)', overflow: 'auto' }}>
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300" style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: '16px', padding: '32px', overflow: 'auto' }}>
           {/* Progress label */}
-          <p style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 500, marginBottom: '16px', margin: '0 0 16px', textAlign: 'center' }}>
+          <p className="text-slate-400 dark:text-slate-500 font-medium" style={{ fontSize: '13px', marginBottom: '16px', margin: '0 0 16px', textAlign: 'center' }}>
             Question: {index + 1}/{total}
           </p>
 
           {/* Question text */}
-          <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', marginBottom: '32px', lineHeight: 1.5, margin: '0 0 32px', textAlign: 'center' }}>
+          <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '18px', fontWeight: 700, marginBottom: '32px', lineHeight: 1.5, margin: '0 0 32px', textAlign: 'center' }}>
             {question.questionText}
           </h2>
 
@@ -807,11 +1208,11 @@ function QuizViewer({ onBack, quiz }) {
                   width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '12px', fontWeight: 700,
-                  backgroundColor: currentRevealed && key === question.correctOption ? '#22c55e'
-                    : currentRevealed && currentSelected === key && key !== question.correctOption ? '#ef4444'
-                    : '#f1f5f9',
+                  backgroundColor: currentRevealed && key === question.correctOption ? 'var(--quiz-opt-correct-border)'
+                    : currentRevealed && currentSelected === key && key !== question.correctOption ? 'var(--quiz-opt-incorrect-border)'
+                    : 'var(--quiz-num-bg)',
                   color: (currentRevealed && key === question.correctOption) || (currentRevealed && currentSelected === key && key !== question.correctOption)
-                    ? '#fff' : '#64748b',
+                    ? '#fff' : 'var(--quiz-num-color)',
                   transition: 'all 0.15s',
                 }}>
                   {key}
@@ -823,13 +1224,16 @@ function QuizViewer({ onBack, quiz }) {
 
           {/* Feedback */}
           {currentRevealed && (
-            <div style={{
-              padding: '14px 20px', borderRadius: '10px', marginBottom: '24px',
-              backgroundColor: currentSelected === question.correctOption ? '#f0fdf4' : '#fef2f2',
-              border: `1.5px solid ${currentSelected === question.correctOption ? '#86efac' : '#fca5a5'}`,
-              color: currentSelected === question.correctOption ? '#15803d' : '#b91c1c',
-              fontSize: '14px', fontWeight: 500, lineHeight: 1.6,
-            }}>
+            <div 
+              className={currentSelected === question.correctOption 
+                ? "bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/40 text-green-800 dark:text-green-300 transition-colors"
+                : "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-red-800 dark:text-red-300 transition-colors"
+              }
+              style={{
+                padding: '14px 20px', borderRadius: '10px', marginBottom: '24px',
+                fontSize: '14px', fontWeight: 500, lineHeight: 1.6,
+              }}
+            >
               {currentSelected === question.correctOption
                 ? '✓ Correct!'
                 : `✗ Correct answer: ${question.correctOption}`}
@@ -843,21 +1247,24 @@ function QuizViewer({ onBack, quiz }) {
               disabled={index === 0}
               onClick={() => move(index - 1)}
               type="button"
-              style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', color: index === 0 ? '#cbd5e1' : '#475569', fontWeight: 600, fontSize: '14px', cursor: index === 0 ? 'default' : 'pointer' }}
+              className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:text-slate-300 dark:disabled:text-slate-700 font-semibold transition-colors"
+              style={{ padding: '10px 24px', borderRadius: '8px', fontSize: '14px', cursor: index === 0 ? 'default' : 'pointer' }}
             >Previous</button>
 
             <button
               onClick={handleSkip}
               type="button"
               disabled={currentRevealed || index >= total - 1}
-              style={{ padding: '10px 24px', borderRadius: '8px', border: '1.5px solid #e2e8f0', background: '#fff', color: (currentRevealed || index >= total - 1) ? '#cbd5e1' : '#475569', fontWeight: 600, fontSize: '14px', cursor: (currentRevealed || index >= total - 1) ? 'default' : 'pointer' }}
+              className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:text-slate-300 dark:disabled:text-slate-700 font-semibold transition-colors"
+              style={{ padding: '10px 24px', borderRadius: '8px', fontSize: '14px', cursor: (currentRevealed || index >= total - 1) ? 'default' : 'pointer' }}
             >Skip</button>
 
             <button
               disabled={index >= total - 1}
               onClick={() => move(index + 1)}
               type="button"
-              style={{ padding: '10px 28px', borderRadius: '8px', border: 'none', background: index >= total - 1 ? '#e0e7ff' : '#6366f1', color: index >= total - 1 ? '#a5b4fc' : '#fff', fontWeight: 600, fontSize: '14px', cursor: index >= total - 1 ? 'default' : 'pointer', transition: 'all 0.15s' }}
+              className="font-semibold transition-colors border-none"
+              style={{ padding: '10px 28px', borderRadius: '8px', background: index >= total - 1 ? 'var(--quiz-num-border)' : '#6366f1', color: index >= total - 1 ? 'var(--quiz-num-color)' : '#fff', fontSize: '14px', cursor: index >= total - 1 ? 'default' : 'pointer' }}
             >Next</button>
           </div>
         </div>

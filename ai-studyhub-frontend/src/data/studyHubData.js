@@ -1,30 +1,30 @@
 export const appUser = {
   initials: 'SV',
-  name: 'Nguyễn Văn A',
+  name: 'Nguyen Van A',
   email: 'student@fpt.edu.vn',
-  city: 'Hà Nội, Việt Nam',
-  joined: 'Tham gia từ tháng 1, 2024',
+  city: 'Hanoi, Vietnam',
+  joined: 'Joined since January 2024',
   notifications: 3,
 }
 
 export const guestUser = {
   initials: '?',
-  name: 'Khách',
-  email: 'Chưa đăng nhập',
+  name: 'Guest',
+  email: 'Not logged in',
   notifications: 0,
 }
 
 export const mainNavItems = [
-  { id: 'home', label: 'Trang chủ', icon: 'home' },
-  { id: 'explore', label: 'Khám phá', icon: 'compass' },
-  { id: 'library', label: 'Tài liệu của tôi', icon: 'folder' },
-  { id: 'upload', label: 'Tải lên', icon: 'upload' },
-  { id: 'profile', label: 'Hồ sơ', icon: 'user' },
+  { id: 'home', label: 'Home', icon: 'home' },
+  { id: 'explore', label: 'Explore', icon: 'compass' },
+  { id: 'library', label: 'My Library', icon: 'folder' },
+  { id: 'upload', label: 'Upload', icon: 'upload' },
+  { id: 'profile', label: 'Profile', icon: 'user' },
 ]
 
 export const publicNavItems = [
-  { id: 'guest-home', label: 'Trang chủ', icon: 'home' },
-  { id: 'explore', label: 'Khám phá', icon: 'compass' },
+  { id: 'guest-home', label: 'Home', icon: 'home' },
+  { id: 'explore', label: 'Explore', icon: 'compass' },
 ]
 
 export const popularCourses = ['CEA201', 'PRF192', 'DBI202', 'SWP391', 'PRO192']
@@ -32,9 +32,9 @@ export const popularCourses = ['CEA201', 'PRF192', 'DBI202', 'SWP391', 'PRO192']
 export const majors = ['SE', 'AI', 'IA', 'SS', 'GD']
 
 export const stats = [
-  { id: 'documents', value: '1,234', label: 'Tài liệu', icon: 'book', tone: 'blue' },
-  { id: 'downloads', value: '45,678', label: 'Lượt tải', icon: 'download', tone: 'green' },
-  { id: 'students', value: '567', label: 'Sinh viên', icon: 'sparkle', tone: 'purple' },
+  { id: 'documents', value: '1,234', label: 'Documents', icon: 'book', tone: 'blue' },
+  { id: 'downloads', value: '45,678', label: 'Downloads', icon: 'download', tone: 'green' },
+  { id: 'students', value: '567', label: 'Students', icon: 'sparkle', tone: 'purple' },
 ]
 
 export const featuredFolders = [
@@ -42,65 +42,65 @@ export const featuredFolders = [
     code: 'PRF192',
     date: '28/5/2024',
     title: 'PRF192 - Programming Fundamentals Full Pack',
-    description: 'Bộ tài liệu hoàn chỉnh PRF192: Slides bài giảng, Source code mẫu, Đề thi + Đáp án',
+    description: 'Complete PRF192 study materials: Lectures, sample source code, past exams + answers',
     files: 22,
     downloads: '5,678',
-    author: 'Trần Thị B',
+    author: 'Tran Thi B',
   },
   {
     code: 'SWP391',
     date: '16/5/2024',
     title: 'SWP391 - Project Templates & Guides',
-    description: 'Template dự án SWP391 đầy đủ: Spring Boot, React, Documentation, Presentation slides',
+    description: 'Complete SWP391 project template: Spring Boot, React, documentation, presentation slides',
     files: 12,
     downloads: '4,320',
-    author: 'Phạm Văn D',
+    author: 'Pham Van D',
   },
   {
     code: 'CEA201',
     date: '10/5/2024',
     title: 'CEA201 - Complete Course Materials',
-    description: 'Tổng hợp tài liệu đầy đủ môn CEA201: Slides, Labs, Assignments, và đề thi các kỳ',
+    description: 'All CEA201 course materials: Slides, Labs, Assignments, and past exams',
     files: 15,
     downloads: '3,245',
-    author: 'Nguyễn Văn A',
+    author: 'Nguyen Van A',
   },
   {
     code: 'DBI202',
     date: '10/5/2024',
     title: 'DBI202 - Database Lab Solutions',
-    description: 'Lời giải chi tiết tất cả Lab DBI202, kèm SQL scripts và giải thích',
+    description: 'Detailed solutions for all DBI202 Labs, with SQL scripts and explanations',
     files: 8,
     downloads: '1,890',
-    author: 'Lê Kim C',
+    author: 'Le Kim C',
     active: true,
   },
   {
     code: 'PRO192',
     date: '20/4/2024',
     title: 'PRO192 - OOP Java Complete Guide',
-    description: 'Tài liệu OOP Java từ cơ bản đến nâng cao: Theory, Practice, Design Patterns',
+    description: 'Java OOP materials from basic to advanced: Theory, practice, and design patterns',
     files: 18,
     downloads: '4,156',
-    author: 'Hoàng Thị E',
+    author: 'Hoang Thị E',
   },
   {
     code: 'CSD201',
     date: '6/5/2024',
     title: 'CSD201 - Data Structures & Algorithms Pack',
-    description: 'Bộ tài liệu CSD201: Slides lý thuyết, Code Implementation, Practice problems',
+    description: 'CSD201 materials: Theory slides, code implementations, and practice problems',
     files: 20,
     downloads: '3,890',
-    author: 'Vũ Văn F',
+    author: 'Vu Van F',
   },
   {
     code: 'IAO201c',
     date: '25/4/2024',
     title: 'IAO201c - Network Security Resources',
-    description: 'Tài liệu bảo mật mạng: Slides, Labs, Tools, và case studies thực tế',
+    description: 'Network Security resources: Slides, Labs, tools, and real-world case studies',
     files: 10,
     downloads: '1,234',
-    author: 'Trần Văn G',
+    author: 'Tran Van G',
   },
 ]
 
@@ -289,46 +289,46 @@ export const libraryFolders = [
 ]
 
 export const recentActivities = [
-  ['Tải lên tài liệu: CEA201 - Chapter 3: Memory Hierarchy', '2 giờ trước'],
-  ['Tải xuống: SWP391 - Project Template', '1 ngày trước'],
-  ['Bình luận: PRF192 - Final Exam 2023', '3 ngày trước'],
+  ['Uploaded document: CEA201 - Chapter 3: Memory Hierarchy', '2 hours ago'],
+  ['Downloaded: SWP391 - Project Template', '1 day ago'],
+  ['Commented on: PRF192 - Final Exam 2023', '3 days ago'],
 ]
 
 export const notifications = [
   {
     id: 1,
     type: 'success',
-    title: 'Tài liệu được duyệt',
-    text: 'Tài liệu "Giải tích 1 - Đề cương ôn tập" của bạn đã được admin duyệt và đăng lên cộng đồng',
-    author: 'Admin FPTU',
-    time: '5 phút trước',
+    title: 'Document Approved',
+    text: 'Your document "Calculus 1 - Study Guide" has been approved and published to the community',
+    author: 'FPTU Admin',
+    time: '5 minutes ago',
     icon: 'check',
   },
   {
     id: 2,
     type: 'info',
-    title: 'Bình luận mới',
-    text: 'Nguyễn Văn A đã bình luận vào tài liệu "Lập trình hướng đối tượng - Java": Cảm ơn bạn',
-    author: 'Nguyễn Văn A',
-    time: '30 phút trước',
+    title: 'New Comment',
+    text: 'Nguyen Van A commented on your document "Object-Oriented Programming - Java": Thank you',
+    author: 'Nguyen Van A',
+    time: '30 minutes ago',
     icon: 'message',
   },
   {
     id: 3,
     type: 'purple',
-    title: 'Trả lời bình luận',
-    text: 'Trần Thị B đã trả lời bình luận của bạn: "Mình cũng đồng ý, phần bài tập rất hay!"',
-    author: 'Trần Thị B',
-    time: '2 giờ trước',
+    title: 'Reply to Comment',
+    text: 'Tran Thi B replied to your comment: "I agree, the exercises are very helpful!"',
+    author: 'Tran Thi B',
+    time: '2 hours ago',
     icon: 'reply',
   },
   {
     id: 4,
     type: 'danger',
-    title: 'Tài liệu bị từ chối',
-    text: 'Tài liệu "Vật lý đại cương - Chương 3" chưa đạt yêu cầu. Lý do: Nội dung chưa đầy đủ',
-    author: 'Admin FPTU',
-    time: '5 giờ trước',
+    title: 'Document Rejected',
+    text: 'Your document "General Physics - Chapter 3" was rejected. Reason: Incomplete content',
+    author: 'FPTU Admin',
+    time: '5 hours ago',
     icon: 'x',
   },
 ]
