@@ -268,6 +268,11 @@ public class AiAssistService {
     private String cleanJsonText(String text) {
         if (text == null) return "{}";
         text = text.trim();
+        int firstBrace = text.indexOf('{');
+        int lastBrace = text.lastIndexOf('}');
+        if (firstBrace != -1 && lastBrace != -1 && firstBrace < lastBrace) {
+            return text.substring(firstBrace, lastBrace + 1);
+        }
         if (text.startsWith("```json")) {
             text = text.substring(7);
         } else if (text.startsWith("```")) {

@@ -26,6 +26,30 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
   const [rightPanelWidth, setRightPanelWidth] = useState(380)
   const [isResizing, setIsResizing] = useState(false)
 
+  // sliding active tab state
+  const tabRefs = useRef({})
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 })
+
+  useEffect(() => {
+    const updateIndicator = () => {
+      const activeEl = tabRefs.current[activeTab]
+      if (activeEl) {
+        setIndicatorStyle({
+          left: activeEl.offsetLeft,
+          width: activeEl.offsetWidth
+        })
+      }
+    }
+    
+    updateIndicator()
+    const timer = setTimeout(updateIndicator, 100)
+    window.addEventListener('resize', updateIndicator)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', updateIndicator)
+    }
+  }, [activeTab, loading])
+
   // ── AI CHATBOT STATES & HANDLERS ─────────────────────────────
   const [chatSessions, setChatSessions] = useState([])
   const [currentSessionId, setCurrentSessionId] = useState(null)
@@ -302,28 +326,24 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
         <div style={{ display: 'flex', flex: 1, alignItems: 'stretch', overflow: 'hidden' }}>
           {/* LEFT COLUMN */}
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: '-1px', position: 'relative', zIndex: 10, paddingLeft: '24px', paddingRight: '24px' }}>
-              <nav className="study-tabs" style={{ display: 'flex', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', position: 'relative', zIndex: 10, paddingLeft: '4px', paddingRight: '4px' }}>
+              <nav className="study-tabs-container">
+                {/* Sliding active tab indicator background */}
+                <div className="study-tab-indicator" style={indicatorStyle} />
                 {studyTabs.map((tab) => {
                   const isActive = activeTab === tab.id;
                   return (
-                  <button 
-                    key={tab.id} 
-                    onClick={() => onTabChange(tab.id)} 
-                    type="button"
-                    className={`transition-all duration-200 text-sm font-semibold rounded-t-xl cursor-pointer ${
-                      isActive 
-                        ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 border-b-white dark:border-b-slate-800 font-bold py-3 px-6' 
-                        : 'bg-slate-50 dark:bg-slate-900 text-indigo-400 dark:text-indigo-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800/50 py-2.5 px-5 border-none'
-                    }`}
-                    style={{
-                      borderBottomLeftRadius: '0',
-                      borderBottomRightRadius: '0',
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                )})}
+                    <button 
+                      key={tab.id} 
+                      ref={(el) => { tabRefs.current[tab.id] = el }}
+                      onClick={() => onTabChange(tab.id)} 
+                      type="button"
+                      className={`study-tab-btn ${isActive ? 'is-active' : ''}`}
+                    >
+                      {tab.label}
+                    </button>
+                  )
+                })}
               </nav>
             </div>
 
@@ -907,12 +927,13 @@ function CollectionPanel({ buttonLabel, disabled, emptyLabel, items, loading, on
 function FlashcardViewer({ set, onRegenerate, loading }) {
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
+  const [slideDirection, setSlideDirection] = useState('')
   const cards = set.cards ?? []
   const card = cards[index]
 
   // Reset to first card when set changes
   const prevSetId = useState(set.id)
-  if (prevSetId[0] !== set.id) { prevSetId[1](set.id); setIndex(0); setFlipped(false) }
+  if (prevSetId[0] !== set.id) { prevSetId[1](set.id); setIndex(0); setFlipped(false); setSlideDirection('') }
 
   return (
     <section>
@@ -943,20 +964,68 @@ function FlashcardViewer({ set, onRegenerate, loading }) {
         </button>
       </div>
 
-      <article onClick={() => setFlipped((value) => !value)} className="border border-indigo-600 dark:border-indigo-500 bg-white dark:bg-slate-800 shadow-md hover:shadow-lg transition-all duration-300" style={{ borderRadius: '12px', padding: '32px', minHeight: '340px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', cursor: 'pointer' }}>
-        <div className="text-slate-500 dark:text-slate-400" style={{ position: 'absolute', top: '16px', left: '16px', fontSize: '12px', fontWeight: 500 }}>{flipped ? 'Answer' : 'Question'}</div>
-        <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '12px', color: '#eab308' }}>
-          <StudyHubIcon name="star" size={16} />
-          <span className="text-indigo-500 dark:text-indigo-400"><StudyHubIcon name="edit" size={16} /></span>
+      <div className={`flashcard-3d-container slide-${slideDirection}`} key={index}>
+        <div 
+          onClick={() => setFlipped((value) => !value)} 
+          className={`flashcard-3d-inner ${flipped ? 'is-flipped' : ''}`}
+        >
+          {/* Front Face */}
+          <div className="flashcard-3d-face flashcard-3d-front">
+            <div className="text-slate-500 dark:text-slate-400" style={{ position: 'absolute', top: '16px', left: '16px', fontSize: '12px', fontWeight: 500 }}>Question</div>
+            <h3 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '24px', fontWeight: 700, textAlign: 'center', maxWidth: '80%', margin: 0 }}>
+              {card ? card.frontContent : 'No cards'}
+            </h3>
+            <div className="text-slate-500 dark:text-slate-400" style={{ position: 'absolute', bottom: '16px', fontSize: '12px' }}>Click to flip</div>
+          </div>
+
+          {/* Back Face */}
+          <div className="flashcard-3d-face flashcard-3d-back">
+            <div className="text-slate-500 dark:text-slate-400" style={{ position: 'absolute', top: '16px', left: '16px', fontSize: '12px', fontWeight: 500, zIndex: 1 }}>Answer</div>
+            <h3 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '24px', fontWeight: 700, textAlign: 'center', maxWidth: '80%', margin: 0, zIndex: 1 }}>
+              {card ? card.backContent : 'No cards'}
+            </h3>
+            <div className="text-slate-500 dark:text-slate-400" style={{ position: 'absolute', bottom: '16px', fontSize: '12px', zIndex: 1 }}>Click to flip</div>
+          </div>
         </div>
-        <h3 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '24px', fontWeight: 700, textAlign: 'center', maxWidth: '80%' }}>{card ? flipped ? card.backContent : card.frontContent : 'No cards'}</h3>
-        <div className="text-slate-500 dark:text-slate-400" style={{ position: 'absolute', bottom: '16px', fontSize: '12px' }}>Click to flip</div>
-      </article>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="flashcard-progress-container">
+        <div 
+          className="flashcard-progress-bar" 
+          style={{ width: `${cards.length ? ((index + 1) / cards.length) * 100 : 0}%` }} 
+        />
+      </div>
       
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '32px', marginTop: '24px' }}>
-        <button disabled={index === 0} onClick={() => { setIndex((value) => value - 1); setFlipped(false) }} type="button" style={{ background: 'none', border: 'none', color: index === 0 ? '#cbd5e1' : '#6366f1', cursor: index === 0 ? 'default' : 'pointer' }}><StudyHubIcon name="arrow-left" size={20} /></button>
-        <span style={{ fontSize: '14px', color: '#475569', fontWeight: 500 }}>{cards.length ? index + 1 : 0} of {cards.length}</span>
-        <button disabled={index >= cards.length - 1} onClick={() => { setIndex((value) => value + 1); setFlipped(false) }} type="button" style={{ background: 'none', border: 'none', color: index >= cards.length - 1 ? '#cbd5e1' : '#6366f1', cursor: index >= cards.length - 1 ? 'default' : 'pointer' }}><StudyHubIcon name="arrow-right" size={20} /></button>
+      {/* Navigation Controls */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '28px', marginTop: '16px' }}>
+        <button 
+          disabled={index === 0} 
+          onClick={() => { setSlideDirection('prev'); setIndex((value) => value - 1); setFlipped(false) }} 
+          type="button" 
+          className="flashcard-nav-btn"
+          aria-label="Previous card"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'translateX(-1px)' }}>
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+        
+        <span className="flashcard-index-text">
+          {cards.length ? index + 1 : 0} / {cards.length}
+        </span>
+        
+        <button 
+          disabled={index >= cards.length - 1} 
+          onClick={() => { setSlideDirection('next'); setIndex((value) => value + 1); setFlipped(false) }} 
+          type="button" 
+          className="flashcard-nav-btn"
+          aria-label="Next card"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ transform: 'translateX(1px)' }}>
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
       </div>
     </section>
   )
@@ -1021,12 +1090,33 @@ function QuizViewer({ onBack, quiz }) {
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState({}) // index -> 'correct' | 'incorrect' | 'skipped'
   const [selectedAnswers, setSelectedAnswers] = useState({}) // index -> key ('A', 'B', etc.)
+  const [showResults, setShowResults] = useState(false)
+  const [animatedScore, setAnimatedScore] = useState(0)
+  const [slideDirection, setSlideDirection] = useState('')
 
   const questions = quiz.questions ?? []
   const question = questions[index]
   const options = question
     ? [['A', question.optionA], ['B', question.optionB], ['C', question.optionC], ['D', question.optionD]]
     : []
+
+  const encouragements = [
+    "Đừng lo, bạn vẫn đang học mà!",
+    "Không sao cả, vấp ngã là mẹ thành công!",
+    "Hãy cố gắng ở câu tiếp theo nhé, bạn làm được mà!",
+    "Sai một lần là thêm một lần nhớ, cố lên nào!",
+    "Cứ tự tin lên, việc học là cả một hành trình!",
+    "Không sao đâu, bạn đang tiến bộ lên mỗi ngày đó!"
+  ]
+
+  const correctEncouragements = [
+    "Xuất sắc! Bạn đã làm rất tốt.",
+    "Chính xác! Tặng bạn một bông hoa 🌸",
+    "Tuyệt vời! Hãy tiếp tục phát huy nhé!",
+    "Quá chuẩn! Bạn học bài rất kỹ đấy.",
+    "Đúng rồi! Bạn thật thông minh.",
+    "Chuẩn không cần chỉnh! Cố lên nhé!"
+  ]
   const total = questions.length
   // Pagination: show 7 at a time
   const PAGE_SIZE = 7
@@ -1038,7 +1128,169 @@ function QuizViewer({ onBack, quiz }) {
   const currentRevealed = !!currentSelected
 
   const move = (nextIndex) => {
+    if (nextIndex > index) {
+      setSlideDirection('next')
+    } else if (nextIndex < index) {
+      setSlideDirection('prev')
+    }
     setIndex(nextIndex)
+  }
+
+  const correctCount = Object.values(answers).filter(val => val === 'correct').length
+  const scorePercent = total ? Math.round((correctCount / total) * 100) : 0
+
+  useEffect(() => {
+    if (showResults) {
+      const timer = setTimeout(() => {
+        setAnimatedScore(scorePercent)
+      }, 150)
+      return () => clearTimeout(timer)
+    } else {
+      setAnimatedScore(0)
+    }
+  }, [showResults, scorePercent])
+
+  if (showResults) {
+    return (
+      <section style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '440px', padding: '16px', textAlign: 'center' }}>
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300 quiz-results-card" style={{ width: '100%', maxWidth: '440px', borderRadius: '24px', padding: '40px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '28px' }}>
+          
+          <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '22px', fontWeight: 800, margin: 0, fontFamily: "'Inter', sans-serif", letterSpacing: '-0.02em' }}>
+            Quiz Results
+          </h2>
+
+          {/* Circular score gauge */}
+          <div style={{ position: 'relative', width: '140px', height: '140px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="140" height="140" className="quiz-svg-ring">
+              <defs>
+                <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  {scorePercent >= 80 ? (
+                    <>
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#059669" />
+                    </>
+                  ) : scorePercent >= 50 ? (
+                    <>
+                      <stop offset="0%" stopColor="#818cf8" />
+                      <stop offset="100%" stopColor="#4f46e5" />
+                    </>
+                  ) : (
+                    <>
+                      <stop offset="0%" stopColor="#f43f5e" />
+                      <stop offset="100%" stopColor="#e11d48" />
+                    </>
+                  )}
+                </linearGradient>
+                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="4" stdDeviation="4" floodOpacity="0.15" floodColor={scorePercent >= 80 ? "#10b981" : scorePercent >= 50 ? "#6366f1" : "#f43f5e"} />
+                </filter>
+              </defs>
+              {/* Background Circle */}
+              <circle
+                cx="70"
+                cy="70"
+                r="54"
+                strokeWidth="10"
+                className="stroke-slate-100 dark:stroke-slate-700"
+                fill="transparent"
+                style={{ stroke: 'var(--slider-track-color)' }}
+              />
+              {/* Progress Circle */}
+              <circle
+                cx="70"
+                cy="70"
+                r="54"
+                strokeWidth="10"
+                stroke="url(#scoreGrad)"
+                strokeLinecap="round"
+                fill="transparent"
+                strokeDasharray="339.292"
+                strokeDashoffset={339.292 - (339.292 * animatedScore) / 100}
+                className="quiz-circle-progress"
+                filter="url(#glow)"
+              />
+            </svg>
+            <div className="bg-white dark:bg-slate-800" style={{
+              position: 'absolute',
+              width: '106px',
+              height: '106px',
+              borderRadius: '50%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.04)',
+            }}>
+              <span className="text-slate-900 dark:text-white" style={{ fontSize: '32px', fontWeight: 800 }}>
+                {scorePercent}%
+              </span>
+              <span className="text-slate-400 dark:text-slate-500" style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em' }}>
+                SCORE
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <h3 className="text-slate-800 dark:text-slate-100" style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>
+              {scorePercent >= 80 ? "Xuất sắc! Bạn làm rất tốt. 🎉" :
+               scorePercent >= 50 ? "Khá tốt! Tiếp tục phát huy nhé. 👍" :
+               "Cố gắng thêm chút nữa ở lần sau nhé! 💪"}
+            </h3>
+            <p className="text-slate-500 dark:text-slate-400" style={{ fontSize: '14px', margin: 0, fontWeight: 500 }}>
+              Bạn đã trả lời đúng <strong>{correctCount}</strong> trên tổng số <strong>{total}</strong> câu hỏi.
+            </p>
+          </div>
+
+          {/* Detailed stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', width: '100%' }}>
+            <div className="quiz-stat-box is-correct">
+              <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                Chính xác
+              </span>
+              <strong style={{ fontSize: '20px', color: '#047857', marginTop: '4px' }} className="dark:text-emerald-400">{correctCount} / {total}</strong>
+            </div>
+            <div className="quiz-stat-box is-incorrect">
+              <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                Sai / Bỏ qua
+              </span>
+              <strong style={{ fontSize: '20px', color: '#b91c1c', marginTop: '4px' }} className="dark:text-rose-400">{total - correctCount} / {total}</strong>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: '16px', width: '100%', marginTop: '4px' }}>
+            <button
+              onClick={() => {
+                setIndex(0)
+                setAnswers({})
+                setSelectedAnswers({})
+                setShowResults(false)
+              }}
+              type="button"
+              className="quiz-btn-secondary"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              Retry
+            </button>
+            <button
+              onClick={onBack}
+              type="button"
+              className={`quiz-btn-primary ${
+                scorePercent >= 80 ? 'quiz-theme-green' :
+                scorePercent >= 50 ? 'quiz-theme-indigo' :
+                'quiz-theme-rose'
+              }`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              Done
+            </button>
+          </div>
+
+        </div>
+      </section>
+    )
   }
 
   const handleSelectOption = (key) => {
@@ -1183,7 +1435,7 @@ function QuizViewer({ onBack, quiz }) {
 
       {/* QUESTION CARD */}
       {question ? (
-        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300" style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: '16px', padding: '32px', overflow: 'auto' }}>
+        <div className={`bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300 quiz-card-container slide-${slideDirection}`} key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRadius: '16px', padding: '32px', overflow: 'auto' }}>
           {/* Progress label */}
           <p className="text-slate-400 dark:text-slate-500 font-medium" style={{ fontSize: '13px', marginBottom: '16px', margin: '0 0 16px', textAlign: 'center' }}>
             Question: {index + 1}/{total}
@@ -1224,21 +1476,55 @@ function QuizViewer({ onBack, quiz }) {
 
           {/* Feedback */}
           {currentRevealed && (
-            <div 
-              className={currentSelected === question.correctOption 
-                ? "bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/40 text-green-800 dark:text-green-300 transition-colors"
-                : "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-red-800 dark:text-red-300 transition-colors"
-              }
-              style={{
-                padding: '14px 20px', borderRadius: '10px', marginBottom: '24px',
-                fontSize: '14px', fontWeight: 500, lineHeight: 1.6,
-              }}
-            >
-              {currentSelected === question.correctOption
-                ? '✓ Correct!'
-                : `✗ Correct answer: ${question.correctOption}`}
-              {question.explanation ? ` — ${question.explanation}` : ''}
-            </div>
+            currentSelected === question.correctOption ? (
+              <div 
+                className="bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-900/40 text-teal-900 dark:text-teal-300 transition-colors"
+                style={{
+                  padding: '16px 20px', borderRadius: '12px', marginBottom: '24px',
+                  lineHeight: 1.6,
+                  textAlign: 'center'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '16px' }}>🎉</span>
+                  <strong style={{ fontSize: '15px', color: '#0d9488' }}>
+                    {correctEncouragements[index % correctEncouragements.length]}
+                  </strong>
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: 500 }} className="text-teal-700 dark:text-teal-400">
+                  Hãy tiếp tục phát huy nhé!
+                </div>
+              </div>
+            ) : (
+              <div 
+                className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 text-rose-900 dark:text-rose-300 transition-colors"
+                style={{
+                  padding: '16px 20px', borderRadius: '12px', marginBottom: '24px',
+                  lineHeight: 1.6,
+                  textAlign: 'center'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '16px' }}>💡</span>
+                  <strong style={{ fontSize: '15px', color: '#e11d48' }}>
+                    {encouragements[index % encouragements.length]}
+                  </strong>
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#4c0519' }} className="dark:text-rose-200">
+                  Đáp án đúng: <span style={{ fontWeight: 700 }}>{question.correctOption}. {
+                    question.correctOption === 'A' ? question.optionA :
+                    question.correctOption === 'B' ? question.optionB :
+                    question.correctOption === 'C' ? question.optionC :
+                    question.optionD
+                  }</span>
+                </div>
+                {question.explanation && (
+                  <div style={{ fontSize: '12px', marginTop: '6px', opacity: 0.85 }}>
+                    Giải thích: {question.explanation}
+                  </div>
+                )}
+              </div>
+            )
           )}
 
           {/* Actions: Previous | Skip | Next */}
@@ -1259,13 +1545,22 @@ function QuizViewer({ onBack, quiz }) {
               style={{ padding: '10px 24px', borderRadius: '8px', fontSize: '14px', cursor: (currentRevealed || index >= total - 1) ? 'default' : 'pointer' }}
             >Skip</button>
 
-            <button
-              disabled={index >= total - 1}
-              onClick={() => move(index + 1)}
-              type="button"
-              className="font-semibold transition-colors border-none"
-              style={{ padding: '10px 28px', borderRadius: '8px', background: index >= total - 1 ? 'var(--quiz-num-border)' : '#6366f1', color: index >= total - 1 ? 'var(--quiz-num-color)' : '#fff', fontSize: '14px', cursor: index >= total - 1 ? 'default' : 'pointer' }}
-            >Next</button>
+            {index >= total - 1 ? (
+              <button
+                onClick={() => setShowResults(true)}
+                type="button"
+                className="font-semibold transition-colors border-none"
+                style={{ padding: '10px 28px', borderRadius: '8px', background: '#6366f1', color: '#fff', fontSize: '14px', cursor: 'pointer' }}
+              >Complete</button>
+            ) : (
+              <button
+                disabled={index >= total - 1}
+                onClick={() => move(index + 1)}
+                type="button"
+                className="font-semibold transition-colors border-none"
+                style={{ padding: '10px 28px', borderRadius: '8px', background: index >= total - 1 ? 'var(--quiz-num-border)' : '#6366f1', color: index >= total - 1 ? 'var(--quiz-num-color)' : '#fff', fontSize: '14px', cursor: index >= total - 1 ? 'default' : 'pointer' }}
+              >Next</button>
+            )}
           </div>
         </div>
       ) : (
