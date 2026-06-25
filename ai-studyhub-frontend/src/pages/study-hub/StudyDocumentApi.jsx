@@ -1400,7 +1400,7 @@ function FlashcardViewer({ set, onRegenerate, loading }) {
                       onClick={() => handleMatchItemClick(item)}
                       className={cardClass}
                       style={{
-                        height: '110px',
+                        minHeight: '110px',
                         borderRadius: '16px',
                         border: borderStyle,
                         backgroundColor: bgStyle,
@@ -1408,16 +1408,24 @@ function FlashcardViewer({ set, onRegenerate, loading }) {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        padding: '16px',
+                        padding: '12px',
                         textAlign: 'center',
                         cursor: isMatched ? 'default' : 'pointer',
                         userSelect: 'none',
-                        fontSize: '15px',
+                        fontSize: (() => {
+                          const len = item.text.length
+                          if (len > 120) return '11px'
+                          if (len > 80) return '12px'
+                          if (len > 40) return '13px'
+                          return '14px'
+                        })(),
                         fontWeight: 700,
                         color: '#1e293b',
                         opacity: isMatched ? 0 : 1,
                         pointerEvents: isMatched ? 'none' : 'auto',
-                        visibility: isMatched ? 'hidden' : 'visible'
+                        visibility: isMatched ? 'hidden' : 'visible',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.3
                       }}
                     >
                       {item.text}
