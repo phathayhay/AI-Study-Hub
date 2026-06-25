@@ -90,7 +90,7 @@ public class AiAssistService {
     }
 
     @Transactional
-    public QuizResponse generateQuiz(Long documentId, DifficultyLevel difficulty, String userEmail) throws IOException {
+    public QuizResponse generateQuiz(Long documentId, DifficultyLevel difficulty, Integer quantity, String userEmail) throws IOException {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
         User user = userRepository.findByEmail(userEmail)
@@ -100,8 +100,9 @@ public class AiAssistService {
         String text = textExtractionService.extractTextFromUrl(doc.getFileUrl());
         String contentToProcess = text.substring(0, Math.min(text.length(), 15000));
 
+        int numQuestions = (quantity != null && quantity > 0) ? quantity : 5;
         String prompt = String.format(
-                "Hãy tạo một bộ câu hỏi trắc nghiệm ôn tập (gồm 5 đến 10 câu hỏi) mức độ %s dựa trên tài liệu sau đây bằng Tiếng Việt. " +
+                "Hãy tạo một bộ câu hỏi trắc nghiệm ôn tập gồm đúng %d câu hỏi, mức độ %s dựa trên tài liệu sau đây bằng Tiếng Việt. " +
                         "Trả về định dạng JSON có cấu trúc chính xác như sau:\n" +
                         "{\n" +
                         "  \"quizTitle\": \"Tiêu đề bộ đề trắc nghiệm\",\n" +
@@ -119,7 +120,7 @@ public class AiAssistService {
                         "}\n" +
                         "Chú ý: correctOption chỉ được nhận một trong bốn giá trị: A, B, C, D.\n" +
                         "Nội dung tài liệu:\n\n%s",
-                difficulty.name(), contentToProcess
+                numQuestions, difficulty.name(), contentToProcess
         );
 
         log.info("Requesting Gemini to generate quiz for document: {}", documentId);

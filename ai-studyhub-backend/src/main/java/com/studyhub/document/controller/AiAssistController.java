@@ -64,9 +64,10 @@ public class AiAssistController {
     })
     public ResponseEntity<QuizResponse> generateQuiz(
             @PathVariable Long documentId,
-            @RequestParam(value = "difficulty", defaultValue = "MEDIUM") DifficultyLevel difficulty) throws IOException {
+            @RequestParam(value = "difficulty", defaultValue = "MEDIUM") DifficultyLevel difficulty,
+            @RequestParam(value = "quantity", required = false) Integer quantity) throws IOException {
         String email = SecurityUtils.getCurrentUserEmail();
-        return ResponseEntity.ok(aiAssistService.generateQuiz(documentId, difficulty, email));
+        return ResponseEntity.ok(aiAssistService.generateQuiz(documentId, difficulty, quantity, email));
     }
 
     // API lấy danh sách các bộ đề trắc nghiệm đã tạo của một tài liệu

@@ -4,8 +4,13 @@ export function generateSummary(documentId) {
   return apiPost(`/ai/documents/${documentId}/summary`)
 }
 
-export function generateQuiz(documentId, difficulty = 'MEDIUM') {
-  return apiPost(`/ai/documents/${documentId}/quiz?difficulty=${difficulty}`)
+export function generateQuiz(documentId, difficulty = 'MEDIUM', quantity = null) {
+  const query = new URLSearchParams()
+  query.append('difficulty', difficulty)
+  if (quantity !== undefined && quantity !== null) {
+    query.append('quantity', quantity)
+  }
+  return apiPost(`/ai/documents/${documentId}/quiz?${query.toString()}`)
 }
 
 export function generateFlashcards(documentId) {
