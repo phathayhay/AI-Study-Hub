@@ -562,6 +562,8 @@ function AdminReports() {
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sortBy, setSortBy] = useState('date:desc')
+  const [detailReport, setDetailReport] = useState(null)
+  const [confirmAction, setConfirmAction] = useState(null)
   const statusOptions = useMemo(() => getStatusOptions(reports, (report) => report.status, ['pending', 'resolved']), [reports])
   const visibleReports = useMemo(() => {
     const filtered = reports.filter((report) => {
@@ -580,6 +582,17 @@ function AdminReports() {
       status: (report) => report.status,
     })
   }, [query, reports, sortBy, statusFilter])
+
+  const handleResolveReport = async () => {
+    if (!confirmAction?.report) return
+    const { rejectDocument, report } = confirmAction
+    await runAdminAction(
+      () => resolveAdminReport(report.id, 'RESOLVED', rejectDocument),
+      reload,
+      rejectDocument ? 'Report resolved and document rejected' : 'Report marked as resolved',
+    )
+    setConfirmAction(null)
+  }
 
   return (
     <main className="admin-page">
@@ -609,9 +622,9 @@ function AdminReports() {
                 <td>{formatDate(report.createdAt)}</td>
                 <td><AdminStatus status={report.status} /></td>
                 <td className="admin-actions">
-                  <button onClick={() => callToast(report.reportReason || 'No reason provided', 'info')} type="button"><StudyHubIcon name="eye" size={15} /></button>
-                  <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', false), reload, 'Report resolved')} type="button"><StudyHubIcon name="check" size={15} /></button>
-                  <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', true), reload, 'Report resolved and document rejected')} type="button"><StudyHubIcon name="x" size={15} /></button>
+                  <button aria-label="View report details" onClick={() => setDetailReport(report)} title="View report details" type="button"><StudyHubIcon name="eye" size={15} /></button>
+                  <button aria-label="Resolve report only" onClick={() => setConfirmAction({ rejectDocument: false, report })} title="Resolve report only" type="button"><StudyHubIcon name="check" size={15} /></button>
+                  <button aria-label="Resolve and reject document" onClick={() => setConfirmAction({ rejectDocument: true, report })} title="Resolve and reject document" type="button"><StudyHubIcon name="x" size={15} /></button>
                 </td>
               </tr>
             ))}
@@ -619,7 +632,84 @@ function AdminReports() {
           </tbody>
         </table>
       </section>
+      {detailReport && <AdminReportModal report={detailReport} onClose={() => setDetailReport(null)} />}
+      {confirmAction && (
+        <AdminReportConfirmModal
+          action={confirmAction}
+          onCancel={() => setConfirmAction(null)}
+          onConfirm={handleResolveReport}
+        />
+      )}
     </main>
+  )
+}
+
+function AdminReportModal({ onClose, report }) {
+  const documentTitle = report.documentTitle || `Document #${report.documentId || '-'}`
+
+  return (
+    <div className="admin-modal-backdrop">
+      <section className="admin-report-modal">
+        <button aria-label="Close report details" className="admin-modal-close" onClick={onClose} type="button">x</button>
+        <header>
+          <span><StudyHubIcon name="flag" size={22} /></span>
+          <div>
+            <h2>Report Details</h2>
+            <p>{documentTitle}</p>
+          </div>
+        </header>
+        <div className="admin-detail-grid">
+          <InfoBlock label="Reporter" value={report.reporterEmail || '-'} />
+          <InfoBlock label="Document" value={documentTitle} />
+          <InfoBlock label="Violation Type" value={report.reportType || '-'} />
+          <InfoBlock label="Report Date" value={formatDate(report.createdAt)} />
+          <InfoBlock label="Status" value={STATUS_LABELS[normalizeStatus(report.status)] || report.status || '-'} />
+          <p className="info-block admin-report-reason">
+            <small>Reason</small>
+            <strong>{report.reportReason || 'No reason provided'}</strong>
+          </p>
+        </div>
+        <footer>
+          <button className="dark-button" onClick={onClose} type="button">Close</button>
+        </footer>
+      </section>
+    </div>
+  )
+}
+
+function AdminReportConfirmModal({ action, onCancel, onConfirm }) {
+  const { rejectDocument, report } = action
+  const documentTitle = report.documentTitle || `Document #${report.documentId || '-'}`
+
+  return (
+    <div className="admin-modal-backdrop">
+      <section className="admin-report-modal admin-report-modal--confirm">
+        <button aria-label="Cancel report action" className="admin-modal-close" onClick={onCancel} type="button">x</button>
+        <header>
+          <span className={rejectDocument ? 'red' : 'green'}><StudyHubIcon name={rejectDocument ? 'x' : 'check'} size={22} /></span>
+          <div>
+            <h2>{rejectDocument ? 'Reject Document' : 'Resolve Report'}</h2>
+            <p>{documentTitle}</p>
+          </div>
+        </header>
+        <div className="admin-report-summary">
+          <p><strong>Reporter:</strong> {report.reporterEmail || '-'}</p>
+          <p><strong>Violation:</strong> {report.reportType || '-'}</p>
+          <p><strong>Reason:</strong> {report.reportReason || 'No reason provided'}</p>
+        </div>
+        <p className="admin-report-warning">
+          {rejectDocument
+            ? 'This will mark the report as resolved and reject the reported document.'
+            : 'This will mark the report as resolved without rejecting the document.'}
+        </p>
+        <footer>
+          <button className="dark-button" onClick={onCancel} type="button">Cancel</button>
+          <button className={rejectDocument ? 'admin-danger' : 'admin-primary'} onClick={onConfirm} type="button">
+            {rejectDocument ? 'Reject document' : 'Resolve report'}
+          </button>
+        </footer>
+      </section>
+    </div>
   )
 }
 

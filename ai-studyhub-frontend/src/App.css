@@ -5224,7 +5224,8 @@ select.admin-filter-input {
 }
 
 .admin-user-modal,
-.admin-course-modal {
+.admin-course-modal,
+.admin-report-modal {
   position: relative;
   width: min(560px, calc(100vw - 40px));
   padding: 28px;
@@ -5291,6 +5292,111 @@ select.admin-filter-input {
   justify-content: space-between;
   padding-top: 18px;
   border-top: 1px solid #e5e7eb;
+}
+
+.admin-report-modal {
+  width: min(680px, calc(100vw - 40px));
+}
+
+.admin-report-modal header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding-right: 34px;
+}
+
+.admin-report-modal header > span {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #2563eb;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+}
+
+.admin-report-modal header > span.green {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.admin-report-modal header > span.red {
+  color: #b91c1c;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.admin-report-modal h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 24px;
+}
+
+.admin-report-modal header p {
+  margin: 6px 0 0;
+  color: #475569;
+  overflow-wrap: anywhere;
+}
+
+.admin-report-reason strong,
+.admin-report-summary {
+  overflow-wrap: anywhere;
+}
+
+.admin-report-summary {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0;
+  padding: 16px;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+  border-radius: 8px;
+}
+
+.admin-report-summary p,
+.admin-report-warning {
+  margin: 0;
+}
+
+.admin-report-warning {
+  padding: 12px 14px;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.admin-report-modal footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.admin-report-modal footer button,
+.admin-danger {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-danger {
+  color: #ffffff;
+  background: #dc2626;
+}
+
+.admin-danger:hover {
+  background: #b91c1c;
 }
 
 .green-text {
