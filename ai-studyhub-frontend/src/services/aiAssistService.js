@@ -19,9 +19,10 @@ export function generateFlashcards(documentId) {
  * @param {any} documentId - Path parameter
  * @param {any} difficulty - Query parameter
  */
-export function generateQuiz(documentId, difficulty) {
+export function generateQuiz(documentId, difficulty, quantity) {
   const query = new URLSearchParams();
   if (difficulty !== undefined && difficulty !== null) query.append('difficulty', difficulty);
+  if (quantity !== undefined && quantity !== null) query.append('quantity', quantity);
   return apiPost(`/ai/documents/${documentId}/quiz${query.toString() ? `?${query.toString()}` : ''}`);
 }
 

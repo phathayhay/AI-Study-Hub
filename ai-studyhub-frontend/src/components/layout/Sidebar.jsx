@@ -421,7 +421,7 @@ export default function Sidebar({
           style={{ padding: collapsed ? '12px 8px' : '14px 16px' }}
         >
           <button
-            onClick={() => onNavigate?.('login')}
+            onClick={() => onNavigate?.('register')}
             style={{
               width: '100%',
               display: 'flex',

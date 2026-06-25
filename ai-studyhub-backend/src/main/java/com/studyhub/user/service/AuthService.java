@@ -330,4 +330,27 @@ public class AuthService {
         userRepository.save(user);
         log.info("User {} successfully activated", email);
     }
+
+    /**
+     * Gửi lại email xác thực tài khoản.
+     */
+    @Transactional
+    public void resendVerificationEmail(String email) {
+        String cleanEmail = email.trim().toLowerCase();
+        log.info("Resending verification email to {}", cleanEmail);
+        User user = userRepository.findByEmail(cleanEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Account with this email does not exist"));
+
+        if (user.getStatus() == UserStatus.ACTIVE) {
+            throw new IllegalStateException("This account is already active");
+        }
+
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new IllegalStateException("Your account has been banned");
+        }
+
+        String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
+        String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
+        emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
+    }
 }

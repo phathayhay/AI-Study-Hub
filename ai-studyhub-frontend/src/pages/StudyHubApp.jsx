@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import AppLayout from '../components/layout/AppLayout'
 import { AdminApp } from './study-hub/admin'
-import { LoginPage, RegisterPage } from './study-hub/auth'
+import { LoginPage, RegisterPage, VerifyEmailPage } from './study-hub/auth'
 import { LibraryPage } from './study-hub/library'
 import { NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal } from './study-hub/modals'
 import {
@@ -342,8 +342,10 @@ export default function StudyHubApp() {
     const savedTheme = localStorage.getItem('theme')
     if (savedTheme === 'dark') {
       document.body.classList.add('dark-theme')
+      document.documentElement.classList.add('dark')
     } else {
       document.body.classList.remove('dark-theme')
+      document.documentElement.classList.remove('dark')
     }
   }, [])
 
@@ -351,7 +353,7 @@ export default function StudyHubApp() {
   useEffect(() => {
     const isAdminRoute = route.startsWith('admin-')
     if (guest) {
-      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
+      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'verify-email']
       if (!publicRoutes.includes(route)) {
         setRoute('login')
         pushPath('login', {}, true)
@@ -559,6 +561,7 @@ export default function StudyHubApp() {
 
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
   if (route === 'register') return <RegisterPage onRegister={handleRegister} onNavigate={navigate} />
+  if (route === 'verify-email') return <VerifyEmailPage onNavigate={navigate} />
   if (route.startsWith('admin-')) {
     if (role !== 'admin') return null
     return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />
@@ -758,6 +761,7 @@ const routeMatchers = [
   { pattern: ROUTES.HOME, route: 'explore' },
   { pattern: ROUTES.LOGIN, route: 'login' },
   { pattern: ROUTES.REGISTER, route: 'register' },
+  { pattern: ROUTES.VERIFY_EMAIL, route: 'verify-email' },
   { pattern: ROUTES.EXPLORE, route: 'explore' },
   { pattern: ROUTES.LIBRARY, route: 'library', libraryTab: 'sessions' },
   { pattern: ROUTES.LIBRARY_SHARED, route: 'library', libraryTab: 'shared' },

@@ -64,6 +64,20 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok("Email verified successfully. You can now log in."));
     }
 
+    // API gửi lại email xác thực
+    @PostMapping("/send-verify-email")
+    @Operation(summary = "Resend verification email", description = "Resends the email verification link to an inactive account.")
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Verification link sent successfully", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiResponse.class), examples = @ExampleObject(value = "{\"success\": true, \"message\": \"Verification link has been resent to your email.\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Email address not found or account already active", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Account with this email does not exist\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"An error occurred, please try again\", \"timestamp\": \"2026-06-14T16:40:00\"}")))
+    })
+    public ResponseEntity<ApiResponse<Void>> resendVerificationEmail(@Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("API: Resending verification email to {}", request.getEmail());
+        authService.resendVerificationEmail(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.ok("Verification link has been resent to your email."));
+    }
+
     // API đăng nhập tài khoản người dùng
     @PostMapping("/login")
     @Operation(summary = "User login authentication", description = "Validates user credentials and issues JWT Access Token and Refresh Token.")

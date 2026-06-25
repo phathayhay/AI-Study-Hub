@@ -771,24 +771,41 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
       window.showToast?.('File size exceeds 10MB limit', 'error')
       return
     }
-    const title = titleRef.current?.value?.trim() || selectedUploadFile.name
+    const title = titleRef.current?.value?.trim() || ''
+    if (!title) {
+      setUploadError('Document Title is required.')
+      window.showToast?.('Please enter Document Title', 'error')
+      return
+    }
+
+    if (!selectedMajor) {
+      setUploadError('Major is required.')
+      window.showToast?.('Please select Major', 'error')
+      return
+    }
+
+    if (!selectedSemester) {
+      setUploadError('Semester is required.')
+      window.showToast?.('Please select Semester', 'error')
+      return
+    }
+
+    if (!selectedCourse) {
+      setUploadError('Course Code is required.')
+      window.showToast?.('Please select Course Code', 'error')
+      return
+    }
+
+    if (!selectedCategory) {
+      setUploadError('Document Type is required.')
+      window.showToast?.('Please select Document Type', 'error')
+      return
+    }
+
     const description = descRef.current?.value?.trim() || ''
     const visibility = visibilityRef.current?.value || 'PRIVATE'
     const tagsRaw = tagsRef.current?.value?.trim() || ''
     const tags = tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : []
-
-    if (visibility === 'PUBLIC') {
-      if (!selectedCourse) {
-        setUploadError('Course Code is required for public documents.')
-        window.showToast?.('Course Code is required for public documents', 'error')
-        return
-      }
-      if (!selectedCategory) {
-        setUploadError('Document Type is required for public documents.')
-        window.showToast?.('Document Type is required for public documents', 'error')
-        return
-      }
-    }
 
     const courseId = UPLOAD_COURSE_MAP[selectedCourse] || null
     const categoryId = UPLOAD_CATEGORY_MAP[selectedCategory] || null
