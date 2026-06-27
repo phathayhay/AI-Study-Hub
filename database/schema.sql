@@ -284,6 +284,11 @@ CREATE TABLE folders (
     user_id BIGINT NOT NULL,
     folder_name VARCHAR(255) NOT NULL,
     parent_folder_id BIGINT NULL,
+    visibility ENUM(
+        'PUBLIC',
+        'PRIVATE'
+    ) DEFAULT 'PRIVATE',
+    published_at TIMESTAMP NULL,
     UNIQUE(user_id, parent_folder_id, folder_name),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -726,6 +731,7 @@ CREATE TABLE notifications (
 		'SYSTEM'
 	),
     is_read BOOLEAN DEFAULT FALSE,
+    source_comment_id BIGINT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_notifications_user
         FOREIGN KEY(user_id)
@@ -891,6 +897,9 @@ ON notifications(user_id);
 CREATE INDEX idx_notifications_read
 ON notifications(is_read);
 
+CREATE INDEX idx_notifications_source_comment
+ON notifications(source_comment_id);
+
 -- USER SUBSCRIPTIONS
 CREATE INDEX idx_user_subscriptions_user
 ON user_subscriptions(user_id);
@@ -916,6 +925,9 @@ ON folders(user_id);
 
 CREATE INDEX idx_folders_parent
 ON folders(parent_folder_id);
+
+CREATE INDEX idx_folders_visibility
+ON folders(visibility);
 
 CREATE INDEX idx_documents_folder
 ON documents(folder_id);

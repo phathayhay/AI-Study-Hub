@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import AppLayout from '../components/layout/AppLayout'
 import { AdminApp } from './study-hub/admin'
-import { LoginPage, RegisterPage } from './study-hub/auth'
+import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from './study-hub/auth'
 import { LibraryPage } from './study-hub/library'
-import { NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal } from './study-hub/modals'
+import { NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal, UpgradePaymentModal } from './study-hub/modals'
 import {
   DocumentDetailPage, ExplorePage, FolderDetailPage, HomeScreen,
   PricingPage, ProfilePage, UploadPage,
@@ -12,9 +12,10 @@ import {
 import StudyDocumentApi from './study-hub/StudyDocumentApi'
 import useAuth from '../hooks/useAuth'
 import { getFolder } from '../features/folders/folderService'
-import { getDocument } from '../features/documents/documentService'
+import { getDocument, searchDocuments } from '../features/documents/documentService'
 import { register as apiRegister } from '../features/auth/authService'
 import { ROUTES, ROUTE_PATHS, fillRoute } from '../constants/routes'
+import { getNotifications as getUserNotifications, markAllNotificationsAsRead, markNotificationAsRead } from '../services/userService'
 
 const defaultStudyFile = {
   name: '漢字--JPD316 Lesson 5-NEW.pptx',
@@ -63,12 +64,18 @@ export default function StudyHubApp() {
   const [showFeatureRequest, setShowFeatureRequest] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
   const [showExtension, setShowExtension] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [upgradePlan, setUpgradePlan] = useState(null)
+  const [upgradePaymentInfo, setUpgradePaymentInfo] = useState(null)
   const [studyBreadcrumbs, setStudyBreadcrumbs] = useState([])
   const [initialFolderId, setInitialFolderId] = useState(null)
   const [toast, setToast] = useState(null)
+  const [notificationState, setNotificationState] = useState({ unreadCount: 0, notifications: [] })
+  const [notificationLoading, setNotificationLoading] = useState(false)
   const [currentDoc, setCurrentDoc] = useState(null)
   const [currentFolder, setCurrentFolder] = useState(null)
   const [docBreadcrumbs, setDocBreadcrumbs] = useState([])
+  const [exploreFilters, setExploreFilters] = useState({ keyword: '', majorCode: 'ALL', courseCode: null })
 
   const getPathForRoute = (nextRoute, params = {}) => {
     if (nextRoute === 'folder-detail') {
@@ -206,6 +213,110 @@ export default function StudyHubApp() {
       isMounted = false
     }
   }, [studyFile?.id, route])
+
+  const loadNotifications = async () => {
+    if (guest) {
+      setNotificationState({ unreadCount: 0, notifications: [] })
+      return
+    }
+
+    setNotificationLoading(true)
+    try {
+      const res = await getUserNotifications()
+      const data = res?.data || res || {}
+      setNotificationState({
+        unreadCount: data.unreadCount || 0,
+        notifications: Array.isArray(data.notifications) ? data.notifications : []
+      })
+    } catch (err) {
+      console.error('Failed to load notifications', err)
+    } finally {
+      setNotificationLoading(false)
+    }
+  }
+
+  const markNotificationReadInState = (notificationId) => {
+    setNotificationState((current) => {
+      const updatedNotifications = current.notifications.map((item) =>
+        item.id === notificationId ? { ...item, isRead: true } : item
+      )
+      const unreadCount = updatedNotifications.filter((item) => !item.isRead).length
+      return { unreadCount, notifications: updatedNotifications }
+    })
+  }
+
+  const markNotificationAsReadIfNeeded = async (notification) => {
+    if (!notification?.id || notification.isRead) return
+    await markNotificationAsRead(notification.id)
+    markNotificationReadInState(notification.id)
+  }
+
+  const extractNotificationDocumentTitle = (notification) => {
+    const matches = notification?.content?.match(/"([^"]+)"/)
+    return matches?.[1]?.trim() || ''
+  }
+
+  const resolveNotificationDocumentId = async (notification) => {
+    if (notification?.documentId) return notification.documentId
+
+    const documentTitle = extractNotificationDocumentTitle(notification)
+    if (!documentTitle) return null
+
+    const res = await searchDocuments({ keyword: documentTitle, page: 0, size: 10 })
+    const docs = Array.isArray(res)
+      ? res
+      : (Array.isArray(res?.data) ? res.data : res?.data?.content || res?.content || [])
+
+    const exactMatch = docs.find((doc) => (doc?.title || '').trim().toLowerCase() === documentTitle.toLowerCase())
+    return exactMatch?.id || docs[0]?.id || null
+  }
+
+  const handleOpenNotification = async (notification) => {
+    try {
+      await markNotificationAsReadIfNeeded(notification)
+
+      if (notification?.notificationType === 'COMMENT') {
+        const documentId = await resolveNotificationDocumentId(notification)
+        if (documentId) {
+          setPreviousRoute(route)
+          setSelectedDocId(Number(documentId))
+          setRoute('doc-detail')
+          setShowNotifications(false)
+          setCurrentDoc(null)
+          routerNavigate(`${fillRoute(ROUTES.DOCUMENT_DETAIL, { documentId })}#comments`)
+          return
+        }
+      }
+
+      setShowNotifications(false)
+    } catch (err) {
+      window.showToast?.(err.message || 'Failed to open notification', 'error')
+    }
+  }
+
+  useEffect(() => {
+    if (guest) {
+      setNotificationState({ unreadCount: 0, notifications: [] })
+      return undefined
+    }
+
+    loadNotifications()
+    const handleRefreshNotifications = () => {
+      if (!document.hidden) {
+        loadNotifications()
+      }
+    }
+
+    const timer = window.setInterval(loadNotifications, 15000)
+    window.addEventListener('focus', handleRefreshNotifications)
+    document.addEventListener('visibilitychange', handleRefreshNotifications)
+
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', handleRefreshNotifications)
+      document.removeEventListener('visibilitychange', handleRefreshNotifications)
+    }
+  }, [guest, user?.id, user?.email])
 
   useEffect(() => {
     if (route !== 'doc-detail' || !currentDoc?.folderId) {
@@ -351,7 +462,7 @@ export default function StudyHubApp() {
   useEffect(() => {
     const isAdminRoute = route.startsWith('admin-')
     if (guest) {
-      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
+      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']
       if (!publicRoutes.includes(route)) {
         setRoute('login')
         pushPath('login', {}, true)
@@ -383,7 +494,7 @@ export default function StudyHubApp() {
     // Enforce route guards
     const hasToken = !!localStorage.getItem('accessToken')
     const isGuest = !user && !hasToken
-    const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register']
+    const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']
     let targetBaseRoute = nextRoute
     if (nextRoute === 'new-study-session') {
       targetBaseRoute = 'upload'
@@ -446,6 +557,13 @@ export default function StudyHubApp() {
       return
     }
     setPreviousRoute(route)
+    if (nextRoute === 'explore') {
+      setExploreFilters({
+        keyword: params.keyword || '',
+        majorCode: params.majorCode || 'ALL',
+        courseCode: params.courseCode || null
+      })
+    }
     setRoute(nextRoute)
     pushPath(nextRoute, params)
     setShowNotifications(false); setShowReport(false)
@@ -559,6 +677,9 @@ export default function StudyHubApp() {
 
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
   if (route === 'register') return <RegisterPage onRegister={handleRegister} onNavigate={navigate} />
+  if (route === 'forgot-password') return <ForgotPasswordPage onNavigate={navigate} />
+  if (route === 'reset-password') return <ResetPasswordPage onNavigate={navigate} />
+  if (route === 'verify-email') return <VerifyEmailPage onNavigate={navigate} />
   if (route.startsWith('admin-')) {
     if (role !== 'admin') return null
     return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />
@@ -587,7 +708,16 @@ export default function StudyHubApp() {
       guest={guest} user={user}
       title={appTitle}
       onNavigate={navigate}
-      onNotifications={() => setShowNotifications((open) => !open)}
+      onNotifications={() => {
+        setShowNotifications((open) => {
+          const next = !open
+          if (next) {
+            loadNotifications()
+          }
+          return next
+        })
+      }}
+      notificationUnreadCount={notificationState.unreadCount}
       sidebarCollapsed={sidebarCollapsed}
       onToggleCollapse={toggleSidebar}
       recentItems={recentItems}
@@ -612,13 +742,51 @@ export default function StudyHubApp() {
         }
       }}
     >
-      {showNotifications && <NotificationPanel onClose={() => setShowNotifications(false)} />}
+      {showNotifications && (
+        <NotificationPanel
+          onClose={() => setShowNotifications(false)}
+          notifications={notificationState.notifications}
+          unreadCount={notificationState.unreadCount}
+          loading={notificationLoading}
+          onOpenNotification={handleOpenNotification}
+          onMarkAsRead={async (notificationId) => {
+            try {
+              await markNotificationAsRead(notificationId)
+              markNotificationReadInState(notificationId)
+            } catch (err) {
+              window.showToast?.(err.message || 'Failed to update notification', 'error')
+            }
+          }}
+          onMarkAllRead={async () => {
+            try {
+              await markAllNotificationsAsRead()
+              setNotificationState((current) => ({
+                unreadCount: 0,
+                notifications: current.notifications.map((item) => ({ ...item, isRead: true }))
+              }))
+            } catch (err) {
+              window.showToast?.(err.message || 'Failed to update notifications', 'error')
+            }
+          }}
+        />
+      )}
 
-      {route === 'explore' && <ExplorePage guest={guest} onNavigate={navigate} onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail', { documentId: id }) }} onOpenFolder={(id) => { setSelectedFolderId(id); navigate('folder-detail', { folderId: id }) }} />}
+      {route === 'explore' && (
+        <ExplorePage 
+          guest={guest} 
+          onNavigate={navigate} 
+          initialKeyword={exploreFilters.keyword}
+          initialMajor={exploreFilters.majorCode}
+          initialCourse={exploreFilters.courseCode}
+          onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail', { documentId: id }) }} 
+          onOpenFolder={(id) => { setSelectedFolderId(id); navigate('folder-detail', { folderId: id }) }} 
+        />
+      )}
       {route === 'folder-detail' && (
         <FolderDetailPage 
           id={selectedFolderId} 
           guest={guest}
+          user={user}
           onNavigate={navigate} 
           onOpenDocument={(id) => { setSelectedDocId(id); navigate('doc-detail', { documentId: id }) }}
           onLoad={(folder) => {
@@ -648,11 +816,22 @@ export default function StudyHubApp() {
       )}
       {route === 'upload' && <UploadPage mode={uploadMode} onStudyFileUploaded={handleStudyUpload} onNavigate={navigate} />}
       {route === 'profile' && <ProfilePage />}
-      {route === 'pricing' && <PricingPage onNavigate={navigate} />}
+      {route === 'pricing' && (
+        <PricingPage 
+          onNavigate={navigate} 
+          user={user} 
+          onSelectUpgrade={(plan, payInfo) => {
+            setUpgradePlan(plan)
+            setUpgradePaymentInfo(payInfo)
+            setShowUpgradeModal(true)
+          }} 
+        />
+      )}
       {route === 'doc-detail' && (
         <DocumentDetailPage
           id={selectedDocId}
           guest={guest}
+          user={user}
           onNavigate={navigate}
           onOpenStudyFile={openStudyFile}
           onBack={() => navigate(previousRoute || 'explore')}
@@ -683,6 +862,17 @@ export default function StudyHubApp() {
       {showFeatureRequest && <FeatureRequestModal onClose={() => setShowFeatureRequest(false)} />}
       {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
       {showExtension && <ChromeExtensionModal onClose={() => setShowExtension(false)} />}
+      {showUpgradeModal && (
+        <UpgradePaymentModal 
+          onClose={() => setShowUpgradeModal(false)} 
+          user={user} 
+          plan={upgradePlan} 
+          paymentInfo={upgradePaymentInfo} 
+          onUpgradeSuccess={(updatedUser) => {
+            setUser(updatedUser)
+          }} 
+        />
+      )}
 
       {toast && (
         <div style={{
@@ -758,6 +948,9 @@ const routeMatchers = [
   { pattern: ROUTES.HOME, route: 'explore' },
   { pattern: ROUTES.LOGIN, route: 'login' },
   { pattern: ROUTES.REGISTER, route: 'register' },
+  { pattern: ROUTES.FORGOT_PASSWORD, route: 'forgot-password' },
+  { pattern: ROUTES.RESET_PASSWORD, route: 'reset-password' },
+  { pattern: ROUTES.VERIFY_EMAIL, route: 'verify-email' },
   { pattern: ROUTES.EXPLORE, route: 'explore' },
   { pattern: ROUTES.LIBRARY, route: 'library', libraryTab: 'sessions' },
   { pattern: ROUTES.LIBRARY_SHARED, route: 'library', libraryTab: 'shared' },

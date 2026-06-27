@@ -1,5 +1,7 @@
 package com.studyhub.document.service;
 
+import com.studyhub.common.enums.ModerationStatus;
+import com.studyhub.common.enums.Visibility;
 import com.studyhub.document.dto.DocumentResponse;
 import com.studyhub.document.dto.FolderRequest;
 import com.studyhub.document.dto.FolderResponse;
@@ -14,7 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -59,6 +63,7 @@ public class FolderService {
                 .folderName(request.getFolderName())
                 .parentFolder(parentFolder)
                 .user(user)
+                .visibility(Visibility.PRIVATE)
                 .build();
 
         Folder savedFolder = folderRepository.save(folder);
@@ -80,48 +85,124 @@ public class FolderService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        Folder folder = folderRepository.findById(folderId)
-                .orElseThrow(() -> new IllegalArgumentException("Folder not found"));
-
-        if (!folder.getUser().getId().equals(user.getId())) {
-            throw new SecurityException("Permission denied");
-        }
+        Folder folder = getOwnedFolder(folderId, user.getId());
 
         return mapToResponse(folder, true);
     }
 
-    @Transactional
-    public FolderResponse renameFolder(Long folderId, FolderRequest request, String userEmail) {
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+    @Transactional(readOnly = true)
+    public List<FolderResponse> getPublishedFolders() {
+        return folderRepository.findByVisibilityOrderByUpdatedAtDesc(Visibility.PUBLIC).stream()
+                .filter(this::isFolderPublishReady)
+                .map(folder -> mapToPublicResponse(folder, false))
+                .collect(Collectors.toList());
+    }
 
+    @Transactional(readOnly = true)
+    public FolderResponse getPublishedFolderDetails(Long folderId) {
         Folder folder = folderRepository.findById(folderId)
                 .orElseThrow(() -> new IllegalArgumentException("Folder not found"));
 
-        if (!folder.getUser().getId().equals(user.getId())) {
-            throw new SecurityException("Permission denied");
+        if (folder.getVisibility() != Visibility.PUBLIC || !isFolderPublishReady(folder)) {
+            throw new IllegalArgumentException("Folder not found");
         }
 
-        // Check duplicate name
-        boolean exists;
-        Folder parentFolder = folder.getParentFolder();
-        if (parentFolder != null) {
-            exists = folderRepository.findByUserIdAndParentFolderIdAndFolderName(
-                    user.getId(), parentFolder.getId(), request.getFolderName())
-                    .filter(f -> !f.getId().equals(folderId)).isPresent();
-        } else {
-            exists = folderRepository.findByUserIdAndParentFolderIsNullAndFolderName(
-                    user.getId(), request.getFolderName())
-                    .filter(f -> !f.getId().equals(folderId)).isPresent();
+        return mapToPublicResponse(folder, true);
+    }
+
+    @Transactional
+    public FolderResponse renameFolder(Long folderId, FolderRequest request, Map<String, Object> rawPayload, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Folder folder = getOwnedFolder(folderId, user.getId());
+
+        // Update name if provided
+        if (request.getFolderName() != null && !request.getFolderName().isBlank()) {
+            Folder targetParent = folder.getParentFolder();
+            if (rawPayload != null && rawPayload.containsKey("parentFolderId")) {
+                Object pId = rawPayload.get("parentFolderId");
+                if (pId != null) {
+                    Long targetParentId = Long.valueOf(pId.toString());
+                    targetParent = folderRepository.findById(targetParentId).orElse(null);
+                } else {
+                    targetParent = null;
+                }
+            }
+
+            boolean exists;
+            if (targetParent != null) {
+                exists = folderRepository.findByUserIdAndParentFolderIdAndFolderName(
+                        user.getId(), targetParent.getId(), request.getFolderName())
+                        .filter(f -> !f.getId().equals(folderId)).isPresent();
+            } else {
+                exists = folderRepository.findByUserIdAndParentFolderIsNullAndFolderName(
+                        user.getId(), request.getFolderName())
+                        .filter(f -> !f.getId().equals(folderId)).isPresent();
+            }
+
+            if (exists) {
+                throw new IllegalArgumentException("Folder with name '" + request.getFolderName() + "' already exists in this directory");
+            }
+
+            folder.setFolderName(request.getFolderName());
         }
 
-        if (exists) {
-            throw new IllegalArgumentException("Folder with name '" + request.getFolderName() + "' already exists in this directory");
+        // Update parent folder (move folder) if parentFolderId key is present
+        if (rawPayload != null && rawPayload.containsKey("parentFolderId")) {
+            Object parentIdVal = rawPayload.get("parentFolderId");
+            if (parentIdVal == null) {
+                folder.setParentFolder(null);
+            } else {
+                Long parentFolderId = Long.valueOf(parentIdVal.toString());
+                if (parentFolderId.equals(folderId)) {
+                    throw new IllegalArgumentException("Cannot move a folder into itself");
+                }
+
+                // Check for cyclical relationship: parentFolderId must not be a subfolder of folderId
+                Long currentParentId = parentFolderId;
+                while (currentParentId != null) {
+                    if (currentParentId.equals(folderId)) {
+                        throw new IllegalArgumentException("Cannot move a folder into its own subfolder");
+                    }
+                    Folder tempParent = folderRepository.findById(currentParentId).orElse(null);
+                    currentParentId = (tempParent != null && tempParent.getParentFolder() != null) ? tempParent.getParentFolder().getId() : null;
+                }
+
+                Folder newParent = folderRepository.findById(parentFolderId)
+                        .orElseThrow(() -> new IllegalArgumentException("Target parent folder not found"));
+
+                if (!newParent.getUser().getId().equals(user.getId())) {
+                    throw new SecurityException("Permission denied for target parent folder");
+                }
+                folder.setParentFolder(newParent);
+            }
         }
 
-        folder.setFolderName(request.getFolderName());
         Folder savedFolder = folderRepository.save(folder);
         return mapToResponse(savedFolder, false);
+    }
+
+    @Transactional
+    public FolderResponse updateVisibility(Long folderId, Visibility visibility, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        Folder folder = getOwnedFolder(folderId, user.getId());
+        Visibility nextVisibility = visibility != null ? visibility : Visibility.PRIVATE;
+
+        if (nextVisibility == Visibility.PUBLIC) {
+            validateFolderCanBePublished(folder);
+            folder.setVisibility(Visibility.PUBLIC);
+            if (folder.getPublishedAt() == null) {
+                folder.setPublishedAt(LocalDateTime.now());
+            }
+        } else {
+            folder.setVisibility(Visibility.PRIVATE);
+            folder.setPublishedAt(null);
+        }
+
+        return mapToResponse(folderRepository.save(folder), true);
     }
 
     @Transactional
@@ -129,40 +210,121 @@ public class FolderService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        Folder folder = folderRepository.findById(folderId)
-                .orElseThrow(() -> new IllegalArgumentException("Folder not found"));
-
-        if (!folder.getUser().getId().equals(user.getId())) {
-            throw new SecurityException("Permission denied");
-        }
+        Folder folder = getOwnedFolder(folderId, user.getId());
 
         folderRepository.delete(folder);
     }
 
     private FolderResponse mapToResponse(Folder folder, boolean includeContents) {
+        List<Document> documents = documentRepository.findByFolderId(folder.getId());
+        return buildFolderResponse(folder, documents, includeContents, false);
+    }
+
+    private FolderResponse mapToPublicResponse(Folder folder, boolean includeContents) {
+        List<Document> documents = filterPublicDocuments(documentRepository.findByFolderId(folder.getId()));
+        return buildFolderResponse(folder, documents, includeContents, true);
+    }
+
+    private FolderResponse buildFolderResponse(Folder folder, List<Document> documents, boolean includeContents, boolean publicView) {
+        boolean publishReady = isPublishReady(documents);
+        String blockedReason = publishReady ? null : buildPublishBlockedReason(documents);
+        int totalDownloads = documents.stream()
+                .mapToInt(doc -> doc.getTotalDownloads() != null ? doc.getTotalDownloads() : 0)
+                .sum();
+
         FolderResponse response = FolderResponse.builder()
                 .id(folder.getId())
                 .userId(folder.getUser().getId())
+                .ownerName(folder.getUser().getFullName())
                 .folderName(folder.getFolderName())
                 .parentFolderId(folder.getParentFolder() != null ? folder.getParentFolder().getId() : null)
+                .visibility(folder.getVisibility() != null ? folder.getVisibility().name() : Visibility.PRIVATE.name())
+                .publishedAt(folder.getPublishedAt())
                 .createdAt(folder.getCreatedAt())
                 .updatedAt(folder.getUpdatedAt())
+                .publicDocumentCount(filterPublicDocuments(documents).size())
+                .totalDownloads(totalDownloads)
+                .publishReady(publishReady)
+                .publishBlockedReason(blockedReason)
                 .build();
 
         if (includeContents) {
-            List<FolderResponse> subfolders = folderRepository.findByParentFolderId(folder.getId()).stream()
-                    .map(f -> mapToResponse(f, false))
-                    .collect(Collectors.toList());
+            List<FolderResponse> subfolders = publicView
+                    ? List.of()
+                    : folderRepository.findByParentFolderId(folder.getId()).stream()
+                        .map(f -> mapToResponse(f, false))
+                        .collect(Collectors.toList());
 
-            List<DocumentResponse> documents = documentRepository.findByFolderId(folder.getId()).stream()
+            List<DocumentResponse> documentResponses = documents.stream()
                     .map(this::mapDocumentToResponse)
                     .collect(Collectors.toList());
 
             response.setSubfolders(subfolders);
-            response.setDocuments(documents);
+            response.setDocuments(documentResponses);
         }
 
         return response;
+    }
+
+    private Folder getOwnedFolder(Long folderId, Long userId) {
+        Folder folder = folderRepository.findById(folderId)
+                .orElseThrow(() -> new IllegalArgumentException("Folder not found"));
+
+        if (!folder.getUser().getId().equals(userId)) {
+            throw new SecurityException("Permission denied");
+        }
+
+        return folder;
+    }
+
+    private void validateFolderCanBePublished(Folder folder) {
+        List<Document> documents = documentRepository.findByFolderId(folder.getId());
+        if (documents.isEmpty()) {
+            throw new IllegalArgumentException("Only folders with at least one document can be published.");
+        }
+
+        String blockedReason = buildPublishBlockedReason(documents);
+        if (blockedReason != null) {
+            throw new IllegalArgumentException(blockedReason);
+        }
+    }
+
+    private boolean isFolderPublishReady(Folder folder) {
+        return folder.getVisibility() == Visibility.PUBLIC
+                && isPublishReady(documentRepository.findByFolderId(folder.getId()));
+    }
+
+    private boolean isPublishReady(List<Document> documents) {
+        return !documents.isEmpty() && documents.stream().allMatch(this::isPublicApprovedDocument);
+    }
+
+    private List<Document> filterPublicDocuments(List<Document> documents) {
+        return documents.stream()
+                .filter(this::isPublicApprovedDocument)
+                .collect(Collectors.toList());
+    }
+
+    private boolean isPublicApprovedDocument(Document document) {
+        return document.getVisibility() == Visibility.PUBLIC
+                && document.getModerationStatus() == ModerationStatus.APPROVED;
+    }
+
+    private String buildPublishBlockedReason(List<Document> documents) {
+        if (documents.isEmpty()) {
+            return "This folder is empty. Add at least one approved public document before publishing.";
+        }
+
+        List<String> blockedTitles = documents.stream()
+                .filter(doc -> !isPublicApprovedDocument(doc))
+                .map(doc -> doc.getTitle() != null && !doc.getTitle().isBlank() ? doc.getTitle() : doc.getFileName())
+                .collect(Collectors.toList());
+
+        if (blockedTitles.isEmpty()) {
+            return null;
+        }
+
+        return "All documents in a public folder must be PUBLIC and APPROVED. Fix: "
+                + String.join(", ", blockedTitles);
     }
 
     private DocumentResponse mapDocumentToResponse(Document doc) {

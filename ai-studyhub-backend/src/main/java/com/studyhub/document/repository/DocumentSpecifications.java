@@ -3,6 +3,11 @@ package com.studyhub.document.repository;
 import com.studyhub.common.enums.ModerationStatus;
 import com.studyhub.common.enums.Visibility;
 import com.studyhub.document.entity.Document;
+import com.studyhub.course.entity.Course;
+import com.studyhub.document.entity.DocumentCategory;
+import com.studyhub.user.entity.User;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 
 public class DocumentSpecifications {
@@ -13,9 +18,20 @@ public class DocumentSpecifications {
                 return null;
             }
             String pattern = "%" + keyword.trim().toLowerCase() + "%";
+            
+            // Use LEFT joins so that documents without courses/categories/uploaders are not excluded
+            Join<Document, Course> courseJoin = root.join("course", JoinType.LEFT);
+            Join<Document, DocumentCategory> categoryJoin = root.join("category", JoinType.LEFT);
+            Join<Document, User> userJoin = root.join("user", JoinType.LEFT);
+            
             return cb.or(
                     cb.like(cb.lower(root.get("title")), pattern),
-                    cb.like(cb.lower(root.get("description")), pattern)
+                    cb.like(cb.lower(root.get("description")), pattern),
+                    cb.like(cb.lower(courseJoin.get("courseCode")), pattern),
+                    cb.like(cb.lower(courseJoin.get("courseName")), pattern),
+                    cb.like(cb.lower(categoryJoin.get("categoryName")), pattern),
+                    cb.like(cb.lower(userJoin.get("firstName")), pattern),
+                    cb.like(cb.lower(userJoin.get("lastName")), pattern)
             );
         };
     }

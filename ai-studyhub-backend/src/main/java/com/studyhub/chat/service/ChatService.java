@@ -31,7 +31,7 @@ public class ChatService {
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
     private final TextExtractionService textExtractionService;
-    private final GeminiApiService geminiApiService;
+    private final AiModelService aiModelService;
 
     /**
      * Tạo một phiên trò chuyện mới.
@@ -138,8 +138,8 @@ public class ChatService {
             }
         }
 
-        // 4. Gọi Gemini API
-        GeminiApiService.GeminiResponse geminiResponse = geminiApiService.chat(
+        // 4. Gọi AI
+        AiModelService.AiResponse geminiResponse = aiModelService.chat(
                 systemPrompt,
                 history,
                 request.getContent()

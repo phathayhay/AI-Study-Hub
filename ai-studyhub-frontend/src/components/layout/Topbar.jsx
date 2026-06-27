@@ -26,6 +26,7 @@ function VisibilityBadge({ visibility }) {
 
 export default function Topbar({
   onNotifications,
+  notificationUnreadCount = 0,
   onNavigate,
   guest = false,
   user,
@@ -179,7 +180,11 @@ export default function Topbar({
             style={{ width: '36px', height: '36px', borderRadius: '50%', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}
           >
             <StudyHubIcon name="bell" size={16} />
-            <span style={{ position: 'absolute', top: '-4px', right: '-4px', backgroundColor: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px' }}>0</span>
+            {notificationUnreadCount > 0 && (
+              <span style={{ position: 'absolute', top: '-4px', right: '-4px', backgroundColor: '#ef4444', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px' }}>
+                {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
+              </span>
+            )}
           </button>
         </div>
       )}

@@ -4,6 +4,7 @@ import Topbar from './Topbar'
 export default function AppLayout({
   active = 'home', children, className = '',
   guest = false, onNavigate, onNotifications, user = null, withTopbar = true, title = null,
+  notificationUnreadCount = 0,
   sidebarCollapsed = false, onToggleCollapse,
   recentItems = [], onOpenRecentItem, activeItemContext = {},
   breadcrumbs = [],
@@ -31,6 +32,7 @@ export default function AppLayout({
             guest={guest}
             onNavigate={onNavigate}
             onNotifications={onNotifications}
+            notificationUnreadCount={notificationUnreadCount}
             user={user}
             title={title}
             active={active}

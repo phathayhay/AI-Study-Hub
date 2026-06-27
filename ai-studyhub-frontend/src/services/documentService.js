@@ -120,6 +120,9 @@ export function updateVisibility(id, visibility) {
  * Path: /api/documents/upload
  * @param {any} body - Request body
  */
-export function uploadDocument(body) {
-  return apiPost(`/documents/upload`, body);
+export function uploadDocument(file, metadata) {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('request', JSON.stringify(metadata));
+  return apiPost(`/documents/upload`, form);
 }

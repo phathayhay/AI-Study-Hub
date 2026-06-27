@@ -32,6 +32,9 @@ public class Notification {
     @Builder.Default
     private Boolean isRead = false;
 
+    @Column(name = "source_comment_id")
+    private Long sourceCommentId;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

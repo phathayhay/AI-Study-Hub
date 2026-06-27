@@ -43,7 +43,7 @@ class ChatServiceTest {
     private TextExtractionService textExtractionService;
 
     @Mock
-    private GeminiApiService geminiApiService;
+    private AiModelService aiModelService;
 
     @InjectMocks
     private ChatService chatService;
@@ -198,13 +198,13 @@ class ChatServiceTest {
         when(chatMessageRepository.findBySession_IdOrderByCreatedAtAsc(200L))
                 .thenReturn(List.of(userMsg));
 
-        // Gemini mock response
-        GeminiApiService.GeminiResponse mockGeminiResp = new GeminiApiService.GeminiResponse(
+        // AI mock response
+        AiModelService.AiResponse mockGeminiResp = new AiModelService.AiResponse(
                 "Java is a popular programming language.",
                 "gemini-2.5-flash-lite",
                 200
         );
-        when(geminiApiService.chat(anyString(), anyList(), eq("What is Java?")))
+        when(aiModelService.chat(anyString(), anyList(), eq("What is Java?")))
                 .thenReturn(mockGeminiResp);
 
         ChatMessageResponse response = chatService.sendMessage(200L, request, "test@fpt.edu.vn");
@@ -248,12 +248,12 @@ class ChatServiceTest {
         when(chatMessageRepository.findBySession_IdOrderByCreatedAtAsc(201L))
                 .thenReturn(List.of(userMsg));
 
-        GeminiApiService.GeminiResponse mockGeminiResp = new GeminiApiService.GeminiResponse(
+        AiModelService.AiResponse mockGeminiResp = new AiModelService.AiResponse(
                 "Document summary text",
                 "gemini-2.5-flash-lite",
                 120
         );
-        when(geminiApiService.chat(
+        when(aiModelService.chat(
                 contains("This is FPT rules document content."),
                 anyList(),
                 eq("Summarize this document")
@@ -300,13 +300,13 @@ class ChatServiceTest {
         when(chatMessageRepository.findBySession_IdOrderByCreatedAtAsc(201L))
                 .thenReturn(List.of(userMsg));
 
-        GeminiApiService.GeminiResponse mockGeminiResp = new GeminiApiService.GeminiResponse(
+        AiModelService.AiResponse mockGeminiResp = new AiModelService.AiResponse(
                 "Fallback response",
                 "gemini-2.5-flash-lite",
                 50
         );
         // Should fallback to default Vietnamese academic tutoring prompt
-        when(geminiApiService.chat(
+        when(aiModelService.chat(
                 contains("Bạn là trợ lý học tập AI của hệ thống AI Study Hub FPT"),
                 anyList(),
                 eq("Summarize this document")

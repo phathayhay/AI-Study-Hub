@@ -3,6 +3,7 @@ package com.studyhub.document.repository;
 import com.studyhub.common.enums.ModerationStatus;
 import com.studyhub.common.enums.Visibility;
 import com.studyhub.document.entity.Document;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -29,4 +30,8 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
             @Param("courseId") Long courseId,
             @Param("visibility") Visibility visibility,
             @Param("status") ModerationStatus status);
+
+    @Modifying
+    @Query("UPDATE Document d SET d.totalDownloads = d.totalDownloads + 1 WHERE d.id = :documentId")
+    int incrementTotalDownloads(@Param("documentId") Long documentId);
 }

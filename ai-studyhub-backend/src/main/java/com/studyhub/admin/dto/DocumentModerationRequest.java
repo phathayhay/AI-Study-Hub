@@ -11,4 +11,6 @@ import lombok.*;
 public class DocumentModerationRequest {
     @NotBlank(message = "Moderation status cannot be blank (APPROVED or REJECTED)")
     private String status;
+
+    private String reason;
 }
