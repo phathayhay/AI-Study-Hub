@@ -1,7 +1,7 @@
 package com.studyhub.document.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.studyhub.chat.service.GeminiApiService;
+import com.studyhub.chat.service.AiModelService;
 import com.studyhub.common.enums.CorrectOption;
 import com.studyhub.common.enums.DifficultyLevel;
 import com.studyhub.document.dto.*;
@@ -34,7 +34,7 @@ public class AiAssistService {
     private final AiFlashcardRepository flashcardRepository;
     private final UserRepository userRepository;
     private final TextExtractionService textExtractionService;
-    private final GeminiApiService geminiApiService;
+    private final AiModelService aiModelService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -54,23 +54,29 @@ public class AiAssistService {
         // Limit context size to avoid token limit errors (e.g. approx 15k characters)
         String contentToProcess = text.substring(0, Math.min(text.length(), 15000));
 
-        String prompt = "Hãy tóm tắt tài liệu sau đây bằng Tiếng Việt. Trả về định dạng JSON có cấu trúc chính xác như sau:\n" +
+        String prompt = "BẮT BUỘC: Bạn phải tạo ra một đối tượng JSON khớp chính xác với cấu trúc dưới đây. Không tự ý thay đổi tên trường (keys):\n" +
                 "{\n" +
                 "  \"shortSummary\": \"Tóm tắt ngắn gọn (dưới 1000 ký tự)\",\n" +
                 "  \"longSummary\": \"Tóm tắt chi tiết các phần quan trọng\",\n" +
                 "  \"keyTakeaways\": [\"Ý chính 1\", \"Ý chính 2\", ...]\n" +
                 "}\n" +
-                "Nội dung tài liệu:\n\n" + contentToProcess;
+                "Tài liệu học tập để bạn dựa vào:\n\n" + contentToProcess;
 
-        log.info("Requesting Gemini to generate summary for document: {}", documentId);
-        GeminiApiService.GeminiResponse response = geminiApiService.chat(
+        log.info("Requesting AI to generate summary for document: {}", documentId);
+        AiModelService.AiResponse response = aiModelService.chat(
                 "Bạn là trợ lý học tập AI chuyên tóm tắt tài liệu học thuật.",
                 Collections.emptyList(),
                 prompt
         );
 
         String jsonText = cleanJsonText(response.text());
+        log.info("generateSummary raw response: {}", response.text());
+        log.info("generateSummary cleaned JSON: {}", jsonText);
         SummaryJsonDto summaryDto = objectMapper.readValue(jsonText, SummaryJsonDto.class);
+
+        if (summaryDto == null || summaryDto.getShortSummary() == null || summaryDto.getLongSummary() == null) {
+            throw new IllegalArgumentException("Không thể trích xuất tóm tắt hợp lệ từ AI. Vui lòng thử lại.");
+        }
 
         DocumentSummary summary = DocumentSummary.builder()
                 .document(doc)
@@ -101,8 +107,8 @@ public class AiAssistService {
         String contentToProcess = text.substring(0, Math.min(text.length(), 15000));
 
         String prompt = String.format(
-                "Hãy tạo một bộ câu hỏi trắc nghiệm ôn tập (gồm 5 đến 10 câu hỏi) mức độ %s dựa trên tài liệu sau đây bằng Tiếng Việt. " +
-                        "Trả về định dạng JSON có cấu trúc chính xác như sau:\n" +
+                "BẮT BUỘC: Hãy tạo một bộ câu hỏi trắc nghiệm ôn tập (gồm 5 đến 10 câu hỏi) mức độ %s dựa trên tài liệu sau đây bằng Tiếng Việt.\n" +
+                        "Bạn phải trả về một đối tượng JSON khớp chính xác với cấu trúc dưới đây, không tự ý thay đổi tên trường (keys):\n" +
                         "{\n" +
                         "  \"quizTitle\": \"Tiêu đề bộ đề trắc nghiệm\",\n" +
                         "  \"questions\": [\n" +
@@ -117,20 +123,26 @@ public class AiAssistService {
                         "    }\n" +
                         "  ]\n" +
                         "}\n" +
-                        "Chú ý: correctOption chỉ được nhận một trong bốn giá trị: A, B, C, D.\n" +
-                        "Nội dung tài liệu:\n\n%s",
+                        "Chú ý: correctOption chỉ nhận một trong bốn giá trị: A, B, C, D.\n" +
+                        "Tài liệu học tập để bạn dựa vào:\n\n%s",
                 difficulty.name(), contentToProcess
         );
 
-        log.info("Requesting Gemini to generate quiz for document: {}", documentId);
-        GeminiApiService.GeminiResponse response = geminiApiService.chat(
+        log.info("Requesting AI to generate quiz for document: {}", documentId);
+        AiModelService.AiResponse response = aiModelService.chat(
                 "Bạn là trợ lý học tập AI chuyên tạo câu hỏi trắc nghiệm ôn tập.",
                 Collections.emptyList(),
                 prompt
         );
 
         String jsonText = cleanJsonText(response.text());
+        log.info("generateQuiz raw response: {}", response.text());
+        log.info("generateQuiz cleaned JSON: {}", jsonText);
         QuizJsonDto quizDto = objectMapper.readValue(jsonText, QuizJsonDto.class);
+
+        if (quizDto == null || quizDto.getQuestions() == null || quizDto.getQuestions().isEmpty()) {
+            throw new IllegalArgumentException("Không thể trích xuất câu hỏi trắc nghiệm hợp lệ từ AI. Vui lòng thử lại.");
+        }
 
         AiQuiz quiz = AiQuiz.builder()
                 .document(doc)
@@ -198,8 +210,8 @@ public class AiAssistService {
         String text = textExtractionService.extractTextFromUrl(doc.getFileUrl());
         String contentToProcess = text.substring(0, Math.min(text.length(), 15000));
 
-        String prompt = "Hãy tạo một bộ thẻ ghi nhớ học tập (flashcards) gồm 8 đến 15 thẻ dựa trên tài liệu sau bằng Tiếng Việt. " +
-                "Trả về định dạng JSON có cấu trúc chính xác như sau:\n" +
+        String prompt = "BẮT BUỘC: Hãy tạo một bộ thẻ ghi nhớ học tập (flashcards) gồm 8 đến 15 thẻ dựa trên tài liệu sau bằng Tiếng Việt.\n" +
+                "Bạn phải trả về một đối tượng JSON khớp chính xác với cấu trúc dưới đây, không tự ý thay đổi tên trường (keys):\n" +
                 "{\n" +
                 "  \"setName\": \"Tên bộ flashcards\",\n" +
                 "  \"description\": \"Mô tả ngắn gọn\",\n" +
@@ -210,17 +222,23 @@ public class AiAssistService {
                 "    }\n" +
                 "  ]\n" +
                 "}\n" +
-                "Nội dung tài liệu:\n\n" + contentToProcess;
+                "Tài liệu học tập để bạn dựa vào:\n\n" + contentToProcess;
 
-        log.info("Requesting Gemini to generate flashcards for document: {}", documentId);
-        GeminiApiService.GeminiResponse response = geminiApiService.chat(
+        log.info("Requesting AI to generate flashcards for document: {}", documentId);
+        AiModelService.AiResponse response = aiModelService.chat(
                 "Bạn là trợ lý học tập AI chuyên tạo flashcards giúp ghi nhớ kiến thức.",
                 Collections.emptyList(),
                 prompt
         );
 
         String jsonText = cleanJsonText(response.text());
+        log.info("generateFlashcards raw response: {}", response.text());
+        log.info("generateFlashcards cleaned JSON: {}", jsonText);
         FlashcardSetJsonDto setDto = objectMapper.readValue(jsonText, FlashcardSetJsonDto.class);
+
+        if (setDto == null || setDto.getCards() == null || setDto.getCards().isEmpty()) {
+            throw new IllegalArgumentException("Không thể trích xuất bộ thẻ ghi nhớ hợp lệ từ AI. Vui lòng thử lại.");
+        }
 
         AiFlashcardSet cardSet = AiFlashcardSet.builder()
                 .document(doc)
@@ -268,10 +286,29 @@ public class AiAssistService {
     private String cleanJsonText(String text) {
         if (text == null) return "{}";
         text = text.trim();
+
         int firstBrace = text.indexOf('{');
         int lastBrace = text.lastIndexOf('}');
-        if (firstBrace != -1 && lastBrace != -1 && firstBrace < lastBrace) {
-            return text.substring(firstBrace, lastBrace + 1);
+        int firstBracket = text.indexOf('[');
+        int lastBracket = text.lastIndexOf(']');
+
+        int start = -1;
+        int end = -1;
+
+        if (firstBrace != -1 && lastBrace != -1) {
+            start = firstBrace;
+            end = lastBrace + 1;
+        }
+
+        if (firstBracket != -1 && lastBracket != -1) {
+            if (start == -1 || firstBracket < start) {
+                start = firstBracket;
+                end = lastBracket + 1;
+            }
+        }
+
+        if (start != -1 && end != -1 && start < end) {
+            return text.substring(start, end);
         }
         if (text.startsWith("```json")) {
             text = text.substring(7);

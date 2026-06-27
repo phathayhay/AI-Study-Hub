@@ -14,10 +14,12 @@ import com.studyhub.user.entity.RefreshToken;
 import com.studyhub.user.entity.Role;
 import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.User;
+import com.studyhub.user.entity.UserSubscription;
 import com.studyhub.user.repository.RefreshTokenRepository;
 import com.studyhub.user.repository.RoleRepository;
 import com.studyhub.user.repository.SubscriptionPlanRepository;
 import com.studyhub.user.repository.UserRepository;
+import com.studyhub.user.repository.UserSubscriptionRepository;
 import com.studyhub.user.dto.ForgotPasswordRequest;
 import com.studyhub.user.dto.ResetPasswordRequest;
 import com.studyhub.user.dto.ChangePasswordRequest;
@@ -34,6 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -46,6 +50,7 @@ public class AuthService {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final MajorRepository majorRepository;
+    private final UserSubscriptionRepository userSubscriptionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
@@ -146,16 +151,7 @@ public class AuthService {
         String accessToken = jwtTokenProvider.generateToken(userDetails);
         String refreshToken = generateAndSaveRefreshToken(user);
 
-        return TokenResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .email(user.getEmail())
-                .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .fullName(user.getFullName())
-                .avatarUrl(user.getAvatarUrl())
-                .build();
+        return buildTokenResponse(user, accessToken, refreshToken);
     }
 
     /**
@@ -203,16 +199,7 @@ public class AuthService {
         refreshTokenRepository.delete(oldRefreshToken);
         String newRefreshToken = generateAndSaveRefreshToken(user);
 
-        return TokenResponse.builder()
-                .accessToken(newAccessToken)
-                .refreshToken(newRefreshToken)
-                .email(user.getEmail())
-                .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .fullName(user.getFullName())
-                .avatarUrl(user.getAvatarUrl())
-                .build();
+        return buildTokenResponse(user, newAccessToken, newRefreshToken);
     }
 
     /**
@@ -240,6 +227,30 @@ public class AuthService {
                 .build();
         refreshTokenRepository.save(refreshToken);
         return token;
+    }
+
+    private TokenResponse buildTokenResponse(User user, String accessToken, String refreshToken) {
+        List<UserSubscription> activeSubscriptions = userSubscriptionRepository.findByUser_IdAndIsActiveTrue(user.getId());
+        LocalDateTime planExpiresAt = activeSubscriptions.stream()
+                .map(UserSubscription::getEndDate)
+                .filter(endDate -> endDate != null)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+
+        return TokenResponse.builder()
+                .id(user.getId())
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .email(user.getEmail())
+                .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .fullName(user.getFullName())
+                .avatarUrl(user.getAvatarUrl())
+                .verificationStatus(user.getVerificationStatus())
+                .planName(user.getPlan() != null ? user.getPlan().getPlanName() : "FREE")
+                .planExpiresAt(planExpiresAt)
+                .build();
     }
 
     /**
@@ -329,5 +340,28 @@ public class AuthService {
         user.setVerifiedAt(LocalDateTime.now());
         userRepository.save(user);
         log.info("User {} successfully activated", email);
+    }
+
+    /**
+     * Gửi lại email xác thực tài khoản.
+     */
+    @Transactional
+    public void resendVerificationEmail(String email) {
+        log.info("Resending verification email for {}", email);
+        User user = userRepository.findByEmail(email.trim().toLowerCase())
+                .orElseThrow(() -> new IllegalArgumentException("Account with this email does not exist"));
+
+        if (user.getStatus() == UserStatus.ACTIVE) {
+            throw new IllegalStateException("This account is already active and does not need verification.");
+        }
+
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new IllegalStateException("Your account has been banned.");
+        }
+
+        // Generate email verification token and send verification email
+        String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
+        String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
+        emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
     }
 }

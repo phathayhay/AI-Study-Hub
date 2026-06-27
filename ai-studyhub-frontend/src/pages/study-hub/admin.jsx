@@ -12,6 +12,7 @@ import {
   deleteAdminMajor,
   deleteAdminPlan,
   getAdminCategories,
+  getAdminActivityLogs,
   getAdminCourses,
   getAdminDashboardData,
   getAdminDocuments,
@@ -28,6 +29,7 @@ import {
   updateAdminCourse,
   updateAdminMajor,
   updateAdminPlan,
+  exportAdminActivityLogs,
 } from '../../features/admin/adminService'
 import { adminNavItems } from './config'
 import { InfoBlock } from './shared'
@@ -49,6 +51,19 @@ const unwrapList = (response) => {
   return []
 }
 
+const unwrapPayload = (response) => response?.data ?? response ?? null
+const unwrapPage = (response) => {
+  const data = unwrapPayload(response)
+  return {
+    content: Array.isArray(data?.content) ? data.content : [],
+    page: Number(data?.page || 0),
+    size: Number(data?.size || 10),
+    totalElements: Number(data?.totalElements || 0),
+    totalPages: Number(data?.totalPages || 0),
+    last: Boolean(data?.last),
+  }
+}
+
 const formatAdminError = (err) => {
   const target = err.path ? `${err.method || 'GET'} ${err.path}` : 'admin data'
   if (err.status >= 500) return `Server error while loading ${target}. Please check the backend logs.`
@@ -62,6 +77,18 @@ const formatDate = (value) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return String(value)
   return date.toLocaleDateString('vi-VN')
+}
+
+const formatDateTime = (value) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 const formatBytes = (value = 0) => {
@@ -79,6 +106,14 @@ const formatBytes = (value = 0) => {
 const normalizeStatus = (value) => String(value || 'pending').toLowerCase()
 const getInitial = (value = 'A') => value.trim().charAt(0).toUpperCase() || 'A'
 const getDocumentName = (doc = {}) => doc.title || doc.fileName || 'Untitled'
+const CHART_PALETTE = ['#2563eb', '#0f766e', '#ea580c', '#16a34a', '#f59e0b', '#7c3aed', '#64748b']
+const ADMIN_LOG_TYPES = [
+  ['user', 'Users'],
+  ['document', 'Documents'],
+  ['download', 'Downloads'],
+  ['report', 'Reports'],
+  ['ai', 'AI'],
+]
 const STATUS_LABELS = {
   active: 'Active',
   banned: 'Banned',
@@ -89,6 +124,8 @@ const STATUS_LABELS = {
   approved: 'Approved',
   rejected: 'Rejected',
   resolved: 'Resolved',
+  success: 'Success',
+  started: 'Started',
 }
 
 const normalizeText = (value) => String(value || '').toLowerCase()
@@ -99,6 +136,7 @@ const matchesSearch = (query, values) => {
 }
 const matchesStatus = (selected, status) => !selected || normalizeStatus(status) === selected
 const compareText = (left, right) => String(left || '').localeCompare(String(right || ''), 'vi', { sensitivity: 'base' })
+const formatTypeLabel = (value) => ADMIN_LOG_TYPES.find(([type]) => type === value)?.[1] || String(value || 'All')
 const compareDate = (left, right) => {
   const leftTime = left ? new Date(left).getTime() : 0
   const rightTime = right ? new Date(right).getTime() : 0
@@ -261,6 +299,7 @@ function AdminOverview({ onOpenUser }) {
             majors: unwrapList(response.majors),
             courses: unwrapList(response.courses),
             categories: unwrapList(response.categories),
+            analytics: unwrapPayload(response.analytics),
           },
           error: '',
           loading: false,
@@ -279,6 +318,9 @@ function AdminOverview({ onOpenUser }) {
   const users = data.users || []
   const documents = data.documents || []
   const reports = data.reports || []
+  const analytics = data.analytics || {}
+  const recentUsers = analytics.recentUsers || users.slice(0, 3)
+  const activities = analytics.activities || []
   const pendingDocs = documents.filter((doc) => normalizeStatus(doc.moderationStatus) === 'pending')
   const totalStorage = documents.reduce((sum, doc) => sum + Number(doc.fileSize || 0), 0)
 
@@ -303,7 +345,7 @@ function AdminOverview({ onOpenUser }) {
       <div className="admin-dashboard-panels">
         <section className="admin-card recent-users">
           <h2><StudyHubIcon name="users" size={20} /> New Users</h2>
-          {users.slice(0, 3).map((user) => (
+          {recentUsers.map((user) => (
             <button className="admin-user-mini" key={user.id || user.email} onClick={() => onOpenUser(user)} type="button">
               <span>{getInitial(user.fullName || user.email)}</span>
               <p><strong>{user.fullName || user.email}</strong><small>{user.email}</small></p>
@@ -311,24 +353,52 @@ function AdminOverview({ onOpenUser }) {
               <StudyHubIcon name="eye" size={15} />
             </button>
           ))}
+          {!state.loading && !state.error && recentUsers.length === 0 && <p className="admin-empty">No recent users yet.</p>}
         </section>
         <section className="admin-card system-activity">
           <h2><StudyHubIcon name="trend" size={18} /> System Activities</h2>
-          {reports.slice(0, 3).map((report) => (
+          {activities.map((activity, index) => (
             <AdminLogItem
-              key={report.id}
-              text={`${report.documentTitle || 'Document'} - ${formatDate(report.createdAt)}`}
-              title={report.reportType || 'Report'}
-              tone="orange"
+              key={`${activity.title}-${activity.createdAt || index}`}
+              text={activity.text}
+              time={formatDateTime(activity.createdAt)}
+              title={activity.title}
+              tone={activity.tone || 'blue'}
             />
           ))}
+          {!state.loading && !state.error && activities.length === 0 && <p className="admin-empty">No system activity available yet.</p>}
         </section>
       </div>
       <div className="admin-chart-grid">
-        <AdminChart title="Upload/Download Trends" type="line" />
-        <AdminChart title="Document Distribution by Subject" type="pie" />
-        <AdminChart title="Active Users by Day" type="bars" />
-        <AdminChart title="AI Chat Usage (24h)" type="curve" />
+        <AdminChart
+          title="Upload/Download Trends"
+          type="dual-bars"
+          data={analytics.uploadTrends || []}
+          secondaryData={analytics.downloadTrends || []}
+          summary="Last 7 days"
+          primaryLabel="Uploads"
+          secondaryLabel="Downloads"
+        />
+        <AdminChart
+          title="Document Distribution by Subject"
+          type="pie"
+          data={analytics.documentDistribution || []}
+          summary="Documents by subject"
+        />
+        <AdminChart
+          title="Active Users by Day"
+          type="bars"
+          data={analytics.activeUsersByDay || []}
+          summary="Unique active users in the last 7 days"
+          primaryLabel="Active users"
+        />
+        <AdminChart
+          title="AI Chat Usage (24h)"
+          type="curve"
+          data={analytics.aiChatUsage24h || []}
+          summary="AI replies generated in the last 24 hours"
+          primaryLabel="AI messages"
+        />
       </div>
     </main>
   )
@@ -628,21 +698,133 @@ function AdminReports() {
 }
 
 function AdminLogs() {
-  const { data: reports } = useAdminList(getAdminReports)
-  const { data: documents } = useAdminList(getAdminDocuments)
-  const items = [
-    ...reports.slice(0, 3).map((report) => ({ tone: 'orange', title: report.reportType || 'Report', text: report.documentTitle || report.reportReason, time: formatDate(report.createdAt) })),
-    ...documents.slice(0, 3).map((doc) => ({ tone: 'green', title: 'Document Uploaded', text: getDocumentName(doc), time: formatDate(doc.createdAt) })),
-  ]
+  const [query, setQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [page, setPage] = useState(0)
+  const [state, setState] = useState({
+    content: [],
+    page: 0,
+    size: 10,
+    totalElements: 0,
+    totalPages: 0,
+    last: true,
+    loading: true,
+    error: '',
+  })
+
+  const loadLogs = useCallback(async () => {
+    setState((current) => ({ ...current, loading: true, error: '' }))
+    try {
+      const response = await getAdminActivityLogs({
+        query,
+        type: typeFilter,
+        dateFrom,
+        dateTo,
+        page,
+        size: 10,
+      })
+      const payload = unwrapPage(response)
+      setState({
+        ...payload,
+        loading: false,
+        error: '',
+      })
+    } catch (err) {
+      setState((current) => ({
+        ...current,
+        content: [],
+        loading: false,
+        error: formatAdminError(err),
+      }))
+    }
+  }, [dateFrom, dateTo, page, query, typeFilter])
+
+  useEffect(() => {
+    const timer = window.setTimeout(loadLogs, 120)
+    return () => window.clearTimeout(timer)
+  }, [loadLogs])
+
+  useEffect(() => {
+    setPage(0)
+  }, [query, typeFilter, dateFrom, dateTo])
+
+  const handleExport = async () => {
+    try {
+      const result = await exportAdminActivityLogs({
+        query,
+        type: typeFilter,
+        dateFrom,
+        dateTo,
+      })
+      const url = URL.createObjectURL(result.blob)
+      const link = window.document.createElement('a')
+      link.href = url
+      link.download = 'admin-activity-logs.csv'
+      window.document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      callToast('Activity logs exported')
+    } catch (err) {
+      callToast(err.message || 'Unable to export activity logs', 'error')
+    }
+  }
 
   return (
     <main className="admin-page">
-      <section className="admin-card logs-card">
+      <section className="admin-card admin-table-card logs-card">
         <AdminSectionHeader icon="trend" title="Activity Logs">
-          <input className="admin-filter-input" placeholder="Search" />
-          <button className="admin-primary" type="button">Export</button>
+          <div className="admin-toolbar-group">
+            <AdminSearch onChange={setQuery} placeholder="Search logs..." value={query} />
+            <select className="admin-filter-input" onChange={(event) => setTypeFilter(event.target.value)} value={typeFilter}>
+              <option value="">All types</option>
+              {ADMIN_LOG_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <input className="admin-filter-input" onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
+            <input className="admin-filter-input" onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
+            <button className="admin-primary" onClick={handleExport} type="button">Export CSV</button>
+          </div>
         </AdminSectionHeader>
-        {items.map((item, index) => <AdminLogItem key={`${item.title}-${index}`} {...item} />)}
+        <AdminTableState error={state.error} loading={state.loading} />
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Action</th>
+              <th>Actor</th>
+              <th>Target</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.content.map((item, index) => (
+              <tr key={`${item.createdAt}-${item.title}-${index}`}>
+                <td>{formatDateTime(item.createdAt)}</td>
+                <td><Badge tone="blue">{formatTypeLabel(item.type)}</Badge></td>
+                <td>
+                  <div className="admin-log-cell">
+                    <strong>{item.title}</strong>
+                    <small>{item.description}</small>
+                  </div>
+                </td>
+                <td>{item.actor || '-'}</td>
+                <td>{item.target || '-'}</td>
+                <td><AdminStatus status={item.status} /></td>
+              </tr>
+            ))}
+            {!state.loading && !state.error && state.content.length === 0 && <AdminNoResults colSpan={6} />}
+          </tbody>
+        </table>
+        <AdminPagination
+          currentPage={state.page}
+          last={state.last}
+          onPageChange={setPage}
+          totalElements={state.totalElements}
+          totalPages={state.totalPages}
+        />
       </section>
     </main>
   )
@@ -776,13 +958,144 @@ function LookupRows({ fields, items, labelKey, loading, onCreate, onDelete, onUp
   )
 }
 
-function AdminChart({ title, type }) {
+function AdminChart({ title, type, data = [], secondaryData = [], summary, primaryLabel, secondaryLabel }) {
+  const normalizedData = type === 'curve' ? compressHourlyUsage(data) : data
+  const hasData = normalizedData.length > 0 && normalizedData.some((item) => Number(item?.value || 0) > 0)
+  const hasSecondary = secondaryData.length > 0 && secondaryData.some((item) => Number(item?.value || 0) > 0)
+
   return (
     <section className={`admin-card admin-chart admin-chart--${type}`}>
       <h2>{title}</h2>
-      {type === 'pie' ? <div className="fake-pie" /> : <div className="fake-chart">{[35, 48, 66, 60, 78, 56, 40].map((height, index) => <span key={index} style={{ height: `${height}%` }} />)}</div>}
-      <small>{type === 'pie' ? 'Courses and categories' : 'Live admin summary'}</small>
+      {type === 'pie' ? (
+        hasData ? <AdminPieChart data={normalizedData} /> : <p className="admin-empty">No chart data yet.</p>
+      ) : type === 'dual-bars' ? (
+        hasData || hasSecondary ? (
+          <AdminDualBarChart
+            data={normalizedData}
+            primaryLabel={primaryLabel}
+            secondaryData={secondaryData}
+            secondaryLabel={secondaryLabel}
+          />
+        ) : (
+          <p className="admin-empty">No chart data yet.</p>
+        )
+      ) : hasData ? (
+        <AdminBarChart data={normalizedData} tone={type === 'curve' ? 'teal' : type === 'bars' ? 'purple' : 'blue'} />
+      ) : (
+        <p className="admin-empty">No chart data yet.</p>
+      )}
+      <small>{summary || (type === 'pie' ? 'Courses and categories' : 'Live admin summary')}</small>
     </section>
+  )
+}
+
+function AdminBarChart({ data, tone = 'blue' }) {
+  const maxValue = Math.max(...data.map((item) => Number(item?.value || 0)), 1)
+  return (
+    <div className={`fake-chart fake-chart--${tone}`}>
+      {data.map((item, index) => {
+        const value = Number(item?.value || 0)
+        const showLabel = data.length <= 8 || index % Math.ceil(data.length / 8) === 0 || index === data.length - 1
+        return (
+        <div className="fake-chart-group" key={item.label}>
+          <span
+            className={`fake-chart-bar${value === 0 ? ' is-zero' : ''}`}
+            style={{ height: `${value === 0 ? 0 : Math.max(10, (value / maxValue) * 100)}%` }}
+          />
+          <strong>{Number(item?.value || 0)}</strong>
+          <small>{showLabel ? item.label : ''}</small>
+        </div>
+      )})}
+    </div>
+  )
+}
+
+function compressHourlyUsage(data) {
+  if (!Array.isArray(data) || data.length <= 8) return data
+  const groups = []
+  for (let index = 0; index < data.length; index += 4) {
+    const slice = data.slice(index, index + 4)
+    const firstLabel = slice[0]?.label || ''
+    const lastLabel = slice[slice.length - 1]?.label || ''
+    const compactFirst = firstLabel.slice(0, 2)
+    const compactLast = lastLabel.slice(0, 2)
+    groups.push({
+      label: `${compactFirst}-${compactLast}`,
+      value: slice.reduce((sum, item) => sum + Number(item?.value || 0), 0),
+    })
+  }
+  return groups
+}
+
+function AdminDualBarChart({ data, primaryLabel, secondaryData, secondaryLabel }) {
+  const labels = [...new Set([...data.map((item) => item.label), ...secondaryData.map((item) => item.label)])]
+  const primaryMap = new Map(data.map((item) => [item.label, Number(item?.value || 0)]))
+  const secondaryMap = new Map(secondaryData.map((item) => [item.label, Number(item?.value || 0)]))
+  const merged = labels.map((label) => ({
+    label,
+    primary: primaryMap.get(label) || 0,
+    secondary: secondaryMap.get(label) || 0,
+  }))
+  const maxValue = Math.max(
+    ...merged.flatMap((item) => [item.primary, item.secondary]),
+    1,
+  )
+
+  return (
+    <>
+      <div className="admin-chart-legend">
+        <span><i className="legend-swatch legend-swatch--blue" /> {primaryLabel || 'Primary'}</span>
+        <span><i className="legend-swatch legend-swatch--teal" /> {secondaryLabel || 'Secondary'}</span>
+      </div>
+      <div className="fake-chart fake-chart--dual">
+        {merged.map((item, index) => {
+          const showLabel = merged.length <= 8 || index % Math.ceil(merged.length / 8) === 0 || index === merged.length - 1
+          return (
+          <div className="fake-chart-group fake-chart-group--dual" key={item.label}>
+            <div className="fake-chart-pair">
+              <span
+                className={`fake-chart-bar fake-chart-bar--blue${item.primary === 0 ? ' is-zero' : ''}`}
+                style={{ height: `${item.primary === 0 ? 0 : Math.max(10, (item.primary / maxValue) * 100)}%` }}
+              />
+              <span
+                className={`fake-chart-bar fake-chart-bar--teal${item.secondary === 0 ? ' is-zero' : ''}`}
+                style={{ height: `${item.secondary === 0 ? 0 : Math.max(10, (item.secondary / maxValue) * 100)}%` }}
+              />
+            </div>
+            <strong>{item.primary}/{item.secondary}</strong>
+            <small>{showLabel ? item.label : ''}</small>
+          </div>
+        )})}
+      </div>
+    </>
+  )
+}
+
+function AdminPieChart({ data }) {
+  const total = data.reduce((sum, item) => sum + Number(item?.value || 0), 0)
+  let offset = 0
+  const gradient = data
+    .map((item, index) => {
+      const value = Number(item?.value || 0)
+      const start = offset
+      offset += total > 0 ? (value / total) * 100 : 0
+      const color = CHART_PALETTE[index % CHART_PALETTE.length]
+      return `${color} ${start}% ${offset}%`
+    })
+    .join(', ')
+
+  return (
+    <div className="admin-pie-wrap">
+      <div className="fake-pie" style={{ background: total > 0 ? `conic-gradient(${gradient})` : undefined }} />
+      <div className="admin-pie-legend">
+        {data.map((item, index) => (
+          <div className="admin-pie-legend-item" key={item.label}>
+            <span><i className="legend-swatch" style={{ background: CHART_PALETTE[index % CHART_PALETTE.length] }} /> {item.label}</span>
+            <strong>{Number(item?.value || 0)}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -830,6 +1143,24 @@ function AdminTableState({ error, loading }) {
 
 function AdminNoResults({ colSpan }) {
   return <tr><td className="admin-table-empty" colSpan={colSpan}>No matching records</td></tr>
+}
+
+function AdminPagination({ currentPage, last, onPageChange, totalElements, totalPages }) {
+  if (!totalElements) return null
+  return (
+    <div className="admin-pagination">
+      <small>{totalElements} logs</small>
+      <div className="admin-pagination-controls">
+        <button disabled={currentPage <= 0} onClick={() => onPageChange(Math.max(0, currentPage - 1))} type="button">
+          Previous
+        </button>
+        <span>Page {currentPage + 1} / {Math.max(totalPages, 1)}</span>
+        <button disabled={last} onClick={() => onPageChange(currentPage + 1)} type="button">
+          Next
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function AdminStatus({ status }) {

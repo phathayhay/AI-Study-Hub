@@ -1,5 +1,6 @@
 package com.studyhub.document.repository;
 
+import com.studyhub.common.enums.Visibility;
 import com.studyhub.document.entity.Folder;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -12,6 +13,7 @@ public interface FolderRepository extends JpaRepository<Folder, Long> {
     List<Folder> findByUserId(Long userId);
     List<Folder> findByUserIdAndParentFolderIdIsNull(Long userId);
     List<Folder> findByParentFolderId(Long parentFolderId);
+    List<Folder> findByVisibilityOrderByUpdatedAtDesc(Visibility visibility);
     Optional<Folder> findByUserIdAndParentFolderIdAndFolderName(Long userId, Long parentFolderId, String folderName);
     Optional<Folder> findByUserIdAndParentFolderIsNullAndFolderName(Long userId, String folderName);
 }

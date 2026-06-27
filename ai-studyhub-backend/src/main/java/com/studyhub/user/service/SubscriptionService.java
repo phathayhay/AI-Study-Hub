@@ -1,6 +1,7 @@
 package com.studyhub.user.service;
 
 import com.studyhub.user.dto.*;
+import com.studyhub.common.enums.NotificationType;
 import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.entity.UserSubscription;
@@ -28,6 +29,7 @@ public class SubscriptionService {
     private final UserRepository userRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final UserSubscriptionRepository userSubscriptionRepository;
+    private final NotificationService notificationService;
 
     /**
      * Lấy danh sách các gói dịch vụ đang hoạt động.
@@ -70,8 +72,8 @@ public class SubscriptionService {
         String transferContent = String.format("SHUPGRADE %d %d %d", user.getId(), plan.getId(), randomCode);
 
         String accountName = "CONG TY AI STUDYHUB FPT";
-        String bankName = "MB"; // MB Bank (Ngân hàng Quân đội)
-        String accountNumber = "1234567890";
+        String bankName = "TPBank";
+        String accountNumber = "00004103937";
         BigDecimal price = plan.getPrice();
 
         // Xây dựng VietQR Image Link
@@ -123,6 +125,12 @@ public class SubscriptionService {
                 .build();
 
         userSubscriptionRepository.save(newSub);
+        notificationService.createNotification(
+                user,
+                "Plan Upgraded",
+                String.format("Your %s plan is now active until %s.", plan.getPlanName(), newSub.getEndDate().toLocalDate()),
+                NotificationType.SYSTEM
+        );
         log.info("Successfully upgraded user {} to plan {}", email, plan.getPlanName());
     }
 
@@ -152,15 +160,28 @@ public class SubscriptionService {
             String encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8.toString());
             return String.format(
                     "https://img.vietqr.io/image/%s-%s-compact2.png?amount=%s&addInfo=%s&accountName=%s",
-                    bank, account, amount.toPlainString(), encodedContent, encodedName
+                    mapBankCode(bank), account, amount.toPlainString(), encodedContent, encodedName
             );
         } catch (Exception e) {
             log.error("Failed to build VietQR URL: {}", e.getMessage());
             // Fallback URL
             return String.format(
                     "https://img.vietqr.io/image/%s-%s-compact2.png?amount=%s&addInfo=%s",
-                    bank, account, amount.toPlainString(), content
+                    mapBankCode(bank), account, amount.toPlainString(), content
             );
         }
+    }
+
+    private String mapBankCode(String bankName) {
+        if (bankName == null) {
+            return "TPB";
+        }
+
+        String normalized = bankName.trim().toUpperCase();
+        return switch (normalized) {
+            case "TPBANK", "TPB" -> "TPB";
+            case "MB", "MBBANK" -> "MB";
+            default -> normalized;
+        };
     }
 }

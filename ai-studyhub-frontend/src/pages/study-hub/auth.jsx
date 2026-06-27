@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import Brand from '../../components/layout/Brand'
 import { login as apiLogin, register as apiRegister } from '../../services/authService'
-import { sendVerifyEmail, verifyEmail } from '../../features/auth/authService'
+import { forgotPassword as requestPasswordReset, resetPassword as submitPasswordReset, sendVerifyEmail, verifyEmail } from '../../features/auth/authService'
 
 export function LoginPage({ onLogin, onNavigate }) {
   return (
@@ -27,8 +27,26 @@ export function RegisterPage({ onNavigate, onRegister }) {
   )
 }
 
+export function ForgotPasswordPage({ onNavigate }) {
+  return (
+    <AuthLayout
+      initialMode="forgot-password"
+      onNavigate={onNavigate}
+    />
+  )
+}
+
+export function ResetPasswordPage({ onNavigate }) {
+  return (
+    <AuthLayout
+      initialMode="reset-password"
+      onNavigate={onNavigate}
+    />
+  )
+}
+
 export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
-  const [mode, setMode] = useState(initialMode) // 'signin', 'signup', 'verify-email'
+  const [mode, setMode] = useState(initialMode)
   const [emailUser, setEmailUser] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -38,8 +56,18 @@ export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
     setError('')
     setSuccess('')
     setMode(newMode)
-    if (onNavigate) {
-      onNavigate(newMode === 'signup' ? 'register' : 'login')
+    if (!onNavigate) return
+
+    const routeMap = {
+      signin: 'login',
+      signup: 'register',
+      'forgot-password': 'forgot-password',
+      'reset-password': 'reset-password',
+    }
+
+    const targetRoute = routeMap[newMode]
+    if (targetRoute) {
+      onNavigate(targetRoute)
     }
   }
 
@@ -56,7 +84,7 @@ export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
       `}</style>
 
       {/* Hero Section (Left Column) */}
-      <section className="relative hidden lg:flex w-full lg:w-[42%] bg-[#0a0f1d] flex-col justify-between p-8 lg:p-10 text-white lg:h-full overflow-y-auto border-r border-slate-800/50">
+      <section className="auth-showcase relative hidden lg:flex w-full lg:w-[42%] bg-[#0a0f1d] flex-col justify-between p-8 lg:p-10 text-white lg:h-full overflow-y-auto border-r border-slate-800/50">
         {/* Glow Blobs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-[120px] animate-pulse duration-[8000ms]" />
@@ -145,6 +173,18 @@ export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Start your smart learning journey today.</p>
               </>
             )}
+            {mode === 'forgot-password' && (
+              <>
+                <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Forgot Password</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Enter your email and we will send you a secure reset link.</p>
+              </>
+            )}
+            {mode === 'reset-password' && (
+              <>
+                <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Reset Password</h1>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Create a new password to regain access to your study workspace.</p>
+              </>
+            )}
             {mode === 'verify-email' && (
               <>
                 <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">Check your inbox</h1>
@@ -175,6 +215,7 @@ export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
               onLoading={setLoading}
               onError={setError}
               onToggleMode={handleToggleMode}
+              onNavigate={onNavigate}
               loading={loading}
             />
           )}
@@ -187,6 +228,26 @@ export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
               }}
               onLoading={setLoading}
               onError={setError}
+              onToggleMode={handleToggleMode}
+              loading={loading}
+            />
+          )}
+
+          {mode === 'forgot-password' && (
+            <ForgotPasswordForm
+              onLoading={setLoading}
+              onError={setError}
+              onSuccess={setSuccess}
+              onToggleMode={handleToggleMode}
+              loading={loading}
+            />
+          )}
+
+          {mode === 'reset-password' && (
+            <ResetPasswordForm
+              onLoading={setLoading}
+              onError={setError}
+              onSuccess={setSuccess}
               onToggleMode={handleToggleMode}
               loading={loading}
             />
@@ -270,42 +331,8 @@ function InputField({
   )
 }
 
-/* SOCIAL LOGIN (GOOGLE) */
-function SocialLogin() {
-  const handleGoogleClick = () => {
-    window.showToast?.('Google authentication is integrated in production mode.', 'info')
-  }
-
-  return (
-    <div className="mt-3 flex flex-col gap-3">
-      <div className="relative flex items-center justify-center">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-200 dark:border-slate-800/80"></div>
-        </div>
-        <span className="relative px-3 bg-white dark:bg-[#0f172a] text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">
-          or check in with
-        </span>
-      </div>
-
-      <button
-        type="button"
-        onClick={handleGoogleClick}
-        className="w-full flex items-center justify-center gap-3 px-4 py-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 font-medium text-sm hover:bg-slate-50 dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200 shadow-sm"
-      >
-        <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
-          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-        </svg>
-        <span>Continue with Google</span>
-      </button>
-    </div>
-  )
-}
-
 /* SIGN IN FORM SUB-COMPONENT */
-function SignInForm({ onLogin, onLoading, onError, onToggleMode, loading }) {
+function SignInForm({ onLogin, onLoading, onError, onToggleMode, onNavigate, loading }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
@@ -360,7 +387,7 @@ function SignInForm({ onLogin, onLoading, onError, onToggleMode, loading }) {
         
         <button 
           type="button" 
-          onClick={() => window.showToast?.('Please contact support to reset your password.', 'info')}
+          onClick={() => onNavigate?.('forgot-password')}
           className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
         >
           Forgot password?
@@ -382,9 +409,7 @@ function SignInForm({ onLogin, onLoading, onError, onToggleMode, loading }) {
         )}
       </button>
 
-      <SocialLogin />
-
-      <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-4">
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-2">
         Don't have an account?{' '}
         <button
           type="button"
@@ -513,9 +538,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
         )}
       </button>
 
-      <SocialLogin />
-
-      <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-4">
+      <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-2">
         Already have an account?{' '}
         <button
           type="button"
@@ -525,6 +548,156 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
           Sign In
         </button>
       </p>
+    </form>
+  )
+}
+
+function ForgotPasswordForm({ onLoading, onError, onSuccess, onToggleMode, loading }) {
+  const [email, setEmail] = useState('')
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    onLoading(true)
+    onError('')
+    onSuccess('')
+
+    try {
+      const normalizedEmail = email.trim().toLowerCase()
+      await requestPasswordReset(normalizedEmail)
+      onSuccess(`A password reset link has been sent to ${normalizedEmail}. Please check your inbox.`)
+    } catch (err) {
+      onError(err.message || 'Unable to send the reset link right now.')
+    } finally {
+      onLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+      <InputField
+        label="Email"
+        icon={Mail}
+        type="email"
+        placeholder="name@fpt.edu.vn"
+        value={email}
+        onChange={setEmail}
+        autoComplete="email"
+      />
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/60 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 cursor-pointer disabled:cursor-not-allowed"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Sending reset link...</span>
+          </>
+        ) : (
+          <span>Send Reset Link</span>
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onToggleMode('signin')}
+        className="w-full border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-200 py-3 px-4 rounded-xl font-semibold text-sm transition-all cursor-pointer"
+      >
+        Back to Sign In
+      </button>
+    </form>
+  )
+}
+
+function ResetPasswordForm({ onLoading, onError, onSuccess, onToggleMode, loading }) {
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const params = new URLSearchParams(window.location.search)
+  const token = params.get('token') || ''
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    onError('')
+    onSuccess('')
+
+    if (!token) {
+      onError('This reset link is invalid or has expired.')
+      return
+    }
+
+    if (password.length < 6) {
+      onError('Password must be at least 6 characters long.')
+      return
+    }
+
+    if (password !== confirmPassword) {
+      onError('Passwords do not match.')
+      return
+    }
+
+    onLoading(true)
+    try {
+      await submitPasswordReset({ token, newPassword: password })
+      onSuccess('Your password has been reset successfully. You can sign in now.')
+      setPassword('')
+      setConfirmPassword('')
+      window.setTimeout(() => onToggleMode('signin'), 1200)
+    } catch (err) {
+      onError(err.message || 'Reset password failed. Please request a new link.')
+    } finally {
+      onLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+      <InputField
+        label="New Password"
+        icon={Lock}
+        type="password"
+        placeholder="Enter a new password"
+        value={password}
+        onChange={setPassword}
+        autoComplete="new-password"
+        revealable
+        minLength={6}
+      />
+
+      <InputField
+        label="Confirm Password"
+        icon={Lock}
+        type="password"
+        placeholder="Re-enter your new password"
+        value={confirmPassword}
+        onChange={setConfirmPassword}
+        autoComplete="new-password"
+        revealable
+        minLength={6}
+      />
+
+      <button
+        type="submit"
+        disabled={loading || !token}
+        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/60 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all shadow-md shadow-indigo-600/10 hover:shadow-indigo-600/20 cursor-pointer disabled:cursor-not-allowed"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Updating password...</span>
+          </>
+        ) : (
+          <span>Reset Password</span>
+        )}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onToggleMode('signin')}
+        className="w-full border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-200 py-3 px-4 rounded-xl font-semibold text-sm transition-all cursor-pointer"
+      >
+        Back to Sign In
+      </button>
     </form>
   )
 }

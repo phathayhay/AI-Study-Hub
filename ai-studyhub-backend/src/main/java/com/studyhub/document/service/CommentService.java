@@ -7,8 +7,10 @@ import com.studyhub.document.entity.Comment;
 import com.studyhub.document.entity.Document;
 import com.studyhub.document.repository.CommentRepository;
 import com.studyhub.document.repository.DocumentRepository;
+import com.studyhub.common.enums.NotificationType;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.UserRepository;
+import com.studyhub.user.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -26,6 +29,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public CommentResponse addComment(Long documentId, CommentRequest request, String email) {
@@ -59,6 +63,7 @@ public class CommentService {
                 .build();
 
         Comment savedComment = commentRepository.save(comment);
+        createCommentNotifications(savedComment, user, doc, parent);
         return mapToResponse(savedComment);
     }
 
@@ -115,6 +120,7 @@ public class CommentService {
         }
 
         // Thực hiện soft delete bằng cách đặt deleted_at
+        notificationService.deleteNotificationsBySourceCommentId(comment.getId());
         comment.setDeletedAt(LocalDateTime.now());
         commentRepository.save(comment);
     }
@@ -135,5 +141,46 @@ public class CommentService {
                 .updatedAt(comment.getUpdatedAt())
                 .replies(replies)
                 .build();
+    }
+
+    private void createCommentNotifications(Comment savedComment, User actor, Document document, Comment parent) {
+        String actorName = actor.getFullName() != null && !actor.getFullName().isBlank()
+                ? actor.getFullName()
+                : actor.getEmail();
+        String documentTitle = document.getTitle() != null && !document.getTitle().isBlank()
+                ? document.getTitle()
+                : "your document";
+
+        Long actorId = actor.getId();
+        Long parentUserId = parent != null && parent.getUser() != null ? parent.getUser().getId() : null;
+        Long documentOwnerId = document.getUser() != null ? document.getUser().getId() : null;
+
+        if (parentUserId != null && !Objects.equals(parentUserId, actorId)) {
+            userRepository.findById(parentUserId).ifPresent((recipient) ->
+                    notificationService.createNotification(
+                            recipient,
+                            "Reply to Comment",
+                            actorName + " replied to your comment on \"" + documentTitle + "\".",
+                            NotificationType.COMMENT,
+                            savedComment.getId()
+                    )
+            );
+        }
+
+        if (documentOwnerId != null
+                && !Objects.equals(documentOwnerId, actorId)
+                && !Objects.equals(documentOwnerId, parentUserId)) {
+            userRepository.findById(documentOwnerId).ifPresent((recipient) ->
+                    notificationService.createNotification(
+                            recipient,
+                            parent != null ? "New Reply" : "New Comment",
+                            parent != null
+                                    ? actorName + " replied in the discussion on your document \"" + documentTitle + "\"."
+                                    : actorName + " commented on your document \"" + documentTitle + "\".",
+                            NotificationType.COMMENT,
+                            savedComment.getId()
+                    )
+            );
+        }
     }
 }

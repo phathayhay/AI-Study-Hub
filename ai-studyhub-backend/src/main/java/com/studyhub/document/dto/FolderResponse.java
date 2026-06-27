@@ -11,10 +11,17 @@ import java.util.List;
 public class FolderResponse {
     private Long id;
     private Long userId;
+    private String ownerName;
     private String folderName;
     private Long parentFolderId;
+    private String visibility;
+    private LocalDateTime publishedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Integer publicDocumentCount;
+    private Integer totalDownloads;
+    private Boolean publishReady;
+    private String publishBlockedReason;
     private List<FolderResponse> subfolders;
     private List<DocumentResponse> documents;
 }

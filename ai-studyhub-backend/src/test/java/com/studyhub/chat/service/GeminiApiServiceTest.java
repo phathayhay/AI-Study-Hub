@@ -69,7 +69,7 @@ class GeminiApiServiceTest {
                 Map.of("senderType", "USER", "content", "Hello"),
                 Map.of("senderType", "AI", "content", "Hi, how can I help you?")
         );
-        GeminiApiService.GeminiResponse response = geminiApiService.chat(
+        AiModelService.AiResponse response = geminiApiService.chat(
                 "System prompt content",
                 history,
                 "What is the capital of Vietnam?"

@@ -5,12 +5,14 @@ import HeroSearch from '../../components/home/HeroSearch'
 import StatsSummary from '../../components/home/StatsSummary'
 import StudyHubIcon, { getFileIconName, getFileIconColor } from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
-import { appUser, featuredDocuments, featuredFolders, recentActivities, majors, popularCourses, stats } from '../../data/studyHubData'
+import { appUser, featuredDocuments, featuredFolders, recentActivities, majors, popularCourses } from '../../data/studyHubData'
 import { pricingPlans } from './config'
+import { getActivePlans, getUpgradePaymentInfo } from '../../services/subscriptionService'
 import { DocumentCardMini, ExploreFolderCard, InfoLine, PageTitle, SectionTitle } from './shared'
 import {
   searchDocuments as getDocuments,
   getDocument,
+  downloadDocumentFile,
   uploadDocument
 } from '../../features/documents/documentService'
 import {
@@ -21,9 +23,17 @@ import {
 } from '../../services/communityService'
 import {
   getComments as getDocumentComments,
-  addComment as addDocumentComment
+  addComment as addDocumentComment,
+  updateComment as updateDocumentComment,
+  deleteComment as deleteDocumentComment
 } from '../../services/commentService'
-import { getRootFolders, getFolder } from '../../features/folders/folderService'
+import {
+  getFolder,
+  getPublicFolder,
+  getPublicFolders,
+  updateFolderVisibility
+} from '../../features/folders/folderService'
+import { getMajors, getCourses, getCategories } from '../../services/courseService'
 
 const uploadSelectFields = [
   {
@@ -50,10 +60,25 @@ const uploadSelectFields = [
 ]
 
 export function HomeScreen({ guest = false, onNavigate }) {
+  const handleSearch = (keyword) => {
+    onNavigate('explore', { keyword })
+  }
+  const handleSelectMajor = (majorCode) => {
+    onNavigate('explore', { majorCode })
+  }
+  const handleSelectCourse = (courseCode) => {
+    onNavigate('explore', { courseCode })
+  }
+
   return (
     <main className="home-main dark:bg-[#0f172a] dark:bg-none">
       <div className="home-container">
-        <HeroSearch title={guest ? 'Study Materials for FPTU Students' : 'FPTU Study Materials'} />
+        <HeroSearch 
+          title={guest ? 'Study Materials for FPTU Students' : 'FPTU Study Materials'} 
+          onSearch={handleSearch}
+          onSelectMajor={handleSelectMajor}
+          onSelectCourse={handleSelectCourse}
+        />
         <StatsSummary />
         <div onClick={() => onNavigate('folder-detail')} role="presentation">
           <FeaturedFolders />
@@ -82,6 +107,49 @@ const COURSE_MAP = {
   'PRO192': 5
 }
 
+const SHARED_FOUNDATION_PREFIXES = ['PRF', 'PRO', 'CSD', 'DBI', 'MAD', 'MAE', 'OSG', 'JPD', 'WED', 'SWT', 'SSI', 'PFP', 'SSL']
+
+function resolveMajorCode(majorValue, majorsList = []) {
+  if (!majorValue) return ''
+
+  const rawValue = String(majorValue).trim()
+  const normalizedValue = rawValue.toUpperCase()
+  const matchedMajor = majorsList.find(
+    (major) => major.majorCode?.toUpperCase() === normalizedValue || major.majorName?.toUpperCase() === normalizedValue
+  )
+
+  if (matchedMajor?.majorCode) {
+    return String(matchedMajor.majorCode).toUpperCase()
+  }
+
+  const fallbackMap = {
+    'SOFTWARE ENGINEERING': 'SE',
+    'ARTIFICIAL INTELLIGENCE': 'AI',
+    'INFORMATION ASSURANCE': 'IA',
+    'INFORMATION SECURITY': 'SS',
+    'GRAPHIC DESIGN': 'GD',
+    'JAPANESE LANGUAGE': 'JL',
+  }
+
+  return fallbackMap[normalizedValue] || normalizedValue
+}
+
+function isSharedFoundationCourse(courseCode = '') {
+  const normalizedCourseCode = String(courseCode).trim().toUpperCase()
+  return SHARED_FOUNDATION_PREFIXES.some((prefix) => normalizedCourseCode.startsWith(prefix))
+}
+
+function isCourseEligibleForMajor(course, selectedMajor, majorsList = []) {
+  const selectedMajorCode = resolveMajorCode(selectedMajor, majorsList)
+  if (!selectedMajorCode || selectedMajorCode === 'ALL') return true
+
+  if (isSharedFoundationCourse(course?.courseCode)) return true
+
+  const courseMajorCode = resolveMajorCode(course?.major?.majorCode || course?.major?.majorName, majorsList)
+  if (courseMajorCode === selectedMajorCode) return true
+  return false
+}
+
 function SkeletonCard() {
   return (
     <div className="bg-white border border-slate-100 rounded-2xl p-5 flex flex-col justify-between h-[210px] shadow-sm animate-pulse">
@@ -104,19 +172,6 @@ function SkeletonCard() {
 function ExploreSkeleton() {
   return (
     <div className="w-full flex flex-col gap-8">
-      {/* Stats Skeleton */}
-      <div className="stats-grid grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-white border border-slate-100 rounded-2xl p-5 flex items-center gap-4 shadow-sm h-[86px]">
-            <div className="w-10 h-10 bg-slate-200 rounded-xl flex-shrink-0" />
-            <div className="flex-1 space-y-2">
-              <div className="h-5 bg-slate-200 rounded w-16" />
-              <div className="h-3 bg-slate-100 rounded w-24" />
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* Grid Sections Skeletons */}
       <div className="space-y-6">
         <div className="h-7 bg-slate-200 rounded w-48 animate-pulse" />
@@ -127,35 +182,6 @@ function ExploreSkeleton() {
         </div>
       </div>
     </div>
-  )
-}
-
-function ExploreStats({ statsData, loading }) {
-  if (loading) return null;
-
-  const iconColors = {
-    blue: 'bg-indigo-50 dark:bg-slate-700 text-indigo-600 dark:text-indigo-400',
-    green: 'bg-emerald-50 dark:bg-slate-700 text-emerald-600 dark:text-emerald-400',
-    purple: 'bg-purple-50 dark:bg-slate-700 text-purple-600 dark:text-purple-400'
-  }
-
-  return (
-    <section className="stats-grid grid grid-cols-1 md:grid-cols-3 gap-6 w-full" aria-label="Quick Stats">
-      {statsData.map((stat) => (
-        <article
-          className="stat-card flex items-center gap-4 p-5 bg-white dark:bg-[#1e293b] rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-all duration-300 hover:shadow-md cursor-pointer hover:-translate-y-0.5"
-          key={stat.id}
-        >
-          <span className={`flex items-center justify-center w-11 h-11 rounded-xl flex-shrink-0 ${iconColors[stat.tone] || 'bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-            <StudyHubIcon name={stat.icon === 'sparkle' ? 'sparkle' : stat.icon} size={20} />
-          </span>
-          <span className="flex flex-col">
-            <strong className="text-xl font-bold text-slate-900 dark:text-white leading-tight">{stat.value}</strong>
-            <small className="text-sm font-medium text-slate-500 dark:text-slate-400">{stat.label}</small>
-          </span>
-        </article>
-      ))}
-    </section>
   )
 }
 
@@ -349,16 +375,106 @@ export const getDocCourseCode = (doc) => {
   return match ? match[0].toUpperCase() : (doc.fileType || doc.type || 'DOC')
 }
 
-export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = false }) {
-  const [selectedMajor, setSelectedMajor] = useState('ALL')
-  const [selectedCourse, setSelectedCourse] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
+function matchesDocumentMajor(doc, selectedMajor, coursesList = [], majorsList = []) {
+  const selectedMajorCode = resolveMajorCode(selectedMajor, majorsList)
+  if (!selectedMajorCode || selectedMajorCode === 'ALL') return true
+
+  const documentCourseCode = getDocCourseCode(doc)
+  const matchedCourse =
+    coursesList.find((course) => Number(course?.id) === Number(doc?.courseId)) ||
+    coursesList.find((course) => String(course?.courseCode || '').toUpperCase() === documentCourseCode)
+
+  if (matchedCourse) {
+    return isCourseEligibleForMajor(matchedCourse, selectedMajorCode, majorsList)
+  }
+
+  if (doc?.major && resolveMajorCode(doc.major, majorsList) === selectedMajorCode) {
+    return true
+  }
+
+  return isSharedFoundationCourse(documentCourseCode)
+}
+
+function getFolderCode(folderName = '') {
+  const codeMatch = folderName.match(/^([A-Z]{3}\d{3})/i)
+  return codeMatch ? codeMatch[1].toUpperCase() : 'FPTU'
+}
+
+function formatFolderMetric(value, singularLabel) {
+  return value === 1 ? `1 ${singularLabel}` : `${value} ${singularLabel}s`
+}
+
+function mapFolderToCard(folder) {
+  const fileCount = Number(folder?.publicDocumentCount ?? folder?.documents?.length ?? 0)
+  const downloadCount = Number(folder?.totalDownloads ?? 0)
+  const ownerName = folder?.ownerName || 'FPTU community'
+
+  return {
+    id: folder?.id,
+    code: getFolderCode(folder?.folderName || ''),
+    title: folder?.folderName || 'Untitled Folder',
+    description: `Public study collection by ${ownerName}`,
+    files: formatFolderMetric(fileCount, 'file'),
+    downloads: formatFolderMetric(downloadCount, 'download'),
+    favorite: false
+  }
+}
+
+export function ExplorePage({ 
+  onNavigate, 
+  onOpenDocument, 
+  onOpenFolder, 
+  guest = false,
+  initialKeyword = '',
+  initialMajor = 'ALL',
+  initialCourse = null
+}) {
+  const [selectedMajor, setSelectedMajor] = useState(initialMajor)
+  const [selectedCourse, setSelectedCourse] = useState(initialCourse)
+  const [searchQuery, setSearchQuery] = useState(initialKeyword)
+
+  useEffect(() => {
+    setSearchQuery(initialKeyword)
+    setSelectedMajor(initialMajor)
+    setSelectedCourse(initialCourse)
+  }, [initialKeyword, initialMajor, initialCourse])
+
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [favoriteIds, setFavoriteIds] = useState(new Set())
   const [realFolders, setRealFolders] = useState([])
   const [foldersLoading, setFoldersLoading] = useState(false)
+
+  const [majorsList, setMajorsList] = useState([])
+  const [coursesList, setCoursesList] = useState([])
+  const [categoriesList, setCategoriesList] = useState([])
+
+  useEffect(() => {
+    getMajors()
+      .then(res => {
+        if (res?.success && Array.isArray(res?.data)) {
+          setMajorsList(res.data.filter(m => m.majorCode !== 'ALL'))
+        }
+      })
+      .catch(err => console.error('Failed to load majors:', err))
+
+    getCourses()
+      .then(res => {
+        if (res?.success && Array.isArray(res?.data)) {
+          setCoursesList(res.data)
+        }
+      })
+      .catch(err => console.error('Failed to load courses:', err))
+
+    getCategories()
+      .then(res => {
+        if (res?.success && Array.isArray(res?.data)) {
+          setCategoriesList(res.data)
+        }
+      })
+      .catch(err => console.error('Failed to load categories:', err))
+  }, [])
 
   useEffect(() => {
     if (guest) return
@@ -374,81 +490,48 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
     let active = true
     setFoldersLoading(true)
 
-    const fetchRealFolders = async () => {
+    const fetchPublicFolders = async () => {
       try {
-        const rootFolders = await getRootFolders()
-        const folderList = Array.isArray(rootFolders)
-          ? rootFolders
-          : (rootFolders?.data || rootFolders?.content || [])
+        const response = await getPublicFolders()
+        const folderList = Array.isArray(response)
+          ? response
+          : (response?.data || response?.content || [])
 
-        const detailedFolders = await Promise.all(
-          folderList.map(async (f) => {
-            try {
-              const detail = await getFolder(f.id)
-              const folderData = detail?.data || detail
-              const docsCount = folderData?.documents?.length || 0
-              const downloadsCount = folderData?.documents?.reduce((acc, doc) => acc + (doc.totalDownloads || 0), 0) || 0
-
-              const codeMatch = (f.folderName || '').match(/^([A-Z]{3}\d{3})/i)
-              const code = codeMatch ? codeMatch[1].toUpperCase() : 'FPTU'
-
-              return {
-                id: f.id,
-                code: code,
-                title: f.folderName,
-                description: `Study materials and documents for ${f.folderName}`,
-                files: docsCount === 1 ? '1 file' : `${docsCount} files`,
-                downloads: downloadsCount === 1 ? '1 download' : `${downloadsCount} downloads`,
-                favorite: false
-              }
-            } catch (err) {
-              const codeMatch = (f.folderName || '').match(/^([A-Z]{3}\d{3})/i)
-              const code = codeMatch ? codeMatch[1].toUpperCase() : 'FPTU'
-              return {
-                id: f.id,
-                code: code,
-                title: f.folderName,
-                description: `Study materials and documents for ${f.folderName}`,
-                files: '0 files',
-                downloads: '0 downloads',
-                favorite: false
-              }
-            }
-          })
-        )
         if (active) {
-          setRealFolders(detailedFolders)
+          setRealFolders(folderList.map(mapFolderToCard))
         }
       } catch (err) {
-        console.error('Failed to load real folders, falling back to mock:', err)
+        console.error('Failed to load public folders:', err)
         if (active) {
-          setRealFolders(featuredFolders)
+          setRealFolders([])
         }
       } finally {
         if (active) setFoldersLoading(false)
       }
     }
 
-    fetchRealFolders()
+    fetchPublicFolders()
 
     return () => {
       active = false
     }
-  }, [guest])
+  }, [])
 
   useEffect(() => {
     let active = true
     setLoading(true)
     setError('')
 
-    const majorId = selectedMajor !== 'ALL' ? MAJOR_MAP[selectedMajor] : null
-    const courseId = selectedCourse ? COURSE_MAP[selectedCourse] : null
+    const majorId = null
 
-    getDocuments({ keyword: searchQuery || null, majorId, courseId, page: 0, size: 40 })
+    const courseObj = coursesList.find(c => c.courseCode === selectedCourse)
+    const courseId = courseObj ? courseObj.id : null
+
+    getDocuments({ keyword: searchQuery || null, majorId, courseId, page: 0, size: 100 })
       .then((res) => {
         if (!active) return
         const docs = res?.content || res?.data?.content || res || []
-        setDocuments(docs)
+        setDocuments(docs.filter((doc) => matchesDocumentMajor(doc, selectedMajor, coursesList, majorsList)))
       })
       .catch((err) => {
         if (!active) return
@@ -461,7 +544,7 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
     return () => {
       active = false
     }
-  }, [searchQuery, selectedMajor, selectedCourse])
+  }, [searchQuery, selectedMajor, selectedCourse, majorsList, coursesList])
 
   const filteredFolders = realFolders.filter(f =>
     (selectedMajor === 'ALL' || (f.code && f.code.startsWith(selectedMajor))) &&
@@ -485,9 +568,8 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
 
   const recommendedDocs = [...documents]
     .filter(doc => {
-      const code = getDocCourseCode(doc)
       if (selectedMajor !== 'ALL') {
-        return code.startsWith(selectedMajor) || doc.major === selectedMajor
+        return matchesDocumentMajor(doc, selectedMajor, coursesList, majorsList)
       }
       return (doc.averageRating || doc.rating || 0) >= 4.0 || (doc.totalDownloads || doc.downloads || 0) > 10
     })
@@ -507,8 +589,12 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
           setSelectedMajor={setSelectedMajor}
           selectedCourse={selectedCourse}
           setSelectedCourse={setSelectedCourse}
-          popularCourses={popularCourses}
-          majors={majors.filter(m => m !== 'ALL')}
+          popularCourses={
+            selectedMajor === 'ALL'
+              ? coursesList.slice(0, 10).map(c => c.courseCode)
+              : coursesList.filter(c => isCourseEligibleForMajor(c, selectedMajor, majorsList)).slice(0, 10).map(c => c.courseCode)
+          }
+          majors={majorsList.map(m => m.majorCode)}
           guest={guest}
         />
 
@@ -517,8 +603,6 @@ export function ExplorePage({ onNavigate, onOpenDocument, onOpenFolder, guest = 
           <ExploreSkeleton />
         ) : (
           <>
-            <ExploreStats statsData={stats} loading={loading} />
-
             {error ? (
               <div className="p-10 border border-red-100 rounded-2xl text-center text-red-500 bg-red-50/30">{error}</div>
             ) : documents.length === 0 ? (
@@ -712,6 +796,24 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
   const [selectedSemester, setSelectedSemester] = useState('')
   const [selectedCourse, setSelectedCourse] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
+
+  const [majorsList, setMajorsList] = useState([])
+  const [coursesList, setCoursesList] = useState([])
+  const [categoriesList, setCategoriesList] = useState([])
+
+  useEffect(() => {
+    getMajors().then(res => {
+      if (res?.success && Array.isArray(res?.data)) setMajorsList(res.data.filter(m => m.majorCode !== 'ALL'))
+    }).catch(err => console.error(err))
+
+    getCourses().then(res => {
+      if (res?.success && Array.isArray(res?.data)) setCoursesList(res.data)
+    }).catch(err => console.error(err))
+
+    getCategories().then(res => {
+      if (res?.success && Array.isArray(res?.data)) setCategoriesList(res.data)
+    }).catch(err => console.error(err))
+  }, [])
   const fileInputRef = useRef(null)
   const titleRef = useRef(null)
   const descRef = useRef(null)
@@ -771,27 +873,33 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
       window.showToast?.('File size exceeds 10MB limit', 'error')
       return
     }
-    const title = titleRef.current?.value?.trim() || selectedUploadFile.name
+    const title = titleRef.current?.value?.trim() || ''
     const description = descRef.current?.value?.trim() || ''
     const visibility = visibilityRef.current?.value || 'PRIVATE'
     const tagsRaw = tagsRef.current?.value?.trim() || ''
     const tags = tagsRaw ? tagsRaw.split(',').map((t) => t.trim()).filter(Boolean) : []
 
-    if (visibility === 'PUBLIC') {
-      if (!selectedCourse) {
-        setUploadError('Course Code is required for public documents.')
-        window.showToast?.('Course Code is required for public documents', 'error')
-        return
-      }
-      if (!selectedCategory) {
-        setUploadError('Document Type is required for public documents.')
-        window.showToast?.('Document Type is required for public documents', 'error')
-        return
-      }
+    const requiredFields = [
+      { value: title, label: 'Document Title' },
+      { value: selectedMajor, label: 'Major' },
+      { value: selectedSemester, label: 'Semester' },
+      { value: selectedCourse, label: 'Course Code' },
+      { value: selectedCategory, label: 'Document Type' },
+    ]
+
+    const missingField = requiredFields.find((field) => !field.value)
+    if (missingField) {
+      const message = `${missingField.label} is required before uploading.`
+      setUploadError(message)
+      window.showToast?.(message, 'error')
+      return
     }
 
-    const courseId = UPLOAD_COURSE_MAP[selectedCourse] || null
-    const categoryId = UPLOAD_CATEGORY_MAP[selectedCategory] || null
+    const courseObj = coursesList.find(c => c.courseCode === selectedCourse)
+    const courseId = courseObj ? courseObj.id : null
+
+    const categoryObj = categoriesList.find(c => c.categoryName === selectedCategory)
+    const categoryId = categoryObj ? categoryObj.id : null
 
     setUploading(true)
     setUploadError('')
@@ -877,26 +985,48 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
             <label>Document Title *<input ref={titleRef} defaultValue={selectedUploadFile.name} placeholder="Enter document title" /></label>
             <label>Description<textarea ref={descRef} placeholder="Brief description of the document..." /></label>
             <div className="upload-form__grid">
-              {uploadSelectFields.map((field) => {
-                let value = ''
-                let onChange = () => {}
-                if (field.label.startsWith('Major')) {
-                  value = selectedMajor
-                  onChange = (e) => setSelectedMajor(e.target.value)
-                } else if (field.label.startsWith('Semester')) {
-                  value = selectedSemester
-                  onChange = (e) => setSelectedSemester(e.target.value)
-                } else if (field.label.startsWith('Course Code')) {
-                  value = selectedCourse
-                  onChange = (e) => setSelectedCourse(e.target.value)
-                } else if (field.label.startsWith('Document Type')) {
-                  value = selectedCategory
-                  onChange = (e) => setSelectedCategory(e.target.value)
-                }
-                return (
+              {(() => {
+                const dynamicSelectFields = [
+                  {
+                    label: 'Major *',
+                    placeholder: 'Select major',
+                    options: majorsList.map(m => m.majorName),
+                    value: selectedMajor,
+                    onChange: (e) => {
+                      setSelectedMajor(e.target.value)
+                      setSelectedCourse('') // reset course
+                    }
+                  },
+                  {
+                    label: 'Semester *',
+                    placeholder: 'Select semester',
+                    options: ['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8', 'Semester 9'],
+                    value: selectedSemester,
+                    onChange: (e) => setSelectedSemester(e.target.value)
+                  },
+                  {
+                    label: 'Course Code *',
+                    hint: '[1 course]',
+                    placeholder: 'Select course code',
+                    options: coursesList
+                      .filter(c => !selectedMajor || isCourseEligibleForMajor(c, selectedMajor, majorsList))
+                      .map(c => c.courseCode),
+                    value: selectedCourse,
+                    onChange: (e) => setSelectedCourse(e.target.value)
+                  },
+                  {
+                    label: 'Document Type *',
+                    placeholder: 'Select document type',
+                    options: categoriesList.map(c => c.categoryName),
+                    value: selectedCategory,
+                    onChange: (e) => setSelectedCategory(e.target.value)
+                  }
+                ]
+
+                return dynamicSelectFields.map((field) => (
                   <label key={field.label}>
                     {field.label} {field.hint && <small>{field.hint}</small>}
-                    <select value={value} onChange={onChange}>
+                    <select value={field.value} onChange={field.onChange}>
                       <option disabled value="">{field.placeholder}</option>
                       {field.options.map((option) => (
                         <option key={option} value={option}>
@@ -905,8 +1035,8 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
                       ))}
                     </select>
                   </label>
-                )
-              })}
+                ))
+              })()}
               <label>Visibility<select ref={visibilityRef} defaultValue="PRIVATE">
                 <option value="PUBLIC">Public</option><option value="PRIVATE">Private</option>
               </select></label>
@@ -978,9 +1108,12 @@ function canReadAsText(file) {
   return file.type.startsWith('text/') || readableExtensions.some((extension) => lowerName.endsWith(extension))
 }
 
-export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest = false }) {
+export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest = false, user = null }) {
   const [folder, setFolder] = useState(null)
   const [favoriteIds, setFavoriteIds] = useState(new Set())
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [publishing, setPublishing] = useState(false)
 
   useEffect(() => {
     const hasToken = !!localStorage.getItem('accessToken')
@@ -995,13 +1128,54 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
 
   useEffect(() => {
     if (!id) return
-    getFolder(id).then((res) => {
-      const data = res?.data || res
-      setFolder(data)
-      onLoad?.(data)
-    }).catch(() => {
-      onLoad?.({ id, name: 'PRF192 - Programming Fundamentals Full Pack' })
+    let active = true
+    setLoading(true)
+    setError('')
+
+    const loadFolder = async () => {
+      const hasToken = !!localStorage.getItem('accessToken')
+
+      try {
+        const publicRes = await getPublicFolder(id)
+        const data = publicRes?.data || publicRes
+        if (!active) return
+        setFolder(data)
+        onLoad?.(data)
+        return
+      } catch (publicErr) {
+        if (!hasToken) {
+          if (active) {
+            setError(publicErr?.message || 'This public folder is not available.')
+          }
+          return
+        }
+      }
+
+      try {
+        const privateRes = await getFolder(id)
+        const data = privateRes?.data || privateRes
+        if (!active) return
+        setFolder(data)
+        onLoad?.(data)
+      } catch (privateErr) {
+        if (!active) return
+        setError(privateErr?.message || 'Could not load folder details.')
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadFolder().finally(() => {
+      if (active) {
+        setLoading(false)
+      }
     })
+
+    return () => {
+      active = false
+    }
   }, [id])
 
   const f = folder || {
@@ -1012,7 +1186,56 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
   }
 
   const folderName = f.folderName || f.name || 'Untitled Folder'
-  const docCount = f.documents?.length || 0
+  const docCount = f.documents?.length || f.publicDocumentCount || 0
+  const totalDownloads = Number(f.totalDownloads || 0)
+  const isOwner = Number(user?.id) === Number(f.userId)
+  const isPublic = f.visibility === 'PUBLIC'
+
+  const handleToggleVisibility = async () => {
+    if (!isOwner || !f.id) return
+
+    setPublishing(true)
+    try {
+      const nextVisibility = isPublic ? 'PRIVATE' : 'PUBLIC'
+      const response = await updateFolderVisibility(f.id, nextVisibility)
+      const data = response?.data || response
+      setFolder(data)
+      onLoad?.(data)
+      window.showToast?.(
+        nextVisibility === 'PUBLIC'
+          ? 'Folder published to Explore successfully.'
+          : 'Folder removed from Explore successfully.',
+        'success'
+      )
+    } catch (err) {
+      window.showToast?.(err?.message || 'Could not update folder visibility.', 'error')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <main className="page-surface bg-slate-50 dark:bg-[#0f172a] min-h-screen py-6 !px-4 md:!px-6 lg:!px-8 xl:!px-10 transition-colors duration-300 ease-in-out">
+        <div className="max-w-[1536px] w-full mx-auto">
+          <div className="bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-800 rounded-2xl p-6 shadow-sm animate-pulse h-40" />
+        </div>
+      </main>
+    )
+  }
+
+  if (error) {
+    return (
+      <main className="page-surface bg-slate-50 dark:bg-[#0f172a] min-h-screen py-6 !px-4 md:!px-6 lg:!px-8 xl:!px-10 transition-colors duration-300 ease-in-out">
+        <div className="max-w-[1536px] w-full mx-auto">
+          <div className="bg-white dark:bg-[#1e293b] border border-red-100 dark:border-red-900/40 rounded-2xl p-8 shadow-sm text-center">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white m-0">Folder not available</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-3 mb-0">{error}</p>
+          </div>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="page-surface bg-slate-50 dark:bg-[#0f172a] min-h-screen py-6 !px-4 md:!px-6 lg:!px-8 xl:!px-10 transition-colors duration-300 ease-in-out" style={{ overflowY: 'auto', flex: 1 }}>
@@ -1028,20 +1251,33 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
           </span>
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <Badge tone="blue">{f.id?.toString().slice(-6) || 'FOL'}</Badge>
-              {f.id && <span className="text-xs font-semibold text-slate-400">ID: {f.id}</span>}
+              <Badge tone="blue">{getFolderCode(folderName)}</Badge>
+              <Badge tone={isPublic ? 'green' : 'orange'}>{isPublic ? 'Public Collection' : 'Private Folder'}</Badge>
             </div>
             <div className="flex items-center gap-3 text-xs font-semibold text-slate-500">
               <span className="flex items-center gap-1"><StudyHubIcon name="file" size={14} /> {docCount} document{docCount !== 1 ? 's' : ''}</span>
-              <span className="flex items-center gap-1"><StudyHubIcon name="download" size={14} /> 0 download{0 !== 1 ? 's' : ''}</span>
+              <span className="flex items-center gap-1"><StudyHubIcon name="download" size={14} /> {totalDownloads} download{totalDownloads !== 1 ? 's' : ''}</span>
+              {f.ownerName && <span className="flex items-center gap-1"><StudyHubIcon name="user" size={14} /> {f.ownerName}</span>}
             </div>
+            {isOwner && !f.publishReady && f.publishBlockedReason && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 m-0 mt-1 max-w-2xl">{f.publishBlockedReason}</p>
+            )}
           </div>
-          <button
-            className="ml-auto py-2.5 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border-0 shadow-sm flex items-center gap-1.5"
-            type="button"
-          >
-            <StudyHubIcon name="download" size={14} /> Download Entire Folder
-          </button>
+          {isOwner && (
+            <button
+              className={`ml-auto py-2.5 px-5 rounded-xl text-xs font-bold transition-colors cursor-pointer border-0 shadow-sm flex items-center gap-1.5 ${
+                isPublic
+                  ? 'bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-white'
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+              type="button"
+              onClick={handleToggleVisibility}
+              disabled={publishing}
+            >
+              <StudyHubIcon name={isPublic ? 'lock' : 'globe'} size={14} />
+              {publishing ? 'Saving...' : isPublic ? 'Make Private' : 'Publish to Explore'}
+            </button>
+          )}
         </section>
 
         <SectionTitle icon="file" title="Documents in Folder" count={docCount} />
@@ -1206,39 +1442,175 @@ function CommentSection({
   setCommentContent,
   commentsLoading,
   onAddComment,
+  onReplyComment,
+  onEditComment,
+  onDeleteComment,
+  currentUserId,
+  documentOwnerId,
   guest
 }) {
+  const [replyingToId, setReplyingToId] = useState(null)
+  const [replyContent, setReplyContent] = useState('')
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editingContent, setEditingContent] = useState('')
+
+  const getCommentCount = (items) => items.reduce(
+    (total, item) => total + 1 + getCommentCount(item.replies || []),
+    0
+  )
+
+  const renderCommentItem = (comment, depth = 0) => {
+    const userName = comment.fullName || comment.user?.fullName || comment.userName || 'Student'
+    const avatarUrl = comment.avatarUrl || comment.user?.avatarUrl || ''
+    const initial = userName[0]?.toUpperCase() || 'S'
+    const dateStr = comment.createdAt
+      ? new Date(comment.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
+      : 'Just now'
+    const isReplying = replyingToId === comment.id
+    const isEditing = editingCommentId === comment.id
+    const canEdit = Number(currentUserId) === Number(comment.userId)
+    const canDelete = canEdit || Number(documentOwnerId) === Number(currentUserId)
+
+    return (
+      <div className="flex flex-col gap-3" key={comment.id} style={{ marginLeft: depth > 0 ? `${Math.min(depth, 3) * 24}px` : 0 }}>
+        <div className="comment-row flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={userName}
+              className="w-9 h-9 rounded-full object-cover flex-shrink-0 border border-slate-200"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+              {initial}
+            </div>
+          )}
+          <div className="flex-1">
+            <div className="flex justify-between items-center mb-1 gap-3">
+              <strong className="text-sm font-bold text-slate-900">{userName}</strong>
+              <small className="text-xs text-slate-400 font-medium whitespace-nowrap">{dateStr}</small>
+            </div>
+            {isEditing ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={editingContent}
+                  onChange={(e) => setEditingContent(e.target.value)}
+                  className="w-full min-h-[84px] p-3 text-sm text-slate-800 border border-slate-200 rounded-xl outline-none resize-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    className="py-1.5 px-3 bg-transparent text-slate-500 hover:text-slate-700 rounded-lg text-xs font-semibold border border-slate-200 cursor-pointer"
+                    onClick={() => {
+                      setEditingCommentId(null)
+                      setEditingContent('')
+                    }}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-semibold border-0 cursor-pointer"
+                    disabled={commentsLoading || !editingContent.trim()}
+                    onClick={() => {
+                      onEditComment?.(comment.id, editingContent.trim())
+                      setEditingCommentId(null)
+                      setEditingContent('')
+                    }}
+                    type="button"
+                  >
+                    {commentsLoading ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-600 leading-relaxed m-0 whitespace-pre-line">{comment.content}</p>
+            )}
+            {!guest && (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                {!isEditing && (
+                  <button
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 bg-transparent border-0 cursor-pointer p-0"
+                    onClick={() => {
+                      setReplyingToId(isReplying ? null : comment.id)
+                      setReplyContent('')
+                    }}
+                    type="button"
+                  >
+                    {isReplying ? 'Cancel reply' : 'Reply'}
+                  </button>
+                )}
+                {canEdit && !isEditing && (
+                  <button
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-700 bg-transparent border-0 cursor-pointer p-0"
+                    onClick={() => {
+                      setEditingCommentId(comment.id)
+                      setEditingContent(comment.content || '')
+                      setReplyingToId(null)
+                    }}
+                    type="button"
+                  >
+                    Edit
+                  </button>
+                )}
+                {canDelete && !isEditing && (
+                  <button
+                    className="text-xs font-semibold text-red-500 hover:text-red-600 bg-transparent border-0 cursor-pointer p-0"
+                    onClick={() => onDeleteComment?.(comment.id)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {isReplying && (
+          <div className="ml-12 flex flex-col gap-2">
+            <textarea
+              value={replyContent}
+              onChange={(e) => setReplyContent(e.target.value)}
+              placeholder="Write a reply..."
+              className="w-full min-h-[84px] p-3 text-sm text-slate-800 placeholder-slate-400 border border-slate-200 rounded-xl outline-none resize-none bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+            <div className="flex justify-end">
+              <button
+                className="py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white disabled:text-slate-500 rounded-xl text-xs font-bold transition-colors cursor-pointer border-0"
+                disabled={commentsLoading || !replyContent.trim()}
+                onClick={() => {
+                  onReplyComment?.(comment.id, replyContent.trim())
+                  setReplyingToId(null)
+                  setReplyContent('')
+                }}
+                type="button"
+              >
+                {commentsLoading ? 'Sending...' : 'Send reply'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(comment.replies || []).length > 0 && (
+          <div className="flex flex-col gap-3">
+            {comment.replies.map((reply) => renderCommentItem(reply, depth + 1))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col gap-6 mt-6">
+    <section id="comments-section" className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex flex-col gap-6 mt-6">
       <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 m-0">
         <StudyHubIcon name="message" size={20} className="text-slate-600" />
-        Comments ({comments.length})
+        Comments ({getCommentCount(comments)})
       </h2>
 
       {/* Comments List */}
       <div className="comments-list flex flex-col gap-4 max-h-[400px] overflow-y-auto pr-2">
         {comments.length > 0 ? (
-          comments.map((comment) => {
-            const userName = comment.user?.fullName || comment.userName || 'Student';
-            const initial = userName[0].toUpperCase();
-            const dateStr = comment.createdAt
-              ? new Date(comment.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
-              : 'Just now';
-            return (
-              <div className="comment-row flex gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100" key={comment.id}>
-                <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-                  {initial}
-                </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-center mb-1">
-                    <strong className="text-sm font-bold text-slate-900">{userName}</strong>
-                    <small className="text-xs text-slate-400 font-medium">{dateStr}</small>
-                  </div>
-                  <p className="text-sm text-slate-600 leading-relaxed m-0 white-space-pre-line">{comment.content}</p>
-                </div>
-              </div>
-            );
-          })
+          comments.map((comment) => renderCommentItem(comment))
         ) : (
           <p className="text-slate-400 text-sm text-center py-8 m-0">No comments yet. Be the first to comment!</p>
         )}
@@ -1280,6 +1652,7 @@ function DocumentSidebar({
   onRate,
   onToggleFavorite,
   onStudyWithAI,
+  onDownload,
   onReport,
   onNavigate
 }) {
@@ -1311,7 +1684,7 @@ function DocumentSidebar({
               if (guest) {
                 onNavigate?.('login')
               } else {
-                window.open(doc.fileUrl, '_blank')
+                onDownload?.()
               }
             }}
           >
@@ -1379,7 +1752,7 @@ function DocumentSidebar({
   )
 }
 
-export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavigate, onOpenStudyFile, onLoad }) {
+export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavigate, onOpenStudyFile, onLoad, user = null }) {
   const [doc, setDoc] = useState(null)
   const [comments, setComments] = useState([])
   const [isFavorite, setIsFavorite] = useState(false)
@@ -1428,7 +1801,24 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
     }
   }, [id, guest])
 
+  useEffect(() => {
+    if (loading || window.location.hash !== '#comments') return
+    const timer = window.setTimeout(() => {
+      window.document.getElementById('comments-section')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      })
+    }, 150)
+    return () => window.clearTimeout(timer)
+  }, [loading, comments.length, id])
+
   const d = doc || featuredDocuments[1]
+
+  const reloadComments = () =>
+    getDocumentComments(d.id)
+      .then((res) => {
+        setComments(res?.data || res || [])
+      })
 
   const handleStudyWithAI = () => {
     if (guest) {
@@ -1441,6 +1831,40 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
         fileUrl: d.fileUrl || '',
         visibility: d.visibility || 'PUBLIC',
       })
+    }
+  }
+
+  const handleDownload = async () => {
+    if (guest) {
+      onNavigate?.('login')
+      return
+    }
+
+    try {
+      const response = await downloadDocumentFile(d.id)
+      const filename = d.fileName || d.title || 'document'
+      const objectUrl = window.URL.createObjectURL(response.blob)
+      const link = window.document.createElement('a')
+      link.href = objectUrl
+      link.download = filename
+      window.document.body.appendChild(link)
+      link.click()
+      window.document.body.removeChild(link)
+      window.URL.revokeObjectURL(objectUrl)
+
+      setDoc((current) => current
+        ? {
+            ...current,
+            totalDownloads: (current.totalDownloads || current.downloads || 0) + 1,
+            downloads: (current.downloads || current.totalDownloads || 0) + 1
+          }
+        : current)
+    } catch (err) {
+      if (err?.status === 401) {
+        onNavigate?.('login')
+        return
+      }
+      window.showToast?.('Download failed. Please try again.', 'error')
     }
   }
 
@@ -1487,18 +1911,70 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
     }
     if (!commentContent.trim()) return
     setCommentsLoading(true)
-    addDocumentComment(d.id, commentContent.trim())
+    addDocumentComment(d.id, { content: commentContent.trim() })
       .then(() => {
         setCommentContent('')
         window.showToast?.('Comment added successfully', 'success')
-        // Reload comments
-        return getDocumentComments(d.id)
-      })
-      .then((res) => {
-        setComments(res?.data || res || [])
+        return reloadComments()
       })
       .catch((err) => {
         window.showToast?.(err.message || 'Failed to add comment', 'error')
+      })
+      .finally(() => setCommentsLoading(false))
+  }
+
+  const handleReplyComment = (parentCommentId, content) => {
+    if (guest) {
+      onNavigate?.('login')
+      return
+    }
+    if (!content.trim()) return
+    setCommentsLoading(true)
+    addDocumentComment(d.id, {
+      content: content.trim(),
+      parentCommentId
+    })
+      .then(() => {
+        window.showToast?.('Reply added successfully', 'success')
+        return reloadComments()
+      })
+      .catch((err) => {
+        window.showToast?.(err.message || 'Failed to add reply', 'error')
+      })
+      .finally(() => setCommentsLoading(false))
+  }
+
+  const handleEditComment = (commentId, content) => {
+    if (guest) {
+      onNavigate?.('login')
+      return
+    }
+    if (!content.trim()) return
+    setCommentsLoading(true)
+    updateDocumentComment(commentId, { content: content.trim() })
+      .then(() => {
+        window.showToast?.('Comment updated successfully', 'success')
+        return reloadComments()
+      })
+      .catch((err) => {
+        window.showToast?.(err.message || 'Failed to update comment', 'error')
+      })
+      .finally(() => setCommentsLoading(false))
+  }
+
+  const handleDeleteComment = (commentId) => {
+    if (guest) {
+      onNavigate?.('login')
+      return
+    }
+    setCommentsLoading(true)
+    deleteDocumentComment(commentId)
+      .then(() => {
+        window.showToast?.('Comment deleted successfully', 'success')
+        return reloadComments()
+      })
+      .catch((err) => {
+        window.showToast?.(err.message || 'Failed to delete comment', 'error')
       })
       .finally(() => setCommentsLoading(false))
   }
@@ -1538,6 +2014,11 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
             setCommentContent={setCommentContent}
             commentsLoading={commentsLoading}
             onAddComment={handleAddComment}
+            onReplyComment={handleReplyComment}
+            onEditComment={handleEditComment}
+            onDeleteComment={handleDeleteComment}
+            currentUserId={user?.id}
+            documentOwnerId={d.userId}
             guest={guest}
           />
         </div>
@@ -1554,6 +2035,7 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
             onRate={handleRate}
             onToggleFavorite={handleToggleFavorite}
             onStudyWithAI={handleStudyWithAI}
+            onDownload={handleDownload}
             onReport={onReport}
             onNavigate={onNavigate}
           />
@@ -1563,7 +2045,51 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
   )
 }
 
-export function PricingPage({ onNavigate }) {
+export function PricingPage({ onNavigate, user, onSelectUpgrade }) {
+  const [plans, setPlans] = useState([])
+  const [loadingPlanId, setLoadingPlanId] = useState(null)
+
+  useEffect(() => {
+    getActivePlans()
+      .then(res => {
+        if (res?.success && Array.isArray(res?.data)) {
+          setPlans(res.data)
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch active plans:', err)
+      })
+  }, [])
+
+  const currentPlan = user?.planName?.toUpperCase() || 'FREE'
+
+  const handleUpgrade = async (plan, backendId) => {
+    if (!user) {
+      window.showToast?.('Vui lòng đăng nhập để nâng cấp gói tài khoản!', 'info')
+      onNavigate('login')
+      return
+    }
+
+    if (!backendId) {
+      window.showToast?.('Không tìm thấy thông tin gói này trên hệ thống!', 'error')
+      return
+    }
+
+    setLoadingPlanId(backendId)
+    try {
+      const res = await getUpgradePaymentInfo({ planId: backendId })
+      if (res?.success && res?.data) {
+        onSelectUpgrade?.(plan, res.data)
+      } else {
+        window.showToast?.('Không thể lấy thông tin thanh toán!', 'error')
+      }
+    } catch (err) {
+      window.showToast?.(err.message || 'Lỗi kết nối khi lấy thông tin thanh toán!', 'error')
+    } finally {
+      setLoadingPlanId(null)
+    }
+  }
+
   return (
     <main className="page-surface pricing-page">
       <button aria-label="Back" className="back-pill" onClick={() => onNavigate('library')} type="button">
@@ -1572,22 +2098,63 @@ export function PricingPage({ onNavigate }) {
       <PageTitle title="Choose the Plan That's Right for You" subtitle="Upgrade to experience all AI learning features" centered />
       <button className="billing-pill" type="button">Monthly</button>
       <div className="pricing-grid">
-        {pricingPlans.map((plan) => (
-          <article className={`pricing-card pricing-card--${plan.tone}`} key={plan.id}>
-            {plan.popular && <span className="popular-ribbon">Most Popular</span>}
-            <span className="plan-icon"><StudyHubIcon name={plan.id === 'free' ? 'star' : 'book'} size={30} /></span>
-            <h2>{plan.name}</h2>
-            <p>{plan.subtitle}</p>
-            <strong>{plan.price}<small>/month</small></strong>
-            <ul>
-              {plan.features.map((feature) => <li key={feature}>✓ {feature}</li>)}
-              {plan.disabled.map((feature) => <li className="disabled" key={feature}>× {feature}</li>)}
-            </ul>
-            <button className={plan.id === 'premium' ? 'purple-button' : 'primary-action'} disabled={plan.id === 'free'} type="button">
-              {plan.id === 'free' ? 'Get Started for Free' : `Upgrade to ${plan.name} →`}
-            </button>
-          </article>
-        ))}
+        {pricingPlans.map((plan) => {
+          const backendPlan = plans.find(p => p.planName?.toUpperCase() === plan.id.toUpperCase())
+          const backendId = backendPlan?.id
+          
+          // Display backend price if available, otherwise static
+          const priceDisplay = backendPlan 
+            ? (backendPlan.price === 0 ? '0đ' : `${Number(backendPlan.price).toLocaleString('vi-VN')}đ`)
+            : plan.price
+
+          // Button states
+          let buttonText = ''
+          let isBtnDisabled = false
+
+          if (plan.id === 'free') {
+            if (currentPlan === 'FREE') {
+              buttonText = 'Current Plan'
+              isBtnDisabled = true
+            } else {
+              buttonText = 'Get Started for Free'
+              isBtnDisabled = true
+            }
+          } else {
+            const planUpper = plan.id.toUpperCase()
+            if (currentPlan === planUpper) {
+              buttonText = 'Current Plan'
+              isBtnDisabled = true
+            } else if (currentPlan === 'PREMIUM' && planUpper === 'PRO') {
+              buttonText = 'Pro Plan (Downgrade not supported)'
+              isBtnDisabled = true
+            } else {
+              buttonText = loadingPlanId === backendId ? 'Processing...' : `Upgrade to ${plan.name} →`
+              isBtnDisabled = loadingPlanId !== null
+            }
+          }
+
+          return (
+            <article className={`pricing-card pricing-card--${plan.tone}`} key={plan.id}>
+              {plan.popular && <span className="popular-ribbon">Most Popular</span>}
+              <span className="plan-icon"><StudyHubIcon name={plan.id === 'free' ? 'star' : 'book'} size={30} /></span>
+              <h2>{plan.name}</h2>
+              <p>{backendPlan?.description || plan.subtitle}</p>
+              <strong>{priceDisplay}<small>/month</small></strong>
+              <ul>
+                {plan.features.map((feature) => <li key={feature}>✓ {feature}</li>)}
+                {plan.disabled.map((feature) => <li className="disabled" key={feature}>× {feature}</li>)}
+              </ul>
+              <button 
+                className={plan.id === 'premium' ? 'purple-button' : 'primary-action'} 
+                disabled={isBtnDisabled} 
+                onClick={() => handleUpgrade(plan, backendId)}
+                type="button"
+              >
+                {buttonText}
+              </button>
+            </article>
+          )
+        })}
       </div>
       <section className="faq-card">
         <h2>Frequently Asked Questions</h2>

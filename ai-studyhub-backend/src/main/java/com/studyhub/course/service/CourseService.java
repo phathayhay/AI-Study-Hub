@@ -43,4 +43,9 @@ public class CourseService {
                 .sorted((c1, c2) -> Long.compare(c2.getDownloads(), c1.getDownloads()))
                 .collect(Collectors.toList());
     }
+
+    @Transactional(readOnly = true)
+    public List<Course> getAllCourses() {
+        return courseRepository.findAll();
+    }
 }

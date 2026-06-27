@@ -4,10 +4,12 @@ import Badge from '../../components/ui/Badge'
 import { featuredDocuments, notifications } from '../../data/studyHubData'
 import { InfoBlock } from './shared'
 import { changePassword } from '../../features/auth/authService'
-import { uploadAvatar, verifyStudent } from '../../services/userService'
+import { uploadAvatar, verifyStudent, updateUserProfile, getUserProfile } from '../../services/userService'
+import { simulatePaymentSuccess } from '../../services/subscriptionService'
+import { getMajors } from '../../services/courseService'
 import { getDocument, reportDocument } from '../../features/documents/documentService'
 
-export function NotificationPanel({ onClose }) {
+function NotificationPanelLegacy({ onClose }) {
   return (
     <aside className="notification-panel">
       <header>
@@ -23,6 +25,112 @@ export function NotificationPanel({ onClose }) {
         </article>
       ))}
       <button className="all-notifications" type="button">See all notifications ›</button>
+    </aside>
+  )
+}
+
+export function NotificationPanel({
+  onClose,
+  notifications = [],
+  unreadCount = 0,
+  loading = false,
+  onMarkAsRead,
+  onMarkAllRead,
+  onOpenNotification
+}) {
+  const [activeTab, setActiveTab] = useState('All')
+
+  const getNoticeVisual = (item) => {
+    switch (item.notificationType) {
+      case 'COMMENT':
+        if ((item.title || '').toLowerCase().includes('reply')) {
+          return { tone: 'purple', icon: 'reply' }
+        }
+        return { tone: 'info', icon: 'message' }
+      case 'DOCUMENT':
+        if ((item.title || '').toLowerCase().includes('reject')) {
+          return { tone: 'danger', icon: 'x' }
+        }
+        return { tone: 'success', icon: 'check' }
+      case 'REPORT':
+        return { tone: 'danger', icon: 'flag' }
+      case 'SHARE':
+        return { tone: 'info', icon: 'upload' }
+      default:
+        return { tone: 'info', icon: 'bell' }
+    }
+  }
+
+  const formatTimeAgo = (value) => {
+    if (!value) return 'Just now'
+    const createdAt = new Date(value)
+    if (Number.isNaN(createdAt.getTime())) return 'Just now'
+
+    const diffMs = Date.now() - createdAt.getTime()
+    const diffMinutes = Math.max(1, Math.floor(diffMs / 60000))
+
+    if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`
+    const diffHours = Math.floor(diffMinutes / 60)
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+    const diffDays = Math.floor(diffHours / 24)
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+  }
+
+  const tabs = ['All', 'Unread', 'Documents', 'Interactions']
+  const counts = {
+    All: notifications.length,
+    Unread: notifications.filter((item) => !item.isRead).length,
+    Documents: notifications.filter((item) => ['DOCUMENT', 'REPORT', 'SYSTEM'].includes(item.notificationType)).length,
+    Interactions: notifications.filter((item) => ['COMMENT', 'SHARE'].includes(item.notificationType)).length
+  }
+
+  const filteredNotifications = notifications.filter((item) => {
+    if (activeTab === 'Unread') return !item.isRead
+    if (activeTab === 'Documents') return ['DOCUMENT', 'REPORT', 'SYSTEM'].includes(item.notificationType)
+    if (activeTab === 'Interactions') return ['COMMENT', 'SHARE'].includes(item.notificationType)
+    return true
+  })
+
+  return (
+    <aside className="notification-panel">
+      <header>
+        <h2><StudyHubIcon name="bell" size={22} /> Notifications <span>{unreadCount}</span></h2>
+        <button disabled={!unreadCount} onClick={onMarkAllRead} type="button">Mark all read</button>
+        <button onClick={onClose} type="button"><StudyHubIcon name="close" size={18} /></button>
+      </header>
+      <nav>
+        {tabs.map((item) => (
+          <button className={activeTab === item ? 'is-active' : ''} key={item} onClick={() => setActiveTab(item)} type="button">
+            {item}
+            <small>{counts[item] || ''}</small>
+          </button>
+        ))}
+      </nav>
+      {loading ? (
+        <div style={{ padding: '24px 22px', color: '#64748b' }}>Loading notifications...</div>
+      ) : filteredNotifications.length === 0 ? (
+        <div style={{ padding: '24px 22px', color: '#64748b' }}>No notifications yet.</div>
+      ) : (
+        filteredNotifications.map((item) => {
+          const visual = getNoticeVisual(item)
+          return (
+            <article
+              className={`notice-item notice-item--${visual.tone}`}
+              key={item.id}
+              onClick={() => onOpenNotification?.(item)}
+              style={{ cursor: 'pointer', opacity: item.isRead ? 0.82 : 1 }}
+            >
+              <span><StudyHubIcon name={visual.icon} size={22} /></span>
+              <div>
+                <h3>{item.title}</h3>
+                <p>{item.content}</p>
+                <strong>{item.notificationType === 'DOCUMENT' ? 'AI Study Hub' : 'Activity'}</strong> <small>{formatTimeAgo(item.createdAt)}</small>
+              </div>
+            </article>
+          )
+        })
+      )}
+      <button className="all-notifications" type="button">End of notifications</button>
     </aside>
   )
 }
@@ -163,10 +271,66 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  // Verification state (simulating or checking local state)
+  // Profile states
+  const [firstName, setFirstName] = useState(user?.firstName || '')
+  const [lastName, setLastName] = useState(user?.lastName || '')
+  const [campus, setCampus] = useState(user?.campus || 'HCM')
+  const [majorId, setMajorId] = useState(user?.majorId || '')
+  const [currentSemester, setCurrentSemester] = useState(user?.currentSemester || '')
+  const [majorsList, setMajorsList] = useState([])
+
+  useEffect(() => {
+    getMajors()
+      .then(res => {
+        if (res?.success && Array.isArray(res?.data)) {
+          setMajorsList(res.data.filter(m => m.majorCode !== 'ALL'))
+        }
+      })
+      .catch(err => console.error('Failed to load majors:', err))
+  }, [])
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setSuccessMsg('')
+    setErrorMsg('')
+    try {
+      const res = await updateUserProfile({
+        firstName,
+        lastName,
+        campus,
+        majorId: majorId ? parseInt(majorId) : null,
+        currentSemester
+      })
+      if (res?.success && res?.data) {
+        onUserUpdate({
+          ...user,
+          firstName: res.data.firstName,
+          lastName: res.data.lastName,
+          fullName: res.data.fullName,
+          campus: res.data.campus,
+          majorId: res.data.majorId,
+          majorName: res.data.majorName,
+          currentSemester: res.data.currentSemester
+        })
+        setSuccessMsg('Profile updated successfully!')
+      } else {
+        setErrorMsg('Unable to update profile.')
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Error updating profile.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Verification state - derive from user prop (backend truth), fallback to localStorage
   const [verificationFile, setVerificationFile] = useState(null)
   const [verificationStatus, setVerificationStatus] = useState(() => {
-    return localStorage.getItem('verificationStatus') || 'unverified' // unverified, pending, verified
+    // Map backend enum values to frontend display values
+    const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified' }
+    const fromUser = user?.verificationStatus ? vsMap[user.verificationStatus] : null
+    return fromUser || localStorage.getItem('verificationStatus') || 'unverified'
   })
 
   const handleAvatarChange = async (e) => {
@@ -265,7 +429,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
           {errorMsg && <div className="modal-alert error">{errorMsg}</div>}
 
           {activeTab === 'profile' && (
-            <>
+            <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="avatar-upload-container bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300">
                 <img
                   src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&h=100"}
@@ -297,20 +461,56 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
 
               <div className="settings-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">Họ và tên đệm</label>
-                  <input value={user?.lastName || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
+                  <label className="text-slate-600 dark:text-slate-400">Họ và tên đệm *</label>
+                  <input required value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }} />
                 </div>
                 <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">Tên</label>
-                  <input value={user?.firstName || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
+                  <label className="text-slate-600 dark:text-slate-400">Tên *</label>
+                  <input required value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }} />
                 </div>
               </div>
 
-              <div className="settings-input-group" style={{ marginTop: '16px' }}>
-                <label className="text-slate-600 dark:text-slate-400">Email đăng ký</label>
-                <input value={user?.email || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400" style={{ outline: 'none' }} />
+              <div className="settings-input-group">
+                <label className="text-slate-600 dark:text-slate-400">Email đăng ký (Read-only)</label>
+                <input value={user?.email || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed" style={{ outline: 'none', padding: '8px 12px', borderRadius: '6px' }} />
               </div>
-            </>
+
+              <div className="settings-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="settings-input-group">
+                  <label className="text-slate-600 dark:text-slate-400">Cơ sở học tập *</label>
+                  <select value={campus} onChange={(e) => setCampus(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }}>
+                    <option value="HCM">FPTU Hồ Chí Minh</option>
+                    <option value="HN">FPTU Hà Nội</option>
+                    <option value="DN">FPTU Đà Nẵng</option>
+                    <option value="CT">FPTU Cần Thơ</option>
+                    <option value="QN">FPTU Quy Nhơn</option>
+                  </select>
+                </div>
+                <div className="settings-input-group">
+                  <label className="text-slate-600 dark:text-slate-400">Học kỳ hiện tại</label>
+                  <select value={currentSemester} onChange={(e) => setCurrentSemester(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }}>
+                    <option value="">Select Semester</option>
+                    {['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8', 'Semester 9'].map(sem => (
+                      <option key={sem} value={sem}>{sem}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="settings-input-group">
+                <label className="text-slate-600 dark:text-slate-400">Chuyên ngành</label>
+                <select value={majorId} onChange={(e) => setMajorId(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }}>
+                  <option value="">Select Major</option>
+                  {majorsList.map(major => (
+                    <option key={major.id} value={major.id}>{major.majorName} ({major.majorCode})</option>
+                  ))}
+                </select>
+              </div>
+
+              <button className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', marginTop: '8px', padding: '10px 18px', border: 'none', borderRadius: '8px' }}>
+                {loading ? 'Saving...' : 'Save Profile Changes'}
+              </button>
+            </form>
           )}
 
           {activeTab === 'password' && (
@@ -599,6 +799,413 @@ export function ChromeExtensionModal({ onClose }) {
           <button onClick={onClose} className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200" style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} type="button">Close</button>
         </footer>
       </section>
+    </div>
+  )
+}
+
+export function UpgradePaymentModal({ onClose, user, plan, paymentInfo, onUpgradeSuccess }) {
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [copiedField, setCopiedField] = useState(null)
+
+  const handleCopy = (text, fieldName) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(fieldName)
+    window.showToast?.(`Đã sao chép ${fieldName}!`, 'success')
+    setTimeout(() => setCopiedField(null), 2000)
+  }
+
+  const handleSimulatePayment = async () => {
+    setLoading(true)
+    try {
+      const res = await simulatePaymentSuccess({
+        planId: paymentInfo.planId,
+        transferContent: paymentInfo.transferContent
+      })
+      if (res?.success) {
+        setSuccess(true)
+        window.showToast?.('Nâng cấp gói tài khoản thành công!', 'success')
+        
+        // Fetch new profile info and update parent context
+        const profileRes = await getUserProfile()
+        if (profileRes?.success && profileRes?.data) {
+          onUpgradeSuccess?.(profileRes.data)
+        }
+      } else {
+        window.showToast?.(res?.message || 'Giả lập thanh toán thất bại!', 'error')
+      }
+    } catch (err) {
+      window.showToast?.(err.message || 'Lỗi kết nối khi giả lập thanh toán!', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCopyEnglish = (text, fieldName) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(fieldName)
+    window.showToast?.(`${fieldName} copied.`, 'success')
+    setTimeout(() => setCopiedField(null), 2000)
+  }
+
+  const handleDemoUpgrade = async () => {
+    setLoading(true)
+    try {
+      const res = await simulatePaymentSuccess({
+        planId: paymentInfo.planId,
+        transferContent: paymentInfo.transferContent
+      })
+
+      if (res?.success) {
+        setSuccess(true)
+        window.showToast?.('Your account has been upgraded successfully.', 'success')
+
+        const profileRes = await getUserProfile()
+        if (profileRes?.success && profileRes?.data) {
+          onUpgradeSuccess?.(profileRes.data)
+        }
+      } else {
+        window.showToast?.(res?.message || 'Demo upgrade failed.', 'error')
+      }
+    } catch (err) {
+      window.showToast?.(err.message || 'Unable to confirm the payment demo right now.', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" style={{ zIndex: 1000 }}>
+      <section className="settings-modal bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors duration-300 ease-in-out" style={{ width: '100%', maxWidth: '680px', overflow: 'hidden' }}>
+        <header className="border-b border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
+          <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: '#6366f1', display: 'inline-flex' }}>
+              <StudyHubIcon name="star" size={20} />
+            </span>
+            Upgrade Plan: {plan.name}
+          </h2>
+          {!success && (
+            <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} type="button">x</button>
+          )}
+        </header>
+
+        <div className="settings-modal-content" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '24px' }}>
+          {success ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', textAlign: 'center', gap: '16px' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 'bold' }}>
+                ✓
+              </div>
+              <h3 className="text-slate-900 dark:text-white" style={{ margin: 0, fontSize: '20px', fontWeight: 700 }}>Upgrade Successful!</h3>
+              <p className="text-slate-600 dark:text-slate-300" style={{ margin: 0, fontSize: '14.5px', maxWidth: '380px', lineHeight: '22px' }}>
+                Your account has been upgraded to the <strong>{plan.name}</strong> plan. You can start using the premium features right away.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 text-blue-800 dark:text-blue-300 transition-colors duration-300" style={{ padding: '12px 16px', borderRadius: '8px', fontSize: '13px', lineHeight: '18px' }}>
+                Please transfer the exact amount and use the exact payment description below so the system can match your upgrade request automatically.
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '24px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ backgroundColor: '#fff', padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '190px', height: '190px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                    <img
+                      src={paymentInfo.qrCodeUrl}
+                      alt="TPBank Payment Code"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      onError={(e) => {
+                        e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=TPBank%20${paymentInfo.accountNumber}%20${paymentInfo.amount}`
+                      }}
+                    />
+                  </div>
+                  <span className="text-slate-500 dark:text-slate-400" style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="ping-dot" style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: '#3b82f6', borderRadius: '50%' }} />
+                    Scan the QR code for faster payment
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="text-slate-450 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Bank</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} className="dark:bg-slate-900 dark:border-slate-700">
+                      <span className="text-slate-800 dark:text-slate-200 font-semibold" style={{ fontSize: '13.5px' }}>{paymentInfo.bankName}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="text-slate-455 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Account number</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} className="dark:bg-slate-900 dark:border-slate-700">
+                      <span className="text-slate-800 dark:text-slate-200 font-mono font-semibold" style={{ fontSize: '13.5px' }}>{paymentInfo.accountNumber}</span>
+                      <button
+                        onClick={() => handleCopyEnglish(paymentInfo.accountNumber, 'Account number')}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6366f1', fontSize: '12px', fontWeight: 600 }}
+                        type="button"
+                      >
+                        {copiedField === 'Account number' ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="text-slate-460 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Account name</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} className="dark:bg-slate-900 dark:border-slate-700">
+                      <span className="text-slate-800 dark:text-slate-200 font-semibold" style={{ fontSize: '13.5px' }}>{paymentInfo.accountName}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="text-slate-465 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Transfer amount</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} className="dark:bg-slate-900 dark:border-slate-700">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold" style={{ fontSize: '15px' }}>
+                        {Number(paymentInfo.amount).toLocaleString('en-US')} VND
+                      </span>
+                      <button
+                        onClick={() => handleCopyEnglish(String(paymentInfo.amount), 'Transfer amount')}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6366f1', fontSize: '12px', fontWeight: 600 }}
+                        type="button"
+                      >
+                        {copiedField === 'Transfer amount' ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="text-slate-470 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Payment description (must match exactly)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fffbeb', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fef3c7' }} className="dark:bg-amber-950/20 dark:border-amber-900/50">
+                      <span className="text-amber-800 dark:text-amber-300 font-mono font-bold" style={{ fontSize: '13.5px' }}>{paymentInfo.transferContent}</span>
+                      <button
+                        onClick={() => handleCopyEnglish(paymentInfo.transferContent, 'Payment description')}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#d97706', fontSize: '12px', fontWeight: 600 }}
+                        type="button"
+                      >
+                        {copiedField === 'Payment description' ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <footer className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: success ? 'flex-end' : 'space-between', padding: '16px 24px', gap: '12px' }}>
+          {success ? (
+            <button
+              onClick={onClose}
+              className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200"
+              style={{ padding: '8px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
+              type="button"
+            >
+              Done
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={handleDemoUpgrade}
+                disabled={loading}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                style={{ padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: loading ? 'not-allowed' : 'pointer' }}
+                type="button"
+              >
+                {loading ? 'Processing...' : 'I have paid'}
+              </button>
+              <button
+                onClick={onClose}
+                className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200"
+                style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontWeight: 500 }}
+                type="button"
+              >
+                Close
+              </button>
+            </>
+          )}
+        </footer>
+      </section>
+      <style>{`
+        .ping-dot {
+          animation: ping-anim 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        @keyframes ping-anim {
+          75%, 100% {
+            transform: scale(2.5);
+            opacity: 0;
+          }
+        }
+      `}</style>
+    </div>
+  )
+
+  return (
+    <div className="modal-backdrop" style={{ zIndex: 1000 }}>
+      <section className="settings-modal bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors duration-300 ease-in-out" style={{ width: '100%', maxWidth: '680px', overflow: 'hidden' }}>
+        <header className="border-b border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
+          <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: '#6366f1', display: 'inline-flex' }}>
+              <StudyHubIcon name="star" size={20} />
+            </span>
+            Nâng Cấp Gói: {plan.name}
+          </h2>
+          {!success && (
+            <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} type="button">×</button>
+          )}
+        </header>
+
+        <div className="settings-modal-content" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '24px' }}>
+          {success ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', textAlign: 'center', gap: '16px' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: '#ecfdf5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 'bold' }}>
+                ✓
+              </div>
+              <h3 className="text-slate-900 dark:text-white" style={{ margin: 0, fontSize: '20px', fontWeight: 700 }}>Nâng Cấp Thành Công!</h3>
+              <p className="text-slate-600 dark:text-slate-300" style={{ margin: 0, fontSize: '14.5px', maxWidth: '380px', lineHeight: '22px' }}>
+                Tài khoản của bạn đã được nâng cấp lên gói <strong>{plan.name}</strong> thành công. Hãy khám phá mọi tính năng cao cấp ngay bây giờ!
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 text-blue-800 dark:text-blue-300 transition-colors duration-300" style={{ padding: '12px 16px', borderRadius: '8px', fontSize: '13px', lineHeight: '18px' }}>
+                Vui lòng chuyển khoản đúng số tiền và nội dung chuyển khoản dưới đây để hệ thống tự động xử lý nâng cấp.
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '24px', alignItems: 'center' }}>
+                {/* QR Code Column */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ backgroundColor: '#fff', padding: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '190px', height: '190px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+                    <img 
+                      src={paymentInfo.qrCodeUrl} 
+                      alt="TPBank Payment Code" 
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      onError={(e) => {
+                        e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=TPBank%20${paymentInfo.accountNumber}%20${paymentInfo.amount}`;
+                      }}
+                    />
+                  </div>
+                  <span className="text-slate-500 dark:text-slate-400" style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className="ping-dot" style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: '#3b82f6', borderRadius: '50%' }} />
+                    Quét mã để thanh toán nhanh
+                  </span>
+                </div>
+
+                {/* Details Column */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Ngân hàng */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="text-slate-450 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Ngân hàng</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} className="dark:bg-slate-900 dark:border-slate-700">
+                      <span className="text-slate-800 dark:text-slate-200 font-semibold" style={{ fontSize: '13.5px' }}>{paymentInfo.bankName}</span>
+                    </div>
+                  </div>
+
+                  {/* Số tài khoản */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="text-slate-455 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Số tài khoản</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} className="dark:bg-slate-900 dark:border-slate-700">
+                      <span className="text-slate-800 dark:text-slate-200 font-mono font-semibold" style={{ fontSize: '13.5px' }}>{paymentInfo.accountNumber}</span>
+                      <button 
+                        onClick={() => handleCopy(paymentInfo.accountNumber, 'Số tài khoản')}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6366f1', fontSize: '12px', fontWeight: 600 }}
+                        type="button"
+                      >
+                        {copiedField === 'Số tài khoản' ? 'Đã copy' : 'Sao chép'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Tên tài khoản */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="text-slate-460 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Tên chủ tài khoản</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} className="dark:bg-slate-900 dark:border-slate-700">
+                      <span className="text-slate-800 dark:text-slate-200 font-semibold" style={{ fontSize: '13.5px' }}>{paymentInfo.accountName}</span>
+                    </div>
+                  </div>
+
+                  {/* Số tiền */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="text-slate-465 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Số tiền chuyển khoản</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} className="dark:bg-slate-900 dark:border-slate-700">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold" style={{ fontSize: '15px' }}>
+                        {Number(paymentInfo.amount).toLocaleString('vi-VN')}đ
+                      </span>
+                      <button 
+                        onClick={() => handleCopy(String(paymentInfo.amount), 'Số tiền')}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#6366f1', fontSize: '12px', fontWeight: 600 }}
+                        type="button"
+                      >
+                        {copiedField === 'Số tiền' ? 'Đã copy' : 'Sao chép'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Nội dung */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span className="text-slate-470 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Nội dung chuyển khoản (Bắt buộc đúng)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#fffbeb', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fef3c7' }} className="dark:bg-amber-950/20 dark:border-amber-900/50">
+                      <span className="text-amber-800 dark:text-amber-300 font-mono font-bold" style={{ fontSize: '13.5px' }}>{paymentInfo.transferContent}</span>
+                      <button 
+                        onClick={() => handleCopy(paymentInfo.transferContent, 'Nội dung')}
+                        style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#d97706', fontSize: '12px', fontWeight: 600 }}
+                        type="button"
+                      >
+                        {copiedField === 'Nội dung' ? 'Đã copy' : 'Sao chép'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Simulation Sandbox Block */}
+              <div style={{ border: '1px dashed #cbd5e1', borderRadius: '12px', padding: '14px', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }} className="dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/20">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: '4px' }}>Simulation</span>
+                  <span className="text-slate-600 dark:text-slate-300" style={{ fontSize: '12px', fontWeight: 500 }}>Chế độ thử nghiệm thanh toán sandbox</span>
+                </div>
+                <button 
+                  onClick={handleSimulatePayment} 
+                  disabled={loading}
+                  style={{ width: '100%', padding: '10px', backgroundColor: '#059669', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'background-color 0.2s' }}
+                  onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = '#047857')}
+                  onMouseOut={(e) => !loading && (e.currentTarget.style.backgroundColor = '#059669')}
+                >
+                  {loading ? 'Đang xử lý...' : 'Giả Lập Giao Dịch Thành Công (Simulate Success)'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <footer className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', gap: '12px' }}>
+          {success ? (
+            <button 
+              onClick={onClose} 
+              className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200" 
+              style={{ padding: '8px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer' }} 
+              type="button"
+            >
+              Hoàn tất
+            </button>
+          ) : (
+            <button 
+              onClick={onClose} 
+              className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200" 
+              style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', cursor: 'pointer', fontWeight: 500 }} 
+              type="button"
+            >
+              Đóng
+            </button>
+          )}
+        </footer>
+      </section>
+      <style>{`
+        .ping-dot {
+          animation: ping-anim 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        @keyframes ping-anim {
+          75%, 100% {
+            transform: scale(2.5);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   )
 }

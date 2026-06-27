@@ -25,15 +25,25 @@ import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -59,7 +69,6 @@ public class DocumentService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        // Validate File
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || !originalFilename.contains(".")) {
             throw new IllegalArgumentException("Invalid file name");
@@ -73,7 +82,6 @@ public class DocumentService {
             throw new IllegalArgumentException("Unsupported file type: " + extension);
         }
 
-        // Validate Parent Folder
         Folder folder = null;
         if (request.getFolderId() != null) {
             folder = folderRepository.findById(request.getFolderId())
@@ -83,21 +91,18 @@ public class DocumentService {
             }
         }
 
-        // Validate Course
         Course course = null;
         if (request.getCourseId() != null) {
             course = courseRepository.findById(request.getCourseId())
                     .orElseThrow(() -> new IllegalArgumentException("Course not found"));
         }
 
-        // Validate Category
         DocumentCategory category = null;
         if (request.getCategoryId() != null) {
             category = categoryRepository.findById(request.getCategoryId())
                     .orElseThrow(() -> new IllegalArgumentException("Category not found"));
         }
 
-        // Handle Tags
         Set<Tag> tags = new HashSet<>();
         if (request.getTags() != null) {
             for (String tagName : request.getTags()) {
@@ -107,10 +112,8 @@ public class DocumentService {
             }
         }
 
-        // Upload to Cloudinary
         String fileUrl = storageService.uploadFile(file, "documents");
 
-        // Build and Save Document
         Document doc = Document.builder()
                 .user(user)
                 .course(course)
@@ -123,7 +126,7 @@ public class DocumentService {
                 .fileSize(file.getSize())
                 .fileType(fileType)
                 .visibility(request.getVisibility() != null ? request.getVisibility() : Visibility.PRIVATE)
-                .moderationStatus(ModerationStatus.APPROVED) // Auto approved for development/testing
+                .moderationStatus(ModerationStatus.APPROVED)
                 .averageRating(BigDecimal.ZERO)
                 .totalViews(0)
                 .totalDownloads(0)
@@ -179,11 +182,9 @@ public class DocumentService {
             }
         }
 
-        // Increment total views
         doc.setTotalViews(doc.getTotalViews() + 1);
         documentRepository.save(doc);
 
-        // Save view history record
         DocumentView view = DocumentView.builder()
                 .document(doc)
                 .user(user)
@@ -223,7 +224,7 @@ public class DocumentService {
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
 
         if (!doc.getUser().getId().equals(user.getId())) {
-            throw new SecurityException("Bạn không có quyền thay đổi trạng thái chia sẻ của tài liệu này");
+            throw new SecurityException("Ban khong co quyen thay doi trang thai chia se cua tai lieu nay");
         }
 
         doc.setVisibility(visibility);
@@ -254,40 +255,75 @@ public class DocumentService {
             throw new SecurityException("Permission denied");
         }
 
-        // Delete from Cloudinary first
         storageService.deleteFile(doc.getFileUrl());
-
         documentRepository.delete(doc);
     }
 
     @Transactional
-    public DocumentResponse downloadDocument(Long documentId, String userEmail) {
+    public ResponseEntity<ByteArrayResource> downloadDocument(Long documentId, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
 
-        // Nếu tài liệu PRIVATE hoặc chưa được duyệt PUBLIC, chỉ chủ sở hữu được phép tải xuống
         if (doc.getVisibility() == Visibility.PRIVATE || doc.getModerationStatus() != ModerationStatus.APPROVED) {
             if (!doc.getUser().getId().equals(user.getId())) {
-                throw new SecurityException("Bạn không có quyền tải xuống tài liệu này");
+                throw new SecurityException("You are not allowed to download this document");
             }
         }
 
-        // Tăng số lượt tải xuống
-        doc.setTotalDownloads(doc.getTotalDownloads() + 1);
-        documentRepository.save(doc);
+        String downloadFileName = doc.getFileName() != null && !doc.getFileName().isBlank()
+                ? doc.getFileName()
+                : doc.getTitle();
 
-        // Lưu lịch sử tải xuống
+        byte[] fileBytes;
+        try (InputStream inputStream = URI.create(doc.getFileUrl()).toURL().openStream()) {
+            fileBytes = inputStream.readAllBytes();
+        } catch (IOException | RuntimeException e) {
+            log.error("Failed to fetch downloadable file for document {}: {}", documentId, e.getMessage());
+            throw new IllegalStateException("Download failed. Please try again.");
+        }
+
+        int updatedRows = documentRepository.incrementTotalDownloads(documentId);
+        if (updatedRows != 1) {
+            throw new IllegalStateException("Download failed. Please try again.");
+        }
+
         DocumentDownload download = DocumentDownload.builder()
                 .document(doc)
                 .user(user)
                 .build();
         documentDownloadRepository.save(download);
 
+        String detectedContentType = URLConnection.guessContentTypeFromName(downloadFileName);
+        if (detectedContentType == null) {
+            try (ByteArrayInputStream sniffStream = new ByteArrayInputStream(fileBytes)) {
+                detectedContentType = URLConnection.guessContentTypeFromStream(sniffStream);
+            } catch (IOException ignored) {
+                detectedContentType = null;
+            }
+        }
+
+        MediaType mediaType;
+        try {
+            mediaType = detectedContentType != null
+                    ? MediaType.parseMediaType(detectedContentType)
+                    : MediaType.APPLICATION_OCTET_STREAM;
+        } catch (Exception ignored) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+
+        ContentDisposition contentDisposition = ContentDisposition.attachment()
+                .filename(downloadFileName, StandardCharsets.UTF_8)
+                .build();
+
         log.info("Document ID {} downloaded by user {}", documentId, userEmail);
-        return mapToResponse(doc);
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .contentLength(fileBytes.length)
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
+                .body(new ByteArrayResource(fileBytes));
     }
 
     public DocumentResponse mapToResponse(Document doc) {

@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from '../../services/api'
+import { apiDelete, apiDownload, apiGet, apiPost, apiPut } from '../../services/api'
 
 export function getAdminUsers() {
   return apiGet('/admin/users')
@@ -88,6 +88,28 @@ export function getAdminCategories() {
   return apiGet('/admin/categories')
 }
 
+export function getAdminDashboardAnalytics() {
+  return apiGet('/admin/dashboard/analytics')
+}
+
+export function getAdminActivityLogs(params = {}) {
+  const search = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') search.set(key, value)
+  })
+  const queryString = search.toString()
+  return apiGet(`/admin/activity-logs${queryString ? `?${queryString}` : ''}`)
+}
+
+export function exportAdminActivityLogs(params = {}) {
+  const search = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') search.set(key, value)
+  })
+  const queryString = search.toString()
+  return apiDownload(`/admin/activity-logs/export${queryString ? `?${queryString}` : ''}`)
+}
+
 export function createAdminCategory(body) {
   return apiPost('/admin/categories', body)
 }
@@ -110,7 +132,8 @@ export function getAdminDashboardData() {
     getAdminMajors(),
     getAdminCourses(),
     getAdminCategories(),
-  ]).then(([users, documents, reports, verifications, plans, majors, courses, categories]) => ({
+    getAdminDashboardAnalytics(),
+  ]).then(([users, documents, reports, verifications, plans, majors, courses, categories, analytics]) => ({
     users,
     documents,
     reports,
@@ -119,5 +142,6 @@ export function getAdminDashboardData() {
     majors,
     courses,
     categories,
+    analytics,
   }))
 }

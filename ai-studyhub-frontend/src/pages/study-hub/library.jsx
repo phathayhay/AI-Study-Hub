@@ -18,7 +18,8 @@ import {
   createFolder, 
   renameFolder, 
   deleteFolder,
-  moveFolder
+  moveFolder,
+  updateFolderVisibility
 } from '../../features/folders/folderService'
 
 function getItemGroup(dateStr) {
@@ -58,6 +59,7 @@ function mapDoc(doc) {
   
   return {
     id: doc.id,
+    userId: doc.userId,
     name: docName,
     subject: doc.fileType || 'Document',
     kind: 'document',
@@ -139,6 +141,10 @@ export function LibraryPage({
           id: f.id,
           name: f.folderName || f.name || 'Untitled Folder',
           count: f.documents?.length || f.documentCount || 0,
+          visibility: f.visibility || 'PRIVATE',
+          public: f.visibility === 'PUBLIC',
+          publishReady: f.publishReady,
+          publishBlockedReason: f.publishBlockedReason,
           date: displayDate,
           time: displayDate,
           group: getItemGroup(f.createdAt),
@@ -201,7 +207,11 @@ export function LibraryPage({
           id: data.id || folder.id,
           name: data.folderName || data.name || folder.name,
           documents: data.documents || [],
-          subfolders: data.subfolders || []
+          subfolders: data.subfolders || [],
+          visibility: data.visibility || folder.visibility || 'PRIVATE',
+          public: data.visibility === 'PUBLIC',
+          publishReady: data.publishReady,
+          publishBlockedReason: data.publishBlockedReason
         })
       })
       .catch((err) => {
@@ -392,6 +402,49 @@ export function LibraryPage({
         handleDeleteLibraryFile(item)
       }
     }
+  }
+
+  const handleToggleFolderPublish = (folder) => {
+    const nextVisibility = folder.visibility === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC'
+    setLoading(true)
+    updateFolderVisibility(folder.id, nextVisibility)
+      .then((res) => {
+        const data = res?.data || res
+        loadLibraryData()
+
+        if (selectedFolder?.id === folder.id) {
+          setSelectedFolder((prev) => prev ? {
+            ...prev,
+            visibility: data.visibility || nextVisibility,
+            public: (data.visibility || nextVisibility) === 'PUBLIC',
+            publishReady: data.publishReady,
+            publishBlockedReason: data.publishBlockedReason
+          } : prev)
+          setSelectedFolderDetails((prev) => prev ? {
+            ...prev,
+            visibility: data.visibility || nextVisibility,
+            public: (data.visibility || nextVisibility) === 'PUBLIC',
+            publishReady: data.publishReady,
+            publishBlockedReason: data.publishBlockedReason
+          } : prev)
+        }
+
+        window.showToast?.(
+          nextVisibility === 'PUBLIC'
+            ? 'Folder published to Explore successfully'
+            : 'Folder moved back to private successfully',
+          'success'
+        )
+      })
+      .catch((err) => {
+        console.error(err)
+        window.showToast?.(err?.message || 'Failed to update folder visibility', 'error')
+      })
+      .finally(() => {
+        setLoading(false)
+        setOpenFolderMenuId(null)
+        setOpenFileMenuId(null)
+      })
   }
 
   const handleConfirmMove = (destFolderId) => {
@@ -637,6 +690,8 @@ export function LibraryPage({
               onPin={handleTogglePin}
               onMove={setMoveItem}
               onShare={handleShareItem}
+              user={user}
+              onTogglePublish={handleToggleFolderPublish}
             />
           ) : (
             <GroupedFolders
@@ -650,6 +705,8 @@ export function LibraryPage({
               onPin={handleTogglePin}
               onMove={setMoveItem}
               onShare={handleShareItem}
+              user={user}
+              onTogglePublish={handleToggleFolderPublish}
             />
           )
         ) : activeTab === 'shared' ? (
@@ -663,7 +720,8 @@ export function LibraryPage({
             pinnedIds={pinnedIds}
             onPin={handleTogglePin}
             onMove={setMoveItem}
-            onShare={handleShareItem}
+            onShare={null}
+            user={user}
           />
         ) : activeTab === 'favorites' ? (
           <SharedLibraryFiles
@@ -677,6 +735,7 @@ export function LibraryPage({
             onPin={handleTogglePin}
             onMove={setMoveItem}
             onShare={handleShareItem}
+            user={user}
           />
         ) : activeTab === 'recent' ? (
           <SharedLibraryFiles
@@ -690,6 +749,7 @@ export function LibraryPage({
             onPin={handleTogglePin}
             onMove={setMoveItem}
             onShare={handleShareItem}
+            user={user}
           />
         ) : selectedFolder ? (
           <FolderFilesView
@@ -709,6 +769,8 @@ export function LibraryPage({
             onPin={handleTogglePin}
             onMove={setMoveItem}
             onShare={handleShareItem}
+            user={user}
+            onTogglePublish={handleToggleFolderPublish}
           />
         ) : (
           <GroupedFiles
@@ -722,6 +784,7 @@ export function LibraryPage({
             onPin={handleTogglePin}
             onMove={setMoveItem}
             onShare={handleShareItem}
+            user={user}
           />
         )}
         </div>
@@ -739,6 +802,7 @@ export function LibraryPage({
         isOpen={!!shareItem}
         onClose={() => setShareItem(null)}
         item={shareItem}
+        user={user}
         onShare={shareDocument}
         onUpdateVisibility={updateDocumentVisibility}
         onSuccess={() => {
@@ -768,7 +832,9 @@ function FolderFilesView({
   pinnedIds,
   onPin,
   onMove,
-  onShare
+  onShare,
+  user,
+  onTogglePublish
 }) {
   if (loading) {
     return (
@@ -787,6 +853,10 @@ function FolderFilesView({
         name: sf.folderName || sf.name || 'Untitled Folder',
         type: 'folder',
         isFolder: true,
+        visibility: sf.visibility || 'PRIVATE',
+        public: sf.visibility === 'PUBLIC',
+        publishReady: sf.publishReady,
+        publishBlockedReason: sf.publishBlockedReason,
         date: displayDate,
         time: displayDate,
         createdAt: sf.createdAt
@@ -868,6 +938,8 @@ function FolderFilesView({
                     onRename={onRenameFile}
                     onToggleFileMenu={onToggleFileMenu}
                     openFileMenuId={openFileMenuId}
+                    user={user}
+                    onTogglePublish={onTogglePublish}
                   />
                 )
               })}
@@ -890,12 +962,16 @@ function ActionableFileRow({
   onShare, 
   onToggleFileMenu, 
   openFileMenuId,
-  isPinned
+  isPinned,
+  user,
+  onTogglePublish
 }) {
   const isActualFolder = isFolder || file.type === 'folder' || file.kind === 'folder';
+  const isOwner = isActualFolder || !file.userId || !user?.id || Number(file.userId) === Number(user?.id) || file.uploader === user?.fullName;
   const fileRef = file.name.includes('.') ? file.name : file.subject;
   const iconName = isActualFolder ? 'folder' : getFileIconName(fileRef);
   const iconColor = isActualFolder ? '#818cf8' : getFileIconColor(fileRef);
+  const isPublicFolder = isActualFolder && file.visibility === 'PUBLIC';
 
   return (
     <div
@@ -910,6 +986,17 @@ function ActionableFileRow({
         <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">
           {file.name}
         </span>
+        {isActualFolder && (
+          <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold border ${
+              isPublicFolder
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/40'
+                : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-900/40'
+            }`}
+          >
+            {isPublicFolder ? 'Public' : 'Private'}
+          </span>
+        )}
       </div>
 
       {/* Cột 2: Loại tài liệu */}
@@ -947,7 +1034,7 @@ function ActionableFileRow({
         >
           <StudyHubIcon name="trash" size={15} />
         </button>
-        {!isActualFolder && (
+        {!isActualFolder && onShare && isOwner && (
           <button 
             className="hover-action-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors" 
             onClick={() => onShare(file)} 
@@ -955,6 +1042,20 @@ function ActionableFileRow({
             title="Share"
           >
             <StudyHubIcon name="share" size={15} />
+          </button>
+        )}
+        {isActualFolder && onTogglePublish && (
+          <button
+            className={`hover-action-btn p-1 transition-colors ${
+              isPublicFolder
+                ? 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300'
+                : 'text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400'
+            }`}
+            onClick={() => onTogglePublish(file)}
+            type="button"
+            title={isPublicFolder ? 'Make private' : 'Publish to Explore'}
+          >
+            <StudyHubIcon name={isPublicFolder ? 'lock' : 'globe'} size={15} />
           </button>
         )}
         <button 
@@ -993,7 +1094,18 @@ function ActionableFileRow({
             <button className="danger hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => { onDelete(file); onToggleFileMenu(null); }} type="button">
               <StudyHubIcon name="trash" size={14} /> Delete
             </button>
-            {!isActualFolder && (
+            {isActualFolder && onTogglePublish && (
+              <button
+                className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700"
+                onClick={() => { onTogglePublish(file); onToggleFileMenu(null); }}
+                type="button"
+                title={file.publishBlockedReason || undefined}
+              >
+                <StudyHubIcon name={isPublicFolder ? 'lock' : 'globe'} size={14} />
+                {isPublicFolder ? 'Make Private' : 'Publish to Explore'}
+              </button>
+            )}
+            {!isActualFolder && onShare && isOwner && (
               <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onShare(file); onToggleFileMenu(null); }} type="button">
                 <StudyHubIcon name="share" size={14} /> Share
               </button>
@@ -1018,7 +1130,8 @@ function GroupedFiles({
   pinnedIds,
   onPin,
   onMove,
-  onShare
+  onShare,
+  user
 }) {
   const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
   return (
@@ -1046,6 +1159,7 @@ function GroupedFiles({
                 onRename={onRenameFile}
                 onToggleFileMenu={onToggleFileMenu}
                 openFileMenuId={openFileMenuId}
+                user={user}
               />
             ))}
           </div>
@@ -1070,7 +1184,9 @@ function GroupedFolders({
   pinnedIds,
   onPin,
   onMove,
-  onShare
+  onShare,
+  user,
+  onTogglePublish
 }) {
   const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
   return (
@@ -1098,6 +1214,8 @@ function GroupedFolders({
                 onRename={onRenameFolder}
                 onToggleFileMenu={onToggleFolderMenu}
                 openFileMenuId={openFolderMenuId}
+                user={user}
+                onTogglePublish={onTogglePublish}
               />
             ))}
           </div>
@@ -1122,7 +1240,8 @@ function SharedLibraryFiles({
   pinnedIds,
   onPin,
   onMove,
-  onShare
+  onShare,
+  user
 }) {
   const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
   const files = allFiles || []
@@ -1151,6 +1270,7 @@ function SharedLibraryFiles({
                 onRename={onRenameFile}
                 onToggleFileMenu={onToggleFileMenu}
                 openFileMenuId={openFileMenuId}
+                user={user}
               />
             ))}
           </div>
@@ -1281,7 +1401,7 @@ function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
   )
 }
 
-function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSuccess }) {
+function ShareModal({ isOpen, onClose, item, user, onShare, onUpdateVisibility, onSuccess }) {
   const [email, setEmail] = useState('')
   const [visibility, setVisibility] = useState('PRIVATE')
   const [loading, setLoading] = useState(false)
@@ -1296,6 +1416,8 @@ function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSucc
   }, [isOpen, item])
 
   if (!isOpen || !item) return null
+
+  const isOwner = !item.userId || !user?.id || Number(item.userId) === Number(user?.id) || item.uploader === user?.fullName
 
   const handleAddPerson = (e) => {
     e.preventDefault()
@@ -1359,45 +1481,47 @@ function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSucc
           Share "{item.name}"
         </h3>
 
-        {/* General Access */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <span className="text-slate-600 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            General access
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Toggle Button Segmented Control */}
-            <div className="border border-slate-200 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', height: '36px', width: '80px', flexShrink: 0 }}>
-              <button 
-                type="button" 
-                onClick={() => setVisibility('PRIVATE')} 
-                className={`flex-1 flex items-center justify-center border-none cursor-pointer transition-all duration-200 ${visibility === 'PRIVATE' ? 'bg-[#4f46e5] text-white' : 'bg-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}
-                title="Restricted"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setVisibility('PUBLIC')} 
-                className={`flex-1 flex items-center justify-center border-none cursor-pointer transition-all duration-200 ${visibility === 'PUBLIC' ? 'bg-[#4f46e5] text-white' : 'bg-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}
-                title="Anyone with the link"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
-              </button>
-            </div>
+        {/* General Access - Only shown/editable for owners */}
+        {isOwner && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <span className="text-slate-600 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              General access
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              {/* Toggle Button Segmented Control */}
+              <div className="border border-slate-200 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', borderRadius: '8px', overflow: 'hidden', height: '36px', width: '80px', flexShrink: 0 }}>
+                <button 
+                  type="button" 
+                  onClick={() => setVisibility('PRIVATE')} 
+                  className={`flex-1 flex items-center justify-center border-none cursor-pointer transition-all duration-200 ${visibility === 'PRIVATE' ? 'bg-[#4f46e5] text-white' : 'bg-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}
+                  title="Restricted"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => setVisibility('PUBLIC')} 
+                  className={`flex-1 flex items-center justify-center border-none cursor-pointer transition-all duration-200 ${visibility === 'PUBLIC' ? 'bg-[#4f46e5] text-white' : 'bg-transparent text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400'}`}
+                  title="Anyone with the link"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+                </button>
+              </div>
 
-            {/* Description Text */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '14px', fontWeight: 700 }}>
-                {visibility === 'PUBLIC' ? 'Anyone with the link' : 'Restricted'}
-              </span>
-              <span className="text-slate-500 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '12px' }}>
-                {visibility === 'PUBLIC' 
-                  ? 'Anyone on the internet with this link can view.' 
-                  : 'Only the people you invite can view.'}
-              </span>
+              {/* Description Text */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '14px', fontWeight: 700 }}>
+                  {visibility === 'PUBLIC' ? 'Anyone with the link' : 'Restricted'}
+                </span>
+                <span className="text-slate-500 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '12px' }}>
+                  {visibility === 'PUBLIC' 
+                    ? 'Anyone on the internet with this link can view.' 
+                    : 'Only the people you invite can view.'}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Add People */}
         <form onSubmit={handleAddPerson} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1434,16 +1558,26 @@ function ShareModal({ isOpen, onClose, item, onShare, onUpdateVisibility, onSucc
             {isCopied ? 'Copied' : 'Copy link'}
           </button>
           
-          <button 
-            type="button" 
-            onClick={handleSaveVisibility}
-            disabled={saveLoading}
-            className={`h-[36px] px-5 rounded-lg text-sm font-semibold text-white transition-colors duration-200 ${saveLoading ? 'bg-slate-400 dark:bg-slate-600 cursor-not-allowed' : 'bg-[#4f46e5] hover:bg-indigo-700 cursor-pointer'}`}
-          >
-            {saveLoading ? 'Saving...' : 'Save'}
-          </button>
+          {isOwner ? (
+            <button 
+              type="button" 
+              onClick={handleSaveVisibility}
+              disabled={saveLoading}
+              className={`h-[36px] px-5 rounded-lg text-sm font-semibold text-white transition-colors duration-200 ${saveLoading ? 'bg-slate-400 dark:bg-slate-600 cursor-not-allowed' : 'bg-[#4f46e5] hover:bg-indigo-700 cursor-pointer'}`}
+            >
+              {saveLoading ? 'Saving...' : 'Save'}
+            </button>
+          ) : (
+            <button 
+              type="button" 
+              onClick={onClose}
+              className="bg-[#4f46e5] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200"
+              style={{ height: '36px', padding: '0 20px', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Close
+            </button>
+          )}
         </div>
-
       </div>
     </div>
   )

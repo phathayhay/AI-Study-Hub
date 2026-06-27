@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { logout as apiLogout } from '../features/auth/authService'
+import { getUserProfile } from '../services/userService'
 
 export default function useAuth() {
   const [user, setUser] = useState(null)
@@ -20,6 +21,46 @@ export default function useAuth() {
           u.fullName = `${u.lastName || ''} ${u.firstName || ''}`.trim()
         }
         setUser(u)
+
+        // Background-sync user profile with server
+        getUserProfile()
+          .then(res => {
+            if (res?.success && res?.data) {
+              const profile = res.data
+              const updatedUser = {
+                ...u,
+                id: profile.id,
+                firstName: profile.firstName,
+                lastName: profile.lastName,
+                fullName: profile.fullName,
+                role: profile.role,
+                avatarUrl: profile.avatarUrl,
+                verificationStatus: profile.verificationStatus,
+                campus: profile.campus,
+                majorId: profile.majorId,
+                majorName: profile.majorName,
+                currentSemester: profile.currentSemester,
+                status: profile.status,
+                planName: profile.planName,
+                planExpiresAt: profile.planExpiresAt
+              }
+              if (profile.avatarUrl) {
+                localStorage.setItem(`avatarUrl_${profile.email}`, profile.avatarUrl)
+              } else {
+                localStorage.removeItem(`avatarUrl_${profile.email}`)
+              }
+              // Also sync verificationStatus to localStorage for Settings modal
+              if (profile.verificationStatus) {
+                const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified' }
+                localStorage.setItem('verificationStatus', vsMap[profile.verificationStatus] || 'unverified')
+              }
+              localStorage.setItem('user', JSON.stringify(updatedUser))
+              setUser(updatedUser)
+            }
+          })
+          .catch(err => {
+            console.error('Failed to sync user profile:', err)
+          })
       } catch (e) {
         console.error('Error parsing cached user:', e)
       }
@@ -35,14 +76,24 @@ export default function useAuth() {
         localStorage.setItem('refreshToken', u.refreshToken)
       }
       
-      // Merge cached avatar if it exists
-      const cachedAvatar = localStorage.getItem(`avatarUrl_${u.email}`)
-      if (cachedAvatar) {
-        u.avatarUrl = cachedAvatar
+      // Save avatar to cache if present, otherwise fallback to cache
+      if (u.avatarUrl) {
+        localStorage.setItem(`avatarUrl_${u.email}`, u.avatarUrl)
+      } else {
+        const cachedAvatar = localStorage.getItem(`avatarUrl_${u.email}`)
+        if (cachedAvatar) {
+          u.avatarUrl = cachedAvatar
+        }
       }
 
       if (!u.fullName && (u.firstName || u.lastName)) {
         u.fullName = `${u.lastName || ''} ${u.firstName || ''}`.trim()
+      }
+
+      // Sync verificationStatus from login response to localStorage
+      if (u.verificationStatus) {
+        const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified' }
+        localStorage.setItem('verificationStatus', vsMap[u.verificationStatus] || 'unverified')
       }
 
       localStorage.setItem('user', JSON.stringify(u))

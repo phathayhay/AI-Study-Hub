@@ -62,11 +62,18 @@ cloudinary:
 # ── Gemini AI ────────────────────────────────────────────────
 gemini:
   api-key: ${GEMINI_API_KEY}
-  model: ${GEMINI_MODEL:gemini-2.0-flash}
+  model: ${GEMINI_MODEL:gemini-2.5-flash}
   project-id: ${GOOGLE_CLOUD_PROJECT_ID}
   location: us-central1
-  max-tokens: 2048
+  max-tokens: 8192
   temperature: 0.7
+
+# ── Local AI (Ollama) ────────────────────────────────────────
+ai:
+  provider: ${AI_PROVIDER:GEMINI}
+  ollama:
+    base-url: ${OLLAMA_API_BASE:http://localhost:11434}
+    model: ${OLLAMA_MODEL:qwen2.5}
 
 # ── Swagger / OpenAPI ────────────────────────────────────────
 springdoc:

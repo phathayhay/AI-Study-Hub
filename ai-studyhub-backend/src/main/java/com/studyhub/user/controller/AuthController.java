@@ -149,6 +149,15 @@ public class AuthController {
         authService.changePassword(currentEmail, request);
         return ResponseEntity.ok(ApiResponse.ok("Password changed successfully"));
     }
+
+    // API gửi lại email xác thực
+    @PostMapping("/send-verify-email")
+    @Operation(summary = "Resend verification email", description = "Resends the account verification email link if the user has not verified it yet.")
+    public ResponseEntity<ApiResponse<Void>> resendVerificationEmail(@Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("API: Resending verification email for {}", request.getEmail());
+        authService.resendVerificationEmail(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.ok("Verification email has been resent successfully."));
+    }
 }
 
 

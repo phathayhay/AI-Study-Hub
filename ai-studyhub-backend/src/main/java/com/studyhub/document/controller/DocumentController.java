@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -186,9 +187,9 @@ public class DocumentController {
         @ApiResponse(responseCode = "404", description = "Document not found", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class))),
         @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class)))
     })
-    public ResponseEntity<DocumentResponse> downloadDocument(@PathVariable Long id) {
+    public ResponseEntity<ByteArrayResource> downloadDocument(@PathVariable Long id) {
         String email = SecurityUtils.getCurrentUserEmail();
-        return ResponseEntity.ok(documentService.downloadDocument(id, email));
+        return documentService.downloadDocument(id, email);
     }
 }
 

@@ -1,5 +1,7 @@
 package com.studyhub.document.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.studyhub.common.enums.Visibility;
 import com.studyhub.document.dto.FolderRequest;
 import com.studyhub.document.dto.FolderResponse;
 import com.studyhub.document.service.FolderService;
@@ -16,7 +18,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/folders")
@@ -25,6 +29,7 @@ import java.util.List;
 public class FolderController {
 
     private final FolderService folderService;
+    private final ObjectMapper objectMapper;
 
     // API tạo thư mục mới
     @PostMapping
@@ -53,6 +58,12 @@ public class FolderController {
         return ResponseEntity.ok(folderService.getRootFolders(email));
     }
 
+    @GetMapping("/public")
+    @Operation(summary = "Get published folders", description = "Retrieves the list of public study collections shown on Explore.")
+    public ResponseEntity<List<FolderResponse>> getPublishedFolders() {
+        return ResponseEntity.ok(folderService.getPublishedFolders());
+    }
+
     // API xem chi tiết thư mục và các thư mục con bên trong
     @GetMapping("/{id}")
     @Operation(summary = "Get folder details", description = "Retrieves details of a folder and its children by its unique folder ID.")
@@ -67,6 +78,12 @@ public class FolderController {
         return ResponseEntity.ok(folderService.getFolderDetails(id, email));
     }
 
+    @GetMapping("/public/{id}")
+    @Operation(summary = "Get published folder details", description = "Retrieves a public study collection by folder ID.")
+    public ResponseEntity<FolderResponse> getPublishedFolderDetails(@PathVariable Long id) {
+        return ResponseEntity.ok(folderService.getPublishedFolderDetails(id));
+    }
+
     // API đổi tên thư mục
     @PutMapping("/{id}")
     @Operation(summary = "Rename an existing folder", description = "Renames a folder owned by the authenticated user.")
@@ -79,9 +96,20 @@ public class FolderController {
     })
     public ResponseEntity<FolderResponse> renameFolder(
             @PathVariable Long id,
-            @Valid @RequestBody FolderRequest request) {
+            @RequestBody String requestBodyJson) throws IOException {
+        FolderRequest request = objectMapper.readValue(requestBodyJson, FolderRequest.class);
+        Map<String, Object> rawPayload = objectMapper.readValue(requestBodyJson, Map.class);
         String email = SecurityUtils.getCurrentUserEmail();
-        return ResponseEntity.ok(folderService.renameFolder(id, request, email));
+        return ResponseEntity.ok(folderService.renameFolder(id, request, rawPayload, email));
+    }
+
+    @PutMapping("/{id}/visibility")
+    @Operation(summary = "Update folder visibility", description = "Publishes or unpublishes a folder owned by the authenticated user.")
+    public ResponseEntity<FolderResponse> updateVisibility(
+            @PathVariable Long id,
+            @RequestParam("visibility") Visibility visibility) {
+        String email = SecurityUtils.getCurrentUserEmail();
+        return ResponseEntity.ok(folderService.updateVisibility(id, visibility, email));
     }
 
     // API xóa thư mục và các tài liệu bên trong

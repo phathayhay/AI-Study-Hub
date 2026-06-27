@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
 :root {
   color: #111827;
   background: #ffffff;
@@ -12,7 +14,7 @@ html, body, #root, *, *::before, *::after {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Merriweather', serif !important;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
   letter-spacing: 0em; /* tracking-normal */
   color: #0f172a; /* text-slate-900 */
 }

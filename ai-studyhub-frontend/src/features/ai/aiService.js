@@ -1,5 +1,9 @@
 import { apiGet, apiPost } from '../../services/api'
 
+export function getDocumentSummary(documentId) {
+  return apiGet(`/ai/documents/${documentId}/summary`)
+}
+
 export function generateSummary(documentId) {
   return apiPost(`/ai/documents/${documentId}/summary`)
 }

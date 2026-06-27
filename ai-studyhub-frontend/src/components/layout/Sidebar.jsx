@@ -65,6 +65,15 @@ export default function Sidebar({
     ? user.fullName.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
     : guest ? '?' : 'SV'
 
+  const normalizedPlan = String(user?.planName || 'FREE').toUpperCase()
+  const hasPaidPlan = normalizedPlan !== 'FREE'
+  const planLabel = user?.planName || 'Free'
+  const planExpiresAt = user?.planExpiresAt ? new Date(user.planExpiresAt) : null
+  const hasValidExpiry = planExpiresAt && !Number.isNaN(planExpiresAt.getTime())
+  const formattedExpiry = hasValidExpiry
+    ? planExpiresAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : null
+
   const renderNavButton = (routeKey, icon, label) => {
     const isActive = active === routeKey
     const handleClick = () => {
@@ -131,7 +140,7 @@ export default function Sidebar({
       >
         {collapsed ? (
           <>
-            <Brand onClick={onToggleCollapse} compact={true} />
+            <Brand onClick={() => onNavigate?.('explore')} compact={true} />
             <button
               onClick={onToggleCollapse}
               style={{
@@ -159,7 +168,7 @@ export default function Sidebar({
         ) : (
           <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Brand
-              onClick={() => onNavigate?.(guest ? 'explore' : 'library')}
+              onClick={() => onNavigate?.('explore')}
               compact={false}
             />
             <button
@@ -455,22 +464,55 @@ export default function Sidebar({
           style={{ padding: collapsed ? '10px 8px' : '12px 14px', display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}
         >
           {!collapsed ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                padding: '12px',
+                borderRadius: '12px',
+                background: isDark ? 'rgba(30, 41, 59, 0.88)' : '#f8fafc',
+                border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-7.88 2.5 2.5 0 0 1 2.46-6.06z" />
                     <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-7.88 2.5 2.5 0 0 0-2.46-6.06z" />
                   </svg>
                 </div>
-                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary, #0f172a)' }} className="upgrade-title-text">Upgrade for more features</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: isDark ? '#94a3b8' : '#64748b' }}>
+                    Current plan
+                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: 700, color: isDark ? '#f8fafc' : '#0f172a' }}>
+                    {planLabel}
+                  </div>
+                </div>
               </div>
-              <button onClick={() => onNavigate?.('pricing')} style={{ width: '100%', padding: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'background-color 0.2s' }}>
-                Upgrade
-              </button>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '12px', color: isDark ? '#cbd5e1' : '#475569' }}>
+                  {hasPaidPlan
+                    ? (formattedExpiry ? `Active until ${formattedExpiry}` : 'Paid plan is active')
+                    : 'Free plan with basic features'}
+                </span>
+                {hasPaidPlan && formattedExpiry && (
+                  <span style={{ fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b' }}>
+                    Renewal date: {formattedExpiry}
+                  </span>
+                )}
+              </div>
+
+              {normalizedPlan !== 'PREMIUM' && (
+                <button onClick={() => onNavigate?.('pricing')} style={{ width: '100%', padding: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'background-color 0.2s' }}>
+                  {hasPaidPlan ? 'Change plan' : 'Upgrade'}
+                </button>
+              )}
             </div>
           ) : (
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate?.('pricing')} title="Upgrade">
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate?.('pricing')} title={formattedExpiry ? `${planLabel} - active until ${formattedExpiry}` : `${planLabel} plan`}>
               <div className="sidebar-upgrade-btn" style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-7.88 2.5 2.5 0 0 1 2.46-6.06z" />

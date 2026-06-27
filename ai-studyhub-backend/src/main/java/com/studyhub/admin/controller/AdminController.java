@@ -3,6 +3,7 @@ package com.studyhub.admin.controller;
 import com.studyhub.admin.dto.*;
 import com.studyhub.admin.service.AdminService;
 import com.studyhub.common.ApiResponse;
+import com.studyhub.common.PageResponse;
 import com.studyhub.course.entity.Course;
 import com.studyhub.course.entity.Major;
 import com.studyhub.document.entity.DocumentCategory;
@@ -13,9 +14,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Slf4j
@@ -35,6 +39,39 @@ public class AdminController {
         log.info("API Admin: Fetching all users list");
         List<AdminUserResponse> response = adminService.getAllUsers();
         return ResponseEntity.ok(ApiResponse.ok("Users list retrieved successfully", response));
+    }
+
+    @GetMapping("/dashboard/analytics")
+    @Operation(summary = "Get dashboard analytics", description = "Retrieves real analytics data for the admin overview dashboard.")
+    public ResponseEntity<ApiResponse<AdminDashboardAnalyticsResponse>> getDashboardAnalytics() {
+        log.info("API Admin: Fetching dashboard analytics");
+        AdminDashboardAnalyticsResponse response = adminService.getDashboardAnalytics();
+        return ResponseEntity.ok(ApiResponse.ok("Dashboard analytics retrieved successfully", response));
+    }
+
+    @GetMapping("/activity-logs")
+    @Operation(summary = "Get activity logs", description = "Retrieves filtered and paginated administrative activity logs.")
+    public ResponseEntity<ApiResponse<PageResponse<AdminActivityLogResponse>>> getActivityLogs(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        PageResponse<AdminActivityLogResponse> response = adminService.getActivityLogs(query, type, dateFrom, dateTo, page, size);
+        return ResponseEntity.ok(ApiResponse.ok("Activity logs retrieved successfully", response));
+    }
+
+    @GetMapping("/activity-logs/export")
+    @Operation(summary = "Export activity logs", description = "Exports the filtered administrative activity logs to CSV.")
+    public ResponseEntity<ByteArrayResource> exportActivityLogs(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo
+    ) {
+        return adminService.exportActivityLogs(query, type, dateFrom, dateTo);
     }
 
     @PostMapping("/users/{id}/ban")

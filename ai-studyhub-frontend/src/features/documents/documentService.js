@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, apiDelete } from '../../services/api'
+import { apiDownload, apiGet, apiPost, apiPut, apiDelete } from '../../services/api'
 
 export function getMyDocuments() {
   return apiGet('/documents/my')
@@ -21,6 +21,10 @@ export function searchDocuments(params = {}) {
 
 export function getDocument(id) {
   return apiGet(`/documents/${id}`)
+}
+
+export function downloadDocumentFile(id) {
+  return apiDownload(`/documents/${id}/download`)
 }
 
 export function deleteDocument(id) {

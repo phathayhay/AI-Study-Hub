@@ -5,6 +5,7 @@ import {
   generateFlashcards,
   generateQuiz,
   generateSummary,
+  getDocumentSummary,
   getDocumentFlashcardSets,
   getDocumentQuizzes,
   getFlashcardSet,
@@ -22,6 +23,7 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
   const [quizzes, setQuizzes] = useState([])
   const [quiz, setQuiz] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [initialAiLoading, setInitialAiLoading] = useState(false)
   const [error, setError] = useState('')
   const [rightPanelWidth, setRightPanelWidth] = useState(380)
   const [isResizing, setIsResizing] = useState(false)
@@ -61,6 +63,21 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   const messagesEndRef = useRef(null)
+
+  const isMissingAiContentError = (requestError) => {
+    const normalizedMessage = String(
+      requestError?.message ||
+      requestError?.data?.message ||
+      ''
+    ).toLowerCase()
+
+    return requestError?.status === 404
+      || normalizedMessage.includes('summary not found for this document')
+      || normalizedMessage.includes('resource not found')
+      || normalizedMessage.includes('flashcard set not found')
+      || normalizedMessage.includes('flashcards not found')
+      || normalizedMessage.includes('quiz not found')
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -254,27 +271,45 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
   useEffect(() => {
     if (!documentId) return undefined
     let active = true
-    setLoading(true)
-    // Load quizzes separately (still used by quiz tab)
-    getDocumentQuizzes(documentId)
-      .then((quizList) => { if (active) setQuizzes(quizList) })
-      .catch(() => {})
-    // Auto-load flashcard: use existing set or generate new one
-    getDocumentFlashcardSets(documentId)
-      .then(async (sets) => {
+    setInitialAiLoading(true)
+    setError('')
+    setSummary(null)
+    setFlashcardSet(null)
+    setQuiz(null)
+
+    Promise.allSettled([
+      getDocumentSummary(documentId),
+      getDocumentQuizzes(documentId),
+      getDocumentFlashcardSets(documentId),
+    ])
+      .then(async ([summaryResult, quizzesResult, flashcardsResult]) => {
         if (!active) return
-        if (sets && sets.length > 0) {
-          const set = await getFlashcardSet(sets[0].id)
-          if (active) setFlashcardSet(set)
-        } else {
-          const generated = await generateFlashcards(documentId)
-          if (active && generated) setFlashcardSet(generated)
+
+        if (summaryResult.status === 'fulfilled') {
+          setSummary(summaryResult.value)
+        } else if (!isMissingAiContentError(summaryResult.reason)) {
+          setError(summaryResult.reason.message)
+        }
+
+        if (quizzesResult.status === 'fulfilled') {
+          setQuizzes(Array.isArray(quizzesResult.value) ? quizzesResult.value : [])
+        }
+
+        if (flashcardsResult.status === 'fulfilled') {
+          const sets = flashcardsResult.value
+          if (Array.isArray(sets) && sets.length > 0) {
+            try {
+              const set = await getFlashcardSet(sets[0].id)
+              if (active) setFlashcardSet(set)
+            } catch (requestError) {
+              if (active) setError(requestError.message)
+            }
+          }
+        } else if (!isMissingAiContentError(flashcardsResult.reason)) {
+          setError(flashcardsResult.reason.message)
         }
       })
-      .catch((requestError) => {
-        if (active) setError(requestError.message)
-      })
-      .finally(() => { if (active) setLoading(false) })
+      .finally(() => { if (active) setInitialAiLoading(false) })
     return () => { active = false }
   }, [documentId])
 
@@ -378,9 +413,9 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
                       <p className="text-slate-700 dark:text-slate-300 transition-colors duration-300" style={{ marginTop: '16px', fontSize: '15px', fontWeight: 500, textAlign: 'center' }}>
                         Create a clear and easy-to-understand summary of your content
                       </p>
-                      <button 
-                        onClick={handleSummary}
-                        disabled={!documentId || loading}
+                        <button 
+                          onClick={handleSummary}
+                        disabled={!documentId || loading || initialAiLoading}
                         style={{ marginTop: '24px', backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', padding: '12px 32px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 600, cursor: 'pointer', border: 'none' }}
                       >
                         {loading ? (
@@ -406,10 +441,38 @@ export default function StudyDocumentApi({ activeTab, file, onBack, onTabChange 
               {activeTab === 'flashcards' && (
                 flashcardSet
                   ? <FlashcardViewer set={flashcardSet} onRegenerate={regenerateFlashcards} loading={loading} />
-                  : <div className="text-indigo-600 dark:text-indigo-400" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '48px' }}>
-                      <div className="border-4 border-indigo-100 dark:border-indigo-950/40 border-t-indigo-600 dark:border-t-indigo-400" style={{ width: '48px', height: '48px', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                      <p className="text-slate-600 dark:text-slate-400 transition-colors duration-300" style={{ fontSize: '15px', fontWeight: 500, margin: 0 }}>{loading ? 'Generating flashcards...' : 'Loading flashcards...'}</p>
+                  : (
+                    <div style={{ padding: '0', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                      <div className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition-colors duration-300" style={{ flex: 1, borderRadius: '16px', padding: '80px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ fontSize: '28px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500, margin: 0 }}>
+                          <span className="text-indigo-600 dark:text-indigo-400" style={{ fontWeight: 600 }}>AI</span> Flashcards
+                        </h2>
+                        <p className="text-slate-700 dark:text-slate-300 transition-colors duration-300" style={{ marginTop: '16px', fontSize: '15px', fontWeight: 500, textAlign: 'center' }}>
+                          Generate flashcards only when you need them for this document
+                        </p>
+                        <button
+                          onClick={regenerateFlashcards}
+                          disabled={!documentId || loading || initialAiLoading}
+                          style={{ marginTop: '24px', backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', padding: '12px 32px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 600, cursor: 'pointer', border: 'none' }}
+                        >
+                          {loading ? (
+                            <>
+                              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>Generating...</span>
+                            </>
+                          ) : (
+                            <>
+                              <StudyHubIcon name="sparkles" size={16} />
+                              <span>Generate</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
+                  )
               )}
               {activeTab === 'quizzes' && (quiz ? <QuizViewer onBack={() => setQuiz(null)} quiz={quiz} /> : <QuizPanel disabled={!documentId || loading} loading={loading} onCreate={handleQuiz} onOpen={openQuiz} quizzes={quizzes} />)}
               </div>

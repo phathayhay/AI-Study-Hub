@@ -16,8 +16,7 @@ function getToken() {
   return localStorage.getItem('accessToken')
 }
 
-async function request(method, path, body, opts = {}) {
-  const url = `${API_BASE}${path}`
+function buildHeaders(body, opts = {}) {
   const headers = new Headers(opts.headers)
   const token = getToken()
   const isFormData = body instanceof FormData
@@ -25,12 +24,18 @@ async function request(method, path, body, opts = {}) {
   if (body && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
+  return headers
+}
+
+async function request(method, path, body, opts = {}) {
+  const url = `${API_BASE}${path}`
+  const headers = buildHeaders(body, opts)
   let res
   try {
     res = await fetch(url, { method, headers, body, ...opts })
   } catch (err) {
     console.error(`[API] Network error ${method} ${url}:`, err)
-    throw new Error(`Unable to connect to the server (${err.message})`)
+    throw new Error(`Unable to connect to the server (${err.message})`, { cause: err })
   }
   const ct = res.headers.get('content-type') || ''
   let data
@@ -38,10 +43,39 @@ async function request(method, path, body, opts = {}) {
     data = ct.includes('application/json') ? await res.json() : await res.text()
   } catch (parseErr) {
     console.error(`[API] Parse error ${method} ${url}:`, parseErr)
-    throw new Error(`Error reading response from server`)
+    throw new Error('Error reading response from server', { cause: parseErr })
   }
   if (!res.ok) throw new ApiError(data?.message || `HTTP ${res.status}`, res.status, data, { method, path, url })
   return res.status === 204 ? null : data
+}
+
+export async function apiDownload(path, opts = {}) {
+  const url = `${API_BASE}${path}`
+  const headers = buildHeaders(null, opts)
+  let res
+  try {
+    res = await fetch(url, { method: 'GET', headers, ...opts })
+  } catch (err) {
+    console.error(`[API] Network error GET ${url}:`, err)
+    throw new Error(`Unable to connect to the server (${err.message})`, { cause: err })
+  }
+
+  if (!res.ok) {
+    const ct = res.headers.get('content-type') || ''
+    let data
+    try {
+      data = ct.includes('application/json') ? await res.json() : await res.text()
+    } catch {
+      data = null
+    }
+    throw new ApiError(data?.message || `HTTP ${res.status}`, res.status, data, { method: 'GET', path, url })
+  }
+
+  return {
+    blob: await res.blob(),
+    contentDisposition: res.headers.get('content-disposition') || '',
+    contentType: res.headers.get('content-type') || ''
+  }
 }
 
 export function apiGet(path, opts) { return request('GET', path, null, opts) }

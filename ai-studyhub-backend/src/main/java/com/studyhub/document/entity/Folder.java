@@ -1,5 +1,6 @@
 package com.studyhub.document.entity;
 
+import com.studyhub.common.enums.Visibility;
 import com.studyhub.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -26,6 +27,13 @@ public class Folder {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_folder_id")
     private Folder parentFolder;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", nullable = false, length = 20)
+    private Visibility visibility = Visibility.PRIVATE;
+
+    @Column(name = "published_at")
+    private LocalDateTime publishedAt;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

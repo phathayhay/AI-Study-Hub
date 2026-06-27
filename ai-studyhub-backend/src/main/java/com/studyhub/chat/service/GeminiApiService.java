@@ -4,6 +4,7 @@ import com.studyhub.config.GeminiConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -28,8 +29,9 @@ import java.util.Map;
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(name = "ai.provider", havingValue = "GEMINI", matchIfMissing = true)
 @RequiredArgsConstructor
-public class GeminiApiService {
+public class GeminiApiService implements AiModelService {
 
     private final GeminiConfig geminiConfig;
     private final RestTemplate restTemplate;
@@ -42,7 +44,8 @@ public class GeminiApiService {
      * @param userQuestion Câu hỏi mới của user
      * @return Câu trả lời từ Gemini
      */
-    public GeminiResponse chat(String systemPrompt,
+    @Override
+    public AiResponse chat(String systemPrompt,
             List<Map<String, String>> history,
             String userQuestion) {
         String url = String.format(GEMINI_BASE_URL,
@@ -50,26 +53,50 @@ public class GeminiApiService {
 
         List<Map<String, Object>> contents = buildContents(systemPrompt, history, userQuestion);
 
+        java.util.Map<String, Object> generationConfig = new java.util.HashMap<>();
+        generationConfig.put("maxOutputTokens", geminiConfig.getMaxTokens());
+        generationConfig.put("temperature", geminiConfig.getTemperature());
+
+        if ((systemPrompt != null && systemPrompt.toUpperCase().contains("JSON")) ||
+                (userQuestion != null && userQuestion.toUpperCase().contains("JSON"))) {
+            generationConfig.put("responseMimeType", "application/json");
+        }
+
         Map<String, Object> requestBody = Map.of(
                 "contents", contents,
-                "generationConfig", Map.of(
-                        "maxOutputTokens", geminiConfig.getMaxTokens(),
-                        "temperature", geminiConfig.getTemperature()));
+                "generationConfig", generationConfig);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        try {
-            ResponseEntity<Map> response = restTemplate.exchange(
-                    url, HttpMethod.POST,
-                    new HttpEntity<>(requestBody, headers),
-                    Map.class);
+        int maxRetries = 3;
+        int delayMs = 2000;
+        Exception lastException = null;
 
-            return parseResponse(response.getBody());
-        } catch (Exception e) {
-            log.error("Gemini API call failed: {}", e.getMessage());
-            throw new RuntimeException("AI service unavailable: " + e.getMessage());
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                log.info("Calling Gemini API (attempt {}/{} using model: {})...", i + 1, maxRetries, geminiConfig.getModel());
+                ResponseEntity<Map> response = restTemplate.exchange(
+                        url, HttpMethod.POST,
+                        new HttpEntity<>(requestBody, headers),
+                        Map.class);
+
+                return parseResponse(response.getBody());
+            } catch (Exception e) {
+                lastException = e;
+                log.warn("Gemini API call failed on attempt {} due to: {}. Retrying in {}ms...", i + 1, e.getMessage(), delayMs);
+                if (i < maxRetries - 1) {
+                    try {
+                        Thread.sleep(delayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("AI service interrupted: " + ie.getMessage());
+                    }
+                }
+            }
         }
+        log.error("All {} attempts to call Gemini API failed.", maxRetries);
+        throw new RuntimeException("AI service unavailable: " + (lastException != null ? lastException.getMessage() : "Unknown error"));
     }
 
     private List<Map<String, Object>> buildContents(
@@ -109,10 +136,17 @@ public class GeminiApiService {
     }
 
     @SuppressWarnings("unchecked")
-    private GeminiResponse parseResponse(Map<?, ?> body) {
+    private AiResponse parseResponse(Map<?, ?> body) {
         try {
             var candidates = (List<Map<?, ?>>) body.get("candidates");
-            var content = (Map<?, ?>) candidates.get(0).get("content");
+            if (candidates == null || candidates.isEmpty()) {
+                throw new IllegalArgumentException("No candidates returned from Gemini");
+            }
+            var firstCandidate = candidates.get(0);
+            String finishReason = (String) firstCandidate.get("finishReason");
+            log.info("Gemini candidate finishReason: {}", finishReason);
+
+            var content = (Map<?, ?>) firstCandidate.get("content");
             var parts = (List<Map<?, ?>>) content.get("parts");
             String text = (String) parts.get(0).get("text");
 
@@ -121,13 +155,10 @@ public class GeminiApiService {
                     ? ((Number) usageMeta.get("totalTokenCount")).intValue()
                     : 0;
 
-            return new GeminiResponse(text.trim(), geminiConfig.getModel(), totalTokens);
+            return new AiResponse(text.trim(), geminiConfig.getModel(), totalTokens);
         } catch (Exception e) {
             log.error("Failed to parse Gemini response: {}", e.getMessage());
-            throw new RuntimeException("Failed to parse AI response");
+            throw new RuntimeException("Failed to parse AI response: " + e.getMessage());
         }
-    }
-
-    public record GeminiResponse(String text, String model, int tokensUsed) {
     }
 }
