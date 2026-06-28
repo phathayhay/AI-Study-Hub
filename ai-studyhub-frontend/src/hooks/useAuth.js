@@ -30,6 +30,7 @@ export default function useAuth() {
               const updatedUser = {
                 ...u,
                 id: profile.id,
+                email: profile.email || u.email,
                 firstName: profile.firstName,
                 lastName: profile.lastName,
                 fullName: profile.fullName,
@@ -88,6 +89,10 @@ export default function useAuth() {
 
       if (!u.fullName && (u.firstName || u.lastName)) {
         u.fullName = `${u.lastName || ''} ${u.firstName || ''}`.trim()
+      }
+
+      if (u.campus && typeof u.campus !== 'string') {
+        u.campus = String(u.campus)
       }
 
       // Sync verificationStatus from login response to localStorage

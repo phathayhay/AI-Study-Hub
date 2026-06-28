@@ -5234,6 +5234,60 @@
   font-size: 24px;
 }
 
+/* Compact admin layout tuning */
+.admin-page {
+  width: min(1320px, calc(100% - 96px));
+  padding: 40px 0 72px;
+}
+
+.admin-page--dashboard {
+  width: min(920px, calc(100% - 96px));
+}
+
+.admin-stat-grid {
+  gap: 18px;
+}
+
+.admin-stat-card {
+  min-height: 118px;
+  padding: 18px;
+}
+
+.admin-stat-card strong {
+  font-size: 26px;
+}
+
+.admin-dashboard-panels {
+  grid-template-columns: minmax(360px, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.recent-users,
+.system-activity,
+.logs-card,
+.settings-card,
+.admin-table-card,
+.admin-course-card,
+.storage-bars {
+  padding: 22px;
+}
+
+.admin-chart-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 24px;
+}
+
+.admin-chart {
+  min-height: 260px;
+  padding: 22px;
+}
+
+.fake-chart {
+  height: 170px;
+}
+
 .admin-search,
 .admin-filter-input,
 .admin-search-row input,
@@ -7363,7 +7417,8 @@ select.admin-filter-input {
   font-size: 12px;
   font-weight: 700;
 }
-.admin-stat-grid,
+@media (max-width: 760px) {
+  .admin-stat-grid,
   .admin-dashboard-panels,
   .admin-chart-grid,
   .course-grid,
@@ -7371,3 +7426,4 @@ select.admin-filter-input {
   .admin-detail-grid {
     grid-template-columns: 1fr;
   }
+}

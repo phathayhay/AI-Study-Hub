@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import {
@@ -282,37 +282,62 @@ function AdminTopbar({ active }) {
 
 function AdminOverview({ onOpenUser }) {
   const [state, setState] = useState({ data: null, error: '', loading: true })
+  const isMountedRef = useRef(true)
 
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const response = await getAdminDashboardData()
-        if (cancelled) return
-        setState({
-          data: {
-            users: unwrapList(response.users),
-            documents: unwrapList(response.documents),
-            reports: unwrapList(response.reports),
-            verifications: unwrapList(response.verifications),
-            plans: unwrapList(response.plans),
-            majors: unwrapList(response.majors),
-            courses: unwrapList(response.courses),
-            categories: unwrapList(response.categories),
-            analytics: unwrapPayload(response.analytics),
-          },
-          error: '',
-          loading: false,
-        })
-      } catch (err) {
-        if (!cancelled) setState({ data: null, error: err.message || 'Unable to load dashboard', loading: false })
-      }
+  const loadDashboard = useCallback(async (showLoading = false) => {
+    if (showLoading) {
+      setState((current) => ({ ...current, error: '', loading: true }))
     }
-    load()
-    return () => {
-      cancelled = true
+    try {
+      const response = await getAdminDashboardData()
+      if (!isMountedRef.current) return
+      setState({
+        data: {
+          users: unwrapList(response.users),
+          documents: unwrapList(response.documents),
+          reports: unwrapList(response.reports),
+          verifications: unwrapList(response.verifications),
+          plans: unwrapList(response.plans),
+          majors: unwrapList(response.majors),
+          courses: unwrapList(response.courses),
+          categories: unwrapList(response.categories),
+          analytics: unwrapPayload(response.analytics),
+        },
+        error: '',
+        loading: false,
+      })
+    } catch (err) {
+      if (!isMountedRef.current) return
+      setState((current) => ({
+        data: current.data,
+        error: formatAdminError(err),
+        loading: false,
+      }))
     }
   }, [])
+
+  useEffect(() => {
+    isMountedRef.current = true
+
+    loadDashboard(true)
+    const refreshTimer = window.setInterval(() => {
+      loadDashboard(false)
+    }, 30000)
+    const handleVisibilityChange = () => {
+      if (window.document.visibilityState === 'visible') {
+        loadDashboard(false)
+      }
+    }
+    window.addEventListener('focus', handleVisibilityChange)
+    window.document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      isMountedRef.current = false
+      window.clearInterval(refreshTimer)
+      window.removeEventListener('focus', handleVisibilityChange)
+      window.document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [loadDashboard])
 
   const data = state.data || {}
   const users = data.users || []
