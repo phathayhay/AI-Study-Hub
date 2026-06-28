@@ -137,6 +137,10 @@ const matchesSearch = (query, values) => {
 const matchesStatus = (selected, status) => !selected || normalizeStatus(status) === selected
 const compareText = (left, right) => String(left || '').localeCompare(String(right || ''), 'vi', { sensitivity: 'base' })
 const formatTypeLabel = (value) => ADMIN_LOG_TYPES.find(([type]) => type === value)?.[1] || String(value || 'All')
+const readCourseMajors = (course = {}) => {
+  if (Array.isArray(course.majors) && course.majors.length > 0) return course.majors
+  return course.major ? [course.major] : []
+}
 const compareDate = (left, right) => {
   const leftTime = left ? new Date(left).getTime() : 0
   const rightTime = right ? new Date(right).getTime() : 0
@@ -574,6 +578,24 @@ function AdminDocuments() {
 
 function AdminCourses({ onEdit }) {
   const { data: courses, error, loading, reload } = useAdminList(getAdminCourses)
+  const [query, setQuery] = useState('')
+  const [majorFilter, setMajorFilter] = useState('')
+  const majorOptions = useMemo(() => {
+    return [...new Set(courses.flatMap((course) => readCourseMajors(course).map((major) => major?.majorCode)).filter(Boolean))].sort((left, right) => compareText(left, right))
+  }, [courses])
+  const visibleCourses = useMemo(() => {
+    return courses.filter((course) => {
+      const courseMajorCodes = readCourseMajors(course).map((major) => String(major?.majorCode || '').toUpperCase()).filter(Boolean)
+      const matchesMajor = !majorFilter || courseMajorCodes.includes(majorFilter.toUpperCase())
+      const matchesCourseSearch = matchesSearch(query, [
+        course.courseCode,
+        course.courseName,
+        course.description,
+        ...readCourseMajors(course).flatMap((major) => [major?.majorCode, major?.majorName]),
+      ])
+      return matchesMajor && matchesCourseSearch
+    })
+  }, [courses, majorFilter, query])
 
   return (
     <main className="admin-page">
@@ -584,12 +606,15 @@ function AdminCourses({ onEdit }) {
           </button>
         </AdminSectionHeader>
         <div className="admin-search-row">
-          <AdminSearch placeholder="Search subjects..." />
-          <input placeholder="Major" />
+          <AdminSearch onChange={setQuery} placeholder="Search subjects..." value={query} />
+          <select aria-label="Filter by major" className="admin-filter-input" onChange={(event) => setMajorFilter(event.target.value)} value={majorFilter}>
+            <option value="">All majors</option>
+            {majorOptions.map((majorCode) => <option key={majorCode} value={majorCode}>{majorCode}</option>)}
+          </select>
         </div>
         <AdminTableState error={error} loading={loading} />
         <div className="course-grid">
-          {courses.map((course) => (
+          {visibleCourses.map((course) => (
             <article className="course-card" key={course.id || course.courseCode}>
               <div>
                 <h3>{course.courseCode}</h3>
@@ -601,10 +626,20 @@ function AdminCourses({ onEdit }) {
                   <StudyHubIcon name="archive" size={16} />
                 </button>
               </div>
-              <div><Badge tone="purple">{course.isActive ? 'Active' : 'Inactive'}</Badge><Badge tone="blue">{course.major?.majorCode || 'Major'}</Badge></div>
+              <div>
+                <Badge tone="purple">{course.isActive ? 'Active' : 'Inactive'}</Badge>
+                {readCourseMajors(course).length > 0
+                  ? readCourseMajors(course).map((major) => (
+                    <Badge key={`${course.id || course.courseCode}-${major?.id || major?.majorCode}`} tone="blue">
+                      {major?.majorCode || 'Major'}
+                    </Badge>
+                  ))
+                  : <Badge tone="blue">Major</Badge>}
+              </div>
               <footer><span>{course.description || 'No description'}</span></footer>
             </article>
           ))}
+          {!loading && !error && visibleCourses.length === 0 && <p className="admin-empty">No matching subjects</p>}
         </div>
       </section>
     </main>
@@ -1230,17 +1265,19 @@ function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
   const edit = mode === 'edit'
   const majors = useAdminList(getAdminMajors)
   const hasMajors = majors.data.length > 0
+  const initialMajorIds = readCourseMajors(course).map((major) => String(major.id)).filter(Boolean)
   const [form, setForm] = useState(() => ({
     courseCode: course.courseCode || '',
     courseName: course.courseName || '',
     description: course.description || '',
-    majorId: course.major?.id || '',
+    majorIds: initialMajorIds,
     isActive: course.isActive ?? true,
   }))
 
   const submit = async (event) => {
     event.preventDefault()
-    const payload = { ...form, majorId: Number(form.majorId) }
+    const majorIds = form.majorIds.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+    const payload = { ...form, majorIds, majorId: majorIds[0] || null }
     await runAdminAction(
       () => (edit ? updateAdminCourse(course.id, payload) : createAdminCourse(payload)),
       onSaved,
@@ -1258,13 +1295,18 @@ function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
         <label>Course Name<input onChange={(e) => setForm({ ...form, courseName: e.target.value })} placeholder="e.g. Computer Architecture" required value={form.courseName} /></label>
         <label>Description<input onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Short description" value={form.description} /></label>
         <label>
-          Major
-          <select disabled={majors.loading || Boolean(majors.error) || !hasMajors} onChange={(e) => setForm({ ...form, majorId: e.target.value })} required value={form.majorId}>
-            <option value="">
-              {majors.loading ? 'Loading majors...' : majors.error ? 'Unable to load majors' : hasMajors ? 'Select major' : 'No majors available'}
-            </option>
+          Majors
+          <select
+            disabled={majors.loading || Boolean(majors.error) || !hasMajors}
+            multiple
+            onChange={(e) => setForm({ ...form, majorIds: Array.from(e.target.selectedOptions, (option) => option.value) })}
+            required
+            size={Math.min(Math.max(majors.data.length, 4), 8)}
+            value={form.majorIds}
+          >
             {majors.data.map((major) => <option key={major.id} value={major.id}>{major.majorCode} - {major.majorName}</option>)}
           </select>
+          {!majors.loading && !majors.error && hasMajors && <small className="admin-field-help">Hold Ctrl or Shift to choose multiple majors.</small>}
           {majors.error && <small className="admin-field-error">{majors.error}</small>}
           {!majors.loading && !majors.error && !hasMajors && <small className="admin-field-error">Please create a major in Settings first.</small>}
         </label>

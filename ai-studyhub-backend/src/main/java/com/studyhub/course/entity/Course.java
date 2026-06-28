@@ -3,6 +3,9 @@ package com.studyhub.course.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 @Entity
 @Table(name = "courses")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -24,6 +27,15 @@ public class Course {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "major_id")
     private Major major;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "course_majors",
+            joinColumns = @JoinColumn(name = "course_id"),
+            inverseJoinColumns = @JoinColumn(name = "major_id")
+    )
+    @Builder.Default
+    private Set<Major> majors = new LinkedHashSet<>();
 
     @Column(name = "is_active")
     @Builder.Default

@@ -139,15 +139,28 @@ function isSharedFoundationCourse(courseCode = '') {
   return SHARED_FOUNDATION_PREFIXES.some((prefix) => normalizedCourseCode.startsWith(prefix))
 }
 
+function getCourseMajorCodes(course, majorsList = []) {
+  const codesFromMajors = Array.isArray(course?.majors)
+    ? course.majors
+        .map((major) => resolveMajorCode(major?.majorCode || major?.majorName, majorsList))
+        .filter(Boolean)
+    : []
+
+  if (codesFromMajors.length > 0) {
+    return [...new Set(codesFromMajors)]
+  }
+
+  const fallbackCode = resolveMajorCode(course?.major?.majorCode || course?.major?.majorName, majorsList)
+  return fallbackCode ? [fallbackCode] : []
+}
+
 function isCourseEligibleForMajor(course, selectedMajor, majorsList = []) {
   const selectedMajorCode = resolveMajorCode(selectedMajor, majorsList)
   if (!selectedMajorCode || selectedMajorCode === 'ALL') return true
 
   if (isSharedFoundationCourse(course?.courseCode)) return true
 
-  const courseMajorCode = resolveMajorCode(course?.major?.majorCode || course?.major?.majorName, majorsList)
-  if (courseMajorCode === selectedMajorCode) return true
-  return false
+  return getCourseMajorCodes(course, majorsList).includes(selectedMajorCode)
 }
 
 function SkeletonCard() {
@@ -1732,21 +1745,26 @@ function DocumentSidebar({
       <hr className="border-slate-100 dark:border-slate-800 my-0" />
 
       {/* Document Rating */}
-      <div className="flex flex-col items-center gap-2">
-        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Your rating</span>
-        <div className="rating-row flex gap-1.5 cursor-pointer text-2xl text-amber-400">
+      <div className="document-rating-panel flex flex-col items-center gap-2">
+        <span className="document-rating-label text-xs font-semibold text-slate-500 dark:text-slate-400">Your rating</span>
+        <div className="rating-row flex gap-1.5 cursor-pointer text-2xl">
           {[1, 2, 3, 4, 5].map((star) => (
             <span
               key={star}
               onClick={() => onRate(star)}
               onMouseEnter={() => setHoverRating(star)}
               onMouseLeave={() => setHoverRating(0)}
-              className="transition-transform duration-100 hover:scale-110"
+              className={`rating-star transition-transform duration-100 hover:scale-110 ${
+                star <= (hoverRating || userRating || Math.round(doc.rating || doc.averageRating || 0)) ? 'is-active' : ''
+              }`}
             >
               {star <= (hoverRating || userRating || Math.round(doc.rating || doc.averageRating || 0)) ? '★' : '☆'}
             </span>
           ))}
         </div>
+        <span className="document-rating-hint text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+          Tap a star to rate this document
+        </span>
       </div>
     </aside>
   )

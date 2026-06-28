@@ -1,8 +1,9 @@
 package com.studyhub.admin.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -18,8 +19,9 @@ public class CourseRequest {
 
     private String description;
 
-    @NotNull(message = "Major ID cannot be null")
     private Long majorId;
+
+    private List<Long> majorIds;
 
     @Builder.Default
     private Boolean isActive = true;

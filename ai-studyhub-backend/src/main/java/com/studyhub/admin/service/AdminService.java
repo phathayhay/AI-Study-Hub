@@ -50,10 +50,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.stream.Collectors;
@@ -391,13 +393,14 @@ public class AdminService {
 
     @Transactional
     public Course createCourse(CourseRequest request) {
-        Major major = majorRepository.findById(request.getMajorId())
-                .orElseThrow(() -> new IllegalArgumentException("Major not found"));
+        List<Major> selectedMajors = resolveCourseMajors(request);
+        Major primaryMajor = selectedMajors.get(0);
         Course course = Course.builder()
                 .courseCode(request.getCourseCode().toUpperCase())
                 .courseName(request.getCourseName())
                 .description(request.getDescription())
-                .major(major)
+                .major(primaryMajor)
+                .majors(new LinkedHashSet<>(selectedMajors))
                 .isActive(request.getIsActive())
                 .build();
         return courseRepository.save(course);
@@ -407,14 +410,37 @@ public class AdminService {
     public Course updateCourse(Long id, CourseRequest request) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
-        Major major = majorRepository.findById(request.getMajorId())
-                .orElseThrow(() -> new IllegalArgumentException("Major not found"));
+        List<Major> selectedMajors = resolveCourseMajors(request);
 
         course.setCourseName(request.getCourseName());
         course.setDescription(request.getDescription());
-        course.setMajor(major);
+        course.setMajor(selectedMajors.get(0));
+        course.setMajors(new LinkedHashSet<>(selectedMajors));
         course.setIsActive(request.getIsActive());
         return courseRepository.save(course);
+    }
+
+    private List<Major> resolveCourseMajors(CourseRequest request) {
+        LinkedHashSet<Long> majorIds = new LinkedHashSet<>();
+        if (request.getMajorIds() != null) {
+            request.getMajorIds().stream()
+                    .filter(Objects::nonNull)
+                    .forEach(majorIds::add);
+        }
+        if (request.getMajorId() != null) {
+            majorIds.add(request.getMajorId());
+        }
+        if (majorIds.isEmpty()) {
+            throw new IllegalArgumentException("At least one major must be selected");
+        }
+
+        List<Major> selectedMajors = new ArrayList<>();
+        for (Long majorId : majorIds) {
+            Major major = majorRepository.findById(majorId)
+                    .orElseThrow(() -> new IllegalArgumentException("Major not found"));
+            selectedMajors.add(major);
+        }
+        return selectedMajors;
     }
 
     @Transactional

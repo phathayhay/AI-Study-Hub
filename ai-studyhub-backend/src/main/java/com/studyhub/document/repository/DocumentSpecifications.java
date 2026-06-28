@@ -41,7 +41,12 @@ public class DocumentSpecifications {
             if (majorId == null) {
                 return null;
             }
-            return cb.equal(root.join("course").join("major").get("id"), majorId);
+            query.distinct(true);
+            Join<Document, Course> courseJoin = root.join("course", JoinType.LEFT);
+            return cb.or(
+                    cb.equal(courseJoin.join("major", JoinType.LEFT).get("id"), majorId),
+                    cb.equal(courseJoin.join("majors", JoinType.LEFT).get("id"), majorId)
+            );
         };
     }
 
