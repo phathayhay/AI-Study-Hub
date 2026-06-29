@@ -4,7 +4,9 @@ import com.studyhub.common.ApiResponse;
 import com.studyhub.security.SecurityUtils;
 import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.dto.NotificationSummaryResponse;
+import com.studyhub.user.entity.StudentVerification;
 import com.studyhub.user.entity.User;
+import com.studyhub.user.repository.StudentVerificationRepository;
 import com.studyhub.user.repository.UserRepository;
 import com.studyhub.user.repository.UserSubscriptionRepository;
 import com.studyhub.user.service.NotificationService;
@@ -42,6 +44,7 @@ public class UserController {
     private final UserSubscriptionRepository userSubscriptionRepository;
     private final CloudinaryStorageService cloudinaryStorageService;
     private final StudentVerificationService studentVerificationService;
+    private final StudentVerificationRepository studentVerificationRepository;
     private final MajorRepository majorRepository;
     private final NotificationService notificationService;
 
@@ -169,6 +172,13 @@ public class UserController {
     }
 
     private UserProfileResponse buildUserProfileResponse(User user) {
+        StudentVerification verification = studentVerificationRepository.findByUserId(user.getId()).orElse(null);
+        boolean verificationRequestSubmitted = verification != null && verification.getImageUrl() != null && !verification.getImageUrl().isBlank();
+        com.studyhub.common.enums.VerificationStatus effectiveVerificationStatus = user.getVerificationStatus();
+        if (effectiveVerificationStatus == com.studyhub.common.enums.VerificationStatus.PENDING && !verificationRequestSubmitted) {
+            effectiveVerificationStatus = com.studyhub.common.enums.VerificationStatus.UNVERIFIED;
+        }
+
         LocalDateTime planExpiresAt = userSubscriptionRepository.findByUser_IdAndIsActiveTrue(user.getId()).stream()
                 .map(subscription -> subscription.getEndDate())
                 .filter(endDate -> endDate != null)
@@ -189,7 +199,9 @@ public class UserController {
                 .planExpiresAt(planExpiresAt)
                 .currentSemester(user.getCurrentSemester())
                 .status(user.getStatus())
-                .verificationStatus(user.getVerificationStatus())
+                .verificationStatus(effectiveVerificationStatus)
+                .verificationRequestSubmitted(verificationRequestSubmitted)
+                .verificationReviewNote(verification != null ? verification.getReviewNote() : null)
                 .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
                 .build();
     }

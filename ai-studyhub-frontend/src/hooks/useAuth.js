@@ -43,7 +43,9 @@ export default function useAuth() {
                 currentSemester: profile.currentSemester,
                 status: profile.status,
                 planName: profile.planName,
-                planExpiresAt: profile.planExpiresAt
+                planExpiresAt: profile.planExpiresAt,
+                verificationRequestSubmitted: profile.verificationRequestSubmitted,
+                verificationReviewNote: profile.verificationReviewNote,
               }
               if (profile.avatarUrl) {
                 localStorage.setItem(`avatarUrl_${profile.email}`, profile.avatarUrl)
@@ -52,7 +54,7 @@ export default function useAuth() {
               }
               // Also sync verificationStatus to localStorage for Settings modal
               if (profile.verificationStatus) {
-                const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified' }
+                const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
                 localStorage.setItem('verificationStatus', vsMap[profile.verificationStatus] || 'unverified')
               }
               localStorage.setItem('user', JSON.stringify(updatedUser))
@@ -97,7 +99,7 @@ export default function useAuth() {
 
       // Sync verificationStatus from login response to localStorage
       if (u.verificationStatus) {
-        const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified' }
+        const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
         localStorage.setItem('verificationStatus', vsMap[u.verificationStatus] || 'unverified')
       }
 

@@ -2,10 +2,12 @@ package com.studyhub;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import java.io.File;
 import java.nio.file.Files;
 
 @SpringBootApplication
+@EnableScheduling
 public class AiStudyHubApplication {
     public static void main(String[] args) {
         loadEnv();

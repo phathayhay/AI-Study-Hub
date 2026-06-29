@@ -68,12 +68,9 @@ public class AuthService {
         log.info("Registering user with email: {}", request.getEmail());
 
 
-        // 1. Determine Verification Status based on Email Domain
+        // 1. Student-card verification starts only after the user uploads an ID image.
         String email = request.getEmail().trim().toLowerCase();
-        VerificationStatus initialVerificationStatus = VerificationStatus.PENDING;
-        if (email.endsWith("@fpt.edu.vn") || email.endsWith("@fe.edu.vn")) {
-            initialVerificationStatus = VerificationStatus.APPROVED;
-        }
+        VerificationStatus initialVerificationStatus = VerificationStatus.UNVERIFIED;
 
         // 2. Validate Email Uniqueness
         if (userRepository.existsByEmail(email)) {

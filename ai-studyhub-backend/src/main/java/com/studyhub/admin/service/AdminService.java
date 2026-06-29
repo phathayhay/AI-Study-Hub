@@ -12,10 +12,12 @@ import com.studyhub.common.enums.NotificationType;
 import com.studyhub.common.enums.ReportStatus;
 import com.studyhub.common.enums.UserStatus;
 import com.studyhub.common.enums.VerificationStatus;
+import com.studyhub.course.dto.CourseListResponse;
 import com.studyhub.course.entity.Course;
 import com.studyhub.course.entity.Major;
 import com.studyhub.course.repository.CourseRepository;
 import com.studyhub.course.repository.MajorRepository;
+import com.studyhub.course.service.CourseService;
 import com.studyhub.document.entity.Document;
 import com.studyhub.document.entity.DocumentDownload;
 import com.studyhub.document.entity.DocumentView;
@@ -79,6 +81,7 @@ public class AdminService {
     private final DocumentViewRepository documentViewRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatSessionRepository chatSessionRepository;
+    private final CourseService courseService;
 
     private static final DateTimeFormatter DAY_LABEL_FORMATTER = DateTimeFormatter.ofPattern("dd/MM");
     private static final DateTimeFormatter HOUR_LABEL_FORMATTER = DateTimeFormatter.ofPattern("HH:00");
@@ -387,12 +390,14 @@ public class AdminService {
 
     // --- Courses CRUD
     @Transactional(readOnly = true)
-    public List<Course> getAllCourses() {
-        return courseRepository.findAll();
+    public List<CourseListResponse> getAllCourses() {
+        return courseRepository.findAll().stream()
+                .map(courseService::toCourseListResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
-    public Course createCourse(CourseRequest request) {
+    public CourseListResponse createCourse(CourseRequest request) {
         List<Major> selectedMajors = resolveCourseMajors(request);
         Major primaryMajor = selectedMajors.get(0);
         Course course = Course.builder()
@@ -403,11 +408,11 @@ public class AdminService {
                 .majors(new LinkedHashSet<>(selectedMajors))
                 .isActive(request.getIsActive())
                 .build();
-        return courseRepository.save(course);
+        return courseService.toCourseListResponse(courseRepository.save(course));
     }
 
     @Transactional
-    public Course updateCourse(Long id, CourseRequest request) {
+    public CourseListResponse updateCourse(Long id, CourseRequest request) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
         List<Major> selectedMajors = resolveCourseMajors(request);
@@ -417,7 +422,7 @@ public class AdminService {
         course.setMajor(selectedMajors.get(0));
         course.setMajors(new LinkedHashSet<>(selectedMajors));
         course.setIsActive(request.getIsActive());
-        return courseRepository.save(course);
+        return courseService.toCourseListResponse(courseRepository.save(course));
     }
 
     private List<Major> resolveCourseMajors(CourseRequest request) {

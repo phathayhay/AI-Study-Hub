@@ -1,7 +1,7 @@
 package com.studyhub.course.controller;
 
 import com.studyhub.common.ApiResponse;
-import com.studyhub.course.entity.Course;
+import com.studyhub.course.dto.CourseListResponse;
 import com.studyhub.course.dto.CourseResponse;
 import com.studyhub.course.service.CourseService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,7 +24,7 @@ public class CourseController {
 
     @GetMapping
     @Operation(summary = "List all courses config", description = "Retrieves all course configurations in the system. Accessible by non-admin users.")
-    public ResponseEntity<ApiResponse<List<Course>>> getAllCourses() {
+    public ResponseEntity<ApiResponse<List<CourseListResponse>>> getAllCourses() {
         return ResponseEntity.ok(ApiResponse.ok("Courses retrieved successfully", courseService.getAllCourses()));
     }
 

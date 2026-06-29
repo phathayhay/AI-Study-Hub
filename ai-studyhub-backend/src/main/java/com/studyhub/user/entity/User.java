@@ -65,7 +65,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "verification_status", nullable = false)
     @Builder.Default
-    private VerificationStatus verificationStatus = VerificationStatus.PENDING;
+    private VerificationStatus verificationStatus = VerificationStatus.UNVERIFIED;
 
     @Column(name = "verified_at")
     private LocalDateTime verifiedAt;

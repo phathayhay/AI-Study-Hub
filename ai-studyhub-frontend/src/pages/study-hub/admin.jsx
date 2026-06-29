@@ -936,7 +936,28 @@ function AdminSettings() {
         <AdminTableState error={verifications.error} loading={verifications.loading} />
         {verifications.data.map((item) => (
           <div className="setting-row" key={item.id}>
-            <p><strong>{item.fullName || item.userEmail || `Request #${item.id}`}</strong><small>{item.studentCode || item.reviewNote || 'Student verification'}</small></p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+              {item.imageUrl ? (
+                <a href={item.imageUrl} rel="noreferrer" target="_blank">
+                  <img
+                    alt={`Student ID ${item.userFullName || item.userEmail || item.id}`}
+                    src={item.imageUrl}
+                    style={{ width: '54px', height: '54px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #cbd5e1' }}
+                  />
+                </a>
+              ) : (
+                <div style={{ width: '54px', height: '54px', borderRadius: '10px', background: '#e2e8f0' }} />
+              )}
+              <p>
+                <strong>{item.userFullName || item.userEmail || `Request #${item.id}`}</strong>
+                <small>{item.reviewNote || 'Student verification request'}</small>
+                {item.imageUrl && (
+                  <a href={item.imageUrl} rel="noreferrer" style={{ display: 'inline-block', marginTop: '4px', color: '#2563eb', fontSize: '12px', fontWeight: 700 }} target="_blank">
+                    View student ID image
+                  </a>
+                )}
+              </p>
+            </div>
             <span className="admin-actions">
               <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'APPROVED', 'Approved by admin'), verifications.reload, 'Verification approved')} type="button"><StudyHubIcon name="check" size={16} /></button>
               <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'REJECTED', 'Rejected by admin'), verifications.reload, 'Verification rejected')} type="button"><StudyHubIcon name="x" size={16} /></button>
@@ -1297,16 +1318,17 @@ function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
         <label>
           Majors
           <select
+            className="admin-multi-select"
             disabled={majors.loading || Boolean(majors.error) || !hasMajors}
             multiple
             onChange={(e) => setForm({ ...form, majorIds: Array.from(e.target.selectedOptions, (option) => option.value) })}
             required
-            size={Math.min(Math.max(majors.data.length, 4), 8)}
+            size={Math.min(Math.max(majors.data.length, 8), 12)}
             value={form.majorIds}
           >
             {majors.data.map((major) => <option key={major.id} value={major.id}>{major.majorCode} - {major.majorName}</option>)}
           </select>
-          {!majors.loading && !majors.error && hasMajors && <small className="admin-field-help">Hold Ctrl or Shift to choose multiple majors.</small>}
+          {!majors.loading && !majors.error && hasMajors && <small className="admin-field-help">Hold Ctrl or Shift to choose multiple majors. You can also drag the bottom edge to expand this list.</small>}
           {majors.error && <small className="admin-field-error">{majors.error}</small>}
           {!majors.loading && !majors.error && !hasMajors && <small className="admin-field-error">Please create a major in Settings first.</small>}
         </label>

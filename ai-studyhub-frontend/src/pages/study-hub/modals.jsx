@@ -275,11 +275,21 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
   const [currentSemester, setCurrentSemester] = useState(user?.currentSemester || '')
   const [majorsList, setMajorsList] = useState([])
   const [verificationFile, setVerificationFile] = useState(null)
+  const verificationRequestSubmitted = Boolean(user?.verificationRequestSubmitted)
   const [verificationStatus, setVerificationStatus] = useState(() => {
-    const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified' }
+    const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
     const fromUser = user?.verificationStatus ? vsMap[user.verificationStatus] : null
     return fromUser || localStorage.getItem('verificationStatus') || 'unverified'
   })
+
+  useEffect(() => {
+    const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
+    const fromUser = user?.verificationStatus ? vsMap[user.verificationStatus] : null
+    if (fromUser) {
+      setVerificationStatus(fromUser)
+      localStorage.setItem('verificationStatus', fromUser)
+    }
+  }, [user?.verificationStatus])
 
   useEffect(() => {
     setFirstName(user?.firstName || '')
@@ -400,6 +410,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
       await verifyStudent(formData)
       setVerificationStatus('pending')
       localStorage.setItem('verificationStatus', 'pending')
+      onUserUpdate?.({ ...user, verificationStatus: 'PENDING', verificationRequestSubmitted: true, verificationReviewNote: null })
       setSuccessMsg('Verification request submitted successfully. Please wait for admin approval.')
       setVerificationFile(null)
     } catch (err) {
@@ -541,10 +552,14 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
                 {verificationStatus === 'verified' && <span className="settings-status-badge verified">Verified</span>}
                 {verificationStatus === 'pending' && <span className="settings-status-badge pending">Pending</span>}
                 {verificationStatus === 'unverified' && <span className="settings-status-badge unverified">Unverified</span>}
+                {verificationStatus === 'rejected' && <span className="settings-status-badge rejected">Rejected</span>}
               </div>
 
-              {verificationStatus === 'unverified' && (
+              {((verificationStatus === 'unverified') || verificationStatus === 'rejected' || (verificationStatus === 'pending' && !verificationRequestSubmitted)) && (
                 <form onSubmit={handleVerificationSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', fontSize: '13px', lineHeight: '19px' }} className="dark:bg-blue-950/20 dark:border-blue-900/50 dark:text-blue-300 transition-colors duration-300">
+                    Please upload a clear photo of your student ID card so the admin team can review it. Accounts that stay unverified for more than 3 days after registration may be banned automatically.
+                  </div>
                   <div className="settings-input-group">
                     <label className="text-slate-600 dark:text-slate-400">Upload Student ID Card image (Front) *</label>
                     <div className="avatar-upload-container bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300">
@@ -562,9 +577,17 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
                 </form>
               )}
 
-              {verificationStatus === 'pending' && (
+              {verificationStatus === 'pending' && verificationRequestSubmitted && (
                 <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', color: '#b45309', fontSize: '13px', lineHeight: '18px' }} className="dark:bg-amber-950/20 dark:border-amber-900/50 dark:text-amber-300 transition-colors duration-300">
                   Your verification request has been submitted successfully. Admin will review and approve your student ID card within the next 24-48 hours.
+                </div>
+              )}
+
+              {verificationStatus === 'rejected' && (
+                <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '13px', lineHeight: '18px' }} className="dark:bg-rose-950/20 dark:border-rose-900/50 dark:text-rose-300 transition-colors duration-300">
+                  {user?.verificationReviewNote
+                    ? `Your previous verification request was rejected. Admin note: ${user.verificationReviewNote}`
+                    : 'Your previous verification request was rejected. Please upload a clearer student ID image and submit again.'}
                 </div>
               )}
 

@@ -27,5 +27,7 @@ public class UserProfileResponse {
     private String currentSemester;
     private UserStatus status;
     private VerificationStatus verificationStatus;
+    private Boolean verificationRequestSubmitted;
+    private String verificationReviewNote;
     private String role;
 }
