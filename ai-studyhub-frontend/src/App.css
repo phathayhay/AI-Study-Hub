@@ -4695,6 +4695,43 @@ body.dark-theme .rating-star.is-active {
   color: #64748b;
 }
 
+.verification-row-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.verification-thumb-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.verification-thumb-image,
+.verification-thumb-placeholder {
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #e2e8f0;
+}
+
+.verification-link-button {
+  display: inline-block;
+  margin-top: 4px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+
 .setting-row--danger {
   color: #dc2626;
   background: #fef2f2;
@@ -5605,6 +5642,79 @@ body.dark-theme .rating-star.is-active {
   background: #ffffff;
   border-radius: 10px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+}
+
+.admin-verification-modal {
+  position: relative;
+  width: min(760px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  padding: 28px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+  display: grid;
+  gap: 18px;
+  overflow-y: auto;
+}
+
+.admin-verification-modal h2 {
+  margin: 0;
+}
+
+.admin-verification-meta strong,
+.admin-verification-meta small {
+  display: block;
+}
+
+.admin-verification-meta small {
+  margin-top: 4px;
+  color: #64748b;
+}
+
+.admin-verification-preview-image {
+  width: 100%;
+  max-height: 65vh;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid #dbe4ee;
+  background: #f8fafc;
+}
+
+.admin-verification-empty {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.admin-verification-modal footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-verification-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.admin-verification-actions button {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #ffffff;
+  background: #2563eb;
+}
+
+.admin-verification-actions button.danger {
+  background: #ef4444;
 }
 
 .admin-user-modal h2 {

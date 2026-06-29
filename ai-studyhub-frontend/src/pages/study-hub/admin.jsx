@@ -147,6 +147,16 @@ const compareDate = (left, right) => {
   return (Number.isNaN(leftTime) ? 0 : leftTime) - (Number.isNaN(rightTime) ? 0 : rightTime)
 }
 
+const getRenderableCloudinaryImage = (url) => {
+  const value = String(url || '').trim()
+  if (!value.includes('/image/upload/')) return value
+  if (value.includes('/image/upload/f_jpg,q_auto/')) return value
+  if (value.includes('/image/upload/f_auto,q_auto/')) {
+    return value.replace('/image/upload/f_auto,q_auto/', '/image/upload/f_jpg,q_auto/')
+  }
+  return value.replace('/image/upload/', '/image/upload/f_jpg,q_auto/')
+}
+
 function getStatusOptions(items, readStatus, defaults = []) {
   const options = new Set(defaults)
   items.forEach((item) => {
@@ -895,6 +905,7 @@ function AdminSettings() {
   const majors = useAdminList(getAdminMajors)
   const categories = useAdminList(getAdminCategories)
   const verifications = useAdminList(getPendingVerifications)
+  const [previewVerification, setPreviewVerification] = useState(null)
 
   return (
     <main className="admin-page settings-page">
@@ -934,37 +945,100 @@ function AdminSettings() {
       <section className="admin-card settings-card">
         <h2><StudyHubIcon name="lock" size={18} /> Pending Verifications</h2>
         <AdminTableState error={verifications.error} loading={verifications.loading} />
-        {verifications.data.map((item) => (
-          <div className="setting-row" key={item.id}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
-              {item.imageUrl ? (
-                <a href={item.imageUrl} rel="noreferrer" target="_blank">
-                  <img
-                    alt={`Student ID ${item.userFullName || item.userEmail || item.id}`}
-                    src={item.imageUrl}
-                    style={{ width: '54px', height: '54px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #cbd5e1' }}
-                  />
-                </a>
-              ) : (
-                <div style={{ width: '54px', height: '54px', borderRadius: '10px', background: '#e2e8f0' }} />
-              )}
-              <p>
-                <strong>{item.userFullName || item.userEmail || `Request #${item.id}`}</strong>
-                <small>{item.reviewNote || 'Student verification request'}</small>
-                {item.imageUrl && (
-                  <a href={item.imageUrl} rel="noreferrer" style={{ display: 'inline-block', marginTop: '4px', color: '#2563eb', fontSize: '12px', fontWeight: 700 }} target="_blank">
-                    View student ID image
-                  </a>
+        {verifications.data.map((item) => {
+          const imageUrl = getRenderableCloudinaryImage(item.imageUrl)
+          return (
+            <div className="setting-row" key={item.id}>
+              <div className="verification-row-content">
+                {imageUrl ? (
+                  <button
+                    className="verification-thumb-button"
+                    onClick={() => setPreviewVerification(item)}
+                    type="button"
+                  >
+                    <img
+                      alt={`Student ID ${item.userFullName || item.userEmail || item.id}`}
+                      className="verification-thumb-image"
+                      src={imageUrl}
+                    />
+                  </button>
+                ) : (
+                  <div className="verification-thumb-placeholder" />
                 )}
-              </p>
+                <p>
+                  <strong>{item.userFullName || item.userEmail || `Request #${item.id}`}</strong>
+                  <small>{item.reviewNote || 'Student verification request'}</small>
+                  {imageUrl && (
+                    <button
+                      className="verification-link-button"
+                      onClick={() => setPreviewVerification(item)}
+                      type="button"
+                    >
+                      View student ID image
+                    </button>
+                  )}
+                </p>
+              </div>
+              <span className="admin-actions">
+                <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'APPROVED', 'Approved by admin'), verifications.reload, 'Verification approved')} type="button"><StudyHubIcon name="check" size={16} /></button>
+                <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'REJECTED', 'Rejected by admin'), verifications.reload, 'Verification rejected')} type="button"><StudyHubIcon name="x" size={16} /></button>
+              </span>
             </div>
-            <span className="admin-actions">
-              <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'APPROVED', 'Approved by admin'), verifications.reload, 'Verification approved')} type="button"><StudyHubIcon name="check" size={16} /></button>
-              <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'REJECTED', 'Rejected by admin'), verifications.reload, 'Verification rejected')} type="button"><StudyHubIcon name="x" size={16} /></button>
-            </span>
-          </div>
-        ))}
+          )
+        })}
       </section>
+      {previewVerification && (
+        <div className="admin-modal-backdrop" onClick={() => setPreviewVerification(null)}>
+          <section className="admin-verification-modal" onClick={(event) => event.stopPropagation()}>
+            <button className="admin-modal-close" onClick={() => setPreviewVerification(null)} type="button">x</button>
+            <h2>Student ID Preview</h2>
+            <div className="admin-verification-meta">
+              <strong>{previewVerification.userFullName || previewVerification.userEmail || `Request #${previewVerification.id}`}</strong>
+              <small>{previewVerification.userEmail || 'Student verification request'}</small>
+            </div>
+            {getRenderableCloudinaryImage(previewVerification.imageUrl) ? (
+              <img
+                alt={`Student ID ${previewVerification.userFullName || previewVerification.userEmail || previewVerification.id}`}
+                className="admin-verification-preview-image"
+                src={getRenderableCloudinaryImage(previewVerification.imageUrl)}
+              />
+            ) : (
+              <div className="admin-verification-empty">No verification image available.</div>
+            )}
+            <footer>
+              <a
+                className="verification-link-button"
+                href={getRenderableCloudinaryImage(previewVerification.imageUrl)}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Open full image
+              </a>
+              <div className="admin-verification-actions">
+                <button
+                  onClick={() => {
+                    runAdminAction(() => reviewVerification(previewVerification.id, 'APPROVED', 'Approved by admin'), verifications.reload, 'Verification approved')
+                    setPreviewVerification(null)
+                  }}
+                  type="button"
+                >
+                  Approve
+                </button>
+                <button
+                  className="danger"
+                  onClick={() => {
+                    runAdminAction(() => reviewVerification(previewVerification.id, 'REJECTED', 'Rejected by admin'), verifications.reload, 'Verification rejected')
+                    setPreviewVerification(null)
+                  }}
+                  type="button"
+                >
+                  Reject
+                </button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      )}
     </main>
   )
 }
