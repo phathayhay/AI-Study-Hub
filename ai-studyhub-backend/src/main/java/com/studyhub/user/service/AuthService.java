@@ -1,6 +1,7 @@
 package com.studyhub.user.service;
 
 import com.studyhub.common.enums.Campus;
+import com.studyhub.common.enums.NotificationType;
 import com.studyhub.common.enums.UserStatus;
 import com.studyhub.common.enums.VerificationStatus;
 import com.studyhub.course.entity.Major;
@@ -55,6 +56,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
+    private final NotificationService notificationService;
 
     @org.springframework.beans.factory.annotation.Value("${app.frontend-url}")
     private String frontendUrl;
@@ -67,10 +69,10 @@ public class AuthService {
     public void register(RegisterRequest request) {
         log.info("Registering user with email: {}", request.getEmail());
 
-
-        // 1. Student-card verification starts only after the user uploads an ID image.
         String email = request.getEmail().trim().toLowerCase();
-        VerificationStatus initialVerificationStatus = VerificationStatus.UNVERIFIED;
+        VerificationStatus initialVerificationStatus = isFptEmail(email)
+                ? VerificationStatus.APPROVED
+                : VerificationStatus.UNVERIFIED;
 
         // 2. Validate Email Uniqueness
         if (userRepository.existsByEmail(email)) {
@@ -340,6 +342,16 @@ public class AuthService {
         user.setStatus(UserStatus.ACTIVE);
         user.setVerifiedAt(LocalDateTime.now());
         userRepository.save(user);
+
+        if (user.getVerificationStatus() == VerificationStatus.UNVERIFIED) {
+            notificationService.createNotification(
+                    user,
+                    "Student verification required",
+                    "Your account must be verified within 3 days. Please upload your student ID card, otherwise your account will be banned automatically.",
+                    NotificationType.SYSTEM
+            );
+        }
+
         log.info("User {} successfully activated", email);
     }
 
@@ -364,5 +376,10 @@ public class AuthService {
         String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
         String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
         emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
+    }
+
+    private boolean isFptEmail(String email) {
+        String normalizedEmail = email == null ? "" : email.trim().toLowerCase();
+        return normalizedEmail.endsWith("@fpt.edu.vn") || normalizedEmail.endsWith("@fe.edu.vn");
     }
 }
