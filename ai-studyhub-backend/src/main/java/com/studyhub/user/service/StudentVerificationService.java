@@ -1,5 +1,6 @@
 package com.studyhub.user.service;
 
+import com.studyhub.common.enums.UserStatus;
 import com.studyhub.common.enums.VerificationStatus;
 import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.entity.StudentVerification;
@@ -23,61 +24,54 @@ public class StudentVerificationService {
     private final UserRepository userRepository;
     private final CloudinaryStorageService cloudinaryStorageService;
 
-    /**
-     * Tải lên ảnh thẻ sinh viên để gửi yêu cầu xác thực.
-     * Nếu đã có yêu cầu bị từ chối hoặc đang chờ duyệt trước đó, sẽ ghi đè và cập nhật lại trạng thái thành PENDING.
-     */
     @Transactional
     public void uploadVerificationCard(MultipartFile file, String email) throws IOException {
         log.info("Processing student verification upload for user: {}", email);
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy người dùng với email đã cung cấp"));
+                .orElseThrow(() -> new IllegalArgumentException("User not found for the provided email"));
+
+        if (user.getStatus() == UserStatus.BANNED) {
+            throw new IllegalStateException("This account has been banned and can no longer submit student verification.");
+        }
 
         if (user.getVerificationStatus() == VerificationStatus.APPROVED) {
-            throw new IllegalStateException("Tài khoản sinh viên của bạn đã được xác thực trước đó.");
+            throw new IllegalStateException("Your student account has already been verified.");
         }
 
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("File tải lên không được để trống");
+            throw new IllegalArgumentException("Uploaded file cannot be empty");
         }
 
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            throw new IllegalArgumentException("Chỉ chấp nhận các file định dạng hình ảnh");
+            throw new IllegalArgumentException("Only image files are accepted for student verification");
         }
 
-        // Tìm xem đã có bản ghi xác thực nào trước đây chưa
         StudentVerification verification = studentVerificationRepository.findByUserId(user.getId())
                 .orElse(null);
 
         if (verification != null) {
-            // Nếu có ảnh cũ, xóa đi để tránh rác trên Cloudinary
             String oldImageUrl = verification.getImageUrl();
-            if (oldImageUrl != null && !oldImageUrl.isEmpty()) {
+            if (oldImageUrl != null && !oldImageUrl.isBlank()) {
                 log.info("Deleting old verification image: {}", oldImageUrl);
                 cloudinaryStorageService.deleteFile(oldImageUrl);
             }
         } else {
-            // Tạo mới nếu chưa từng gửi yêu cầu
             verification = StudentVerification.builder()
                     .user(user)
                     .build();
         }
 
-        // Tải ảnh mới lên Cloudinary
         String newImageUrl = cloudinaryStorageService.uploadFile(file, "student_verifications");
 
-        // Cập nhật thông tin yêu cầu xác thực
         verification.setImageUrl(newImageUrl);
         verification.setStatus(VerificationStatus.PENDING);
         verification.setReviewNote(null);
         verification.setReviewedBy(null);
         verification.setReviewedAt(null);
-
         studentVerificationRepository.save(verification);
 
-        // Cập nhật trạng thái xác thực của User
         user.setVerificationStatus(VerificationStatus.PENDING);
         userRepository.save(user);
 

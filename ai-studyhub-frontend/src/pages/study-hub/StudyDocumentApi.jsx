@@ -1164,21 +1164,21 @@ function QuizViewer({ onBack, quiz }) {
     : []
 
   const encouragements = [
-    "Đừng lo, bạn vẫn đang học mà!",
-    "Không sao cả, vấp ngã là mẹ thành công!",
-    "Hãy cố gắng ở câu tiếp theo nhé, bạn làm được mà!",
-    "Sai một lần là thêm một lần nhớ, cố lên nào!",
-    "Cứ tự tin lên, việc học là cả một hành trình!",
-    "Không sao đâu, bạn đang tiến bộ lên mỗi ngày đó!"
+    "Don't worry, you're still learning!",
+    "That's okay, mistakes help you grow!",
+    "Keep going, you can get the next one!",
+    "One wrong answer means one more thing to remember. Keep it up!",
+    "Stay confident, learning is a journey!",
+    "No worries, you're making progress every day!"
   ]
 
   const correctEncouragements = [
-    "Xuất sắc! Bạn đã làm rất tốt.",
-    "Chính xác! Tặng bạn một bông hoa 🌸",
-    "Tuyệt vời! Hãy tiếp tục phát huy nhé!",
-    "Quá chuẩn! Bạn học bài rất kỹ đấy.",
-    "Đúng rồi! Bạn thật thông minh.",
-    "Chuẩn không cần chỉnh! Cố lên nhé!"
+    "Excellent work! You did really well.",
+    "Correct! Great job on that one.",
+    "Awesome! Keep up the great work!",
+    "Nicely done! You studied this carefully.",
+    "That's right! You're doing great.",
+    "Spot on! Keep the momentum going!"
   ]
   const total = questions.length
   // Pagination: show 7 at a time
@@ -1295,12 +1295,12 @@ function QuizViewer({ onBack, quiz }) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <h3 className="text-slate-800 dark:text-slate-100" style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>
-              {scorePercent >= 80 ? "Xuất sắc! Bạn làm rất tốt. 🎉" :
-               scorePercent >= 50 ? "Khá tốt! Tiếp tục phát huy nhé. 👍" :
-               "Cố gắng thêm chút nữa ở lần sau nhé! 💪"}
+              {scorePercent >= 80 ? "Excellent! You did a great job." :
+               scorePercent >= 50 ? "Nice work! Keep it going." :
+               "Keep practicing and you'll do even better next time."}
             </h3>
             <p className="text-slate-500 dark:text-slate-400" style={{ fontSize: '14px', margin: 0, fontWeight: 500 }}>
-              Bạn đã trả lời đúng <strong>{correctCount}</strong> trên tổng số <strong>{total}</strong> câu hỏi.
+              You answered <strong>{correctCount}</strong> out of <strong>{total}</strong> questions correctly.
             </p>
           </div>
 
@@ -1309,14 +1309,14 @@ function QuizViewer({ onBack, quiz }) {
             <div className="quiz-stat-box is-correct">
               <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                Chính xác
+                Correct
               </span>
               <strong style={{ fontSize: '20px', color: '#047857', marginTop: '4px' }} className="dark:text-emerald-400">{correctCount} / {total}</strong>
             </div>
             <div className="quiz-stat-box is-incorrect">
               <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                Sai / Bỏ qua
+                Wrong / Skipped
               </span>
               <strong style={{ fontSize: '20px', color: '#b91c1c', marginTop: '4px' }} className="dark:text-rose-400">{total - correctCount} / {total}</strong>
             </div>
@@ -1555,7 +1555,7 @@ function QuizViewer({ onBack, quiz }) {
                   </strong>
                 </div>
                 <div style={{ fontSize: '13px', fontWeight: 500 }} className="text-teal-700 dark:text-teal-400">
-                  Hãy tiếp tục phát huy nhé!
+                  Keep up the great work!
                 </div>
               </div>
             ) : (

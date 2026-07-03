@@ -113,6 +113,8 @@ export function LibraryPage({
   })
   const [moveItem, setMoveItem] = useState(null)
   const [shareItem, setShareItem] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [pendingRenameItem, setPendingRenameItem] = useState(null)
 
   const loadLibraryData = () => {
     setLoading(true)
@@ -284,30 +286,21 @@ export function LibraryPage({
 
   const handleRenameItem = (item) => {
     const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
-    const nextName = window.prompt(`Enter new ${isFolder ? 'folder' : 'document'} name:`, item.name)?.trim()
-    if (!nextName) return
 
-    if (isFolder) {
-      setLoading(true)
-      renameFolder(item.id, nextName)
-        .then(() => {
-          loadLibraryData()
-          if (selectedFolder && selectedFolder.id === item.id) {
-            setSelectedFolder({ ...selectedFolder, name: nextName })
-          }
-          window.showToast?.('Folder renamed successfully', 'success')
-        })
-        .catch((err) => {
-          console.error(err)
-          setLoading(false)
-          window.showToast?.('Failed to rename folder', 'error')
-        })
-    } else {
+    setPendingRenameItem({ ...item, isFolder })
+    setOpenFileMenuId(null)
+    setOpenFolderMenuId(null)
+  }
+
+  const handleConfirmRenameItem = (nextName) => {
+    if (!pendingRenameItem?.id || !nextName) return
+
+    if (!pendingRenameItem.isFolder) {
       try {
         const localRenames = JSON.parse(localStorage.getItem('renamedDocs') || '{}')
-        localRenames[item.id] = nextName
+        localRenames[pendingRenameItem.id] = nextName
         localStorage.setItem('renamedDocs', JSON.stringify(localRenames))
-        
+
         loadLibraryData()
         if (selectedFolder) {
           handleSelectFolder(selectedFolder)
@@ -316,14 +309,39 @@ export function LibraryPage({
       } catch (err) {
         console.error('Failed to rename document locally', err)
         window.showToast?.('Failed to rename document', 'error')
+      } finally {
+        setPendingRenameItem(null)
       }
+      return
     }
-    setOpenFileMenuId(null)
-    setOpenFolderMenuId(null)
+
+    setLoading(true)
+    renameFolder(pendingRenameItem.id, nextName)
+      .then(() => {
+        loadLibraryData()
+        if (selectedFolder && selectedFolder.id === pendingRenameItem.id) {
+          setSelectedFolder({ ...selectedFolder, name: nextName })
+        }
+        if (selectedFolderDetails && selectedFolderDetails.id === pendingRenameItem.id) {
+          setSelectedFolderDetails({
+            ...selectedFolderDetails,
+            name: nextName,
+            folderName: nextName
+          })
+        }
+        window.showToast?.('Folder renamed successfully', 'success')
+      })
+      .catch((err) => {
+        console.error(err)
+        window.showToast?.('Failed to rename folder', 'error')
+      })
+      .finally(() => {
+        setLoading(false)
+        setPendingRenameItem(null)
+      })
   }
 
   const handleDeleteFolder = (folder) => {
-    if (!window.confirm(`Are you sure you want to delete the folder "${folder.name}"?`)) return
     setLoading(true)
     deleteFolder(folder.id)
       .then(() => {
@@ -337,19 +355,19 @@ export function LibraryPage({
       })
       .catch((err) => {
         console.error(err)
-        setLoading(false)
         window.showToast?.('Failed to delete folder', 'error')
       })
-    setOpenFolderMenuId(null)
+      .finally(() => {
+        setLoading(false)
+        setPendingDelete(null)
+      })
   }
 
   const handleDeleteLibraryFile = (file) => {
-    setOpenFileMenuId(null)
     if (!file.id) {
       window.showToast?.('Cannot delete: document ID is missing', 'error')
       return
     }
-    if (!window.confirm(`Are you sure you want to delete the document "${file.name}"?`)) return
     setLoading(true)
     deleteDocument(file.id)
       .then(() => {
@@ -362,19 +380,20 @@ export function LibraryPage({
       })
       .catch((err) => {
         console.error('[Delete Document Error]', err)
-        setLoading(false)
         const msg = err?.data?.message || err?.message || 'Failed to delete document'
         window.showToast?.(`${msg}`, 'error')
+      })
+      .finally(() => {
+        setLoading(false)
+        setPendingDelete(null)
       })
   }
 
   const handleDeleteFolderFile = (folder, file) => {
-    setOpenFileMenuId(null)
     if (!file.id) {
       window.showToast?.('Cannot delete: document ID is missing', 'error')
       return
     }
-    if (!window.confirm(`Are you sure you want to delete the document "${file.name}"?`)) return
     setLoading(true)
     deleteDocument(file.id)
       .then(() => {
@@ -385,23 +404,40 @@ export function LibraryPage({
       })
       .catch((err) => {
         console.error('[Delete Document Error]', err)
-        setLoading(false)
         const msg = err?.data?.message || err?.message || 'Failed to delete document'
         window.showToast?.(`${msg}`, 'error')
+      })
+      .finally(() => {
+        setLoading(false)
+        setPendingDelete(null)
       })
   }
 
   const handleDeleteItem = (item) => {
+    setOpenFileMenuId(null)
+    setOpenFolderMenuId(null)
     const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
-    if (isFolder) {
-      handleDeleteFolder(item)
-    } else {
-      if (selectedFolder) {
-        handleDeleteFolderFile(selectedFolder, item)
-      } else {
-        handleDeleteLibraryFile(item)
-      }
+    setPendingDelete({
+      item,
+      isFolder,
+      parentFolder: !isFolder && selectedFolder ? selectedFolder : null
+    })
+  }
+
+  const handleConfirmDelete = () => {
+    if (!pendingDelete?.item) return
+
+    if (pendingDelete.isFolder) {
+      handleDeleteFolder(pendingDelete.item)
+      return
     }
+
+    if (pendingDelete.parentFolder) {
+      handleDeleteFolderFile(pendingDelete.parentFolder, pendingDelete.item)
+      return
+    }
+
+    handleDeleteLibraryFile(pendingDelete.item)
   }
 
   const handleToggleFolderPublish = (folder) => {
@@ -812,6 +848,127 @@ export function LibraryPage({
           }
         }}
       />
+      <DeleteConfirmModal
+        isOpen={!!pendingDelete}
+        loading={loading}
+        item={pendingDelete?.item}
+        isFolder={pendingDelete?.isFolder}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={handleConfirmDelete}
+      />
+      <RenameItemModal
+        isOpen={!!pendingRenameItem}
+        loading={loading}
+        item={pendingRenameItem}
+        onClose={() => setPendingRenameItem(null)}
+        onConfirm={handleConfirmRenameItem}
+      />
+    </div>
+  )
+}
+
+function DeleteConfirmModal({
+  isOpen,
+  loading,
+  item,
+  isFolder,
+  onClose,
+  onConfirm
+}) {
+  if (!isOpen || !item) return null
+
+  const itemName = item.name || (isFolder ? 'Untitled Folder' : 'Untitled Document')
+
+  return (
+    <div className="modal-backdrop">
+      <section className="report-modal delete-confirm-modal">
+        <header>
+          <h2>
+            <StudyHubIcon name="trash" size={18} /> Delete {isFolder ? 'Folder' : 'Document'}
+          </h2>
+          <button onClick={onClose} type="button" aria-label="Close delete dialog">×</button>
+        </header>
+        <div className="report-doc delete-confirm-modal__body">
+          <strong>{itemName}</strong>
+          <p>
+            {isFolder
+              ? 'This will remove the folder from your library. Please make sure you no longer need the contents inside it.'
+              : 'This will permanently remove the document from your library and AI study workspace.'}
+          </p>
+        </div>
+        <div className="warning-box">
+          This action cannot be undone.
+        </div>
+        <footer>
+          <button onClick={onClose} disabled={loading} type="button">Cancel</button>
+          <button className="danger-button" onClick={onConfirm} disabled={loading} type="button">
+            {loading ? 'Deleting...' : 'Delete'}
+          </button>
+        </footer>
+      </section>
+    </div>
+  )
+}
+
+function RenameItemModal({
+  isOpen,
+  loading,
+  item,
+  onClose,
+  onConfirm
+}) {
+  const [name, setName] = useState(item?.name || '')
+
+  useEffect(() => {
+    setName(item?.name || '')
+  }, [item])
+
+  if (!isOpen || !item) return null
+
+  const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
+
+  const handleSubmit = () => {
+    const trimmedName = name.trim()
+    if (!trimmedName) {
+      window.showToast?.(`${isFolder ? 'Folder' : 'Document'} name cannot be empty`, 'error')
+      return
+    }
+    onConfirm(trimmedName)
+  }
+
+  return (
+    <div className="modal-backdrop">
+      <section className="report-modal rename-folder-modal">
+        <header>
+          <h2>
+            <StudyHubIcon name="edit" size={18} /> Rename {isFolder ? 'Folder' : 'Document'}
+          </h2>
+          <button onClick={onClose} type="button" aria-label="Close rename dialog">×</button>
+        </header>
+        <label className="rename-folder-modal__label">
+          {isFolder ? 'Folder name' : 'Document name'}
+          <input
+            autoFocus
+            value={name}
+            maxLength={100}
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                handleSubmit()
+              }
+            }}
+            type="text"
+            placeholder={`Enter ${isFolder ? 'folder' : 'document'} name`}
+          />
+        </label>
+        <footer>
+          <button onClick={onClose} disabled={loading} type="button">Cancel</button>
+          <button onClick={handleSubmit} disabled={loading} type="button">
+            {loading ? 'Saving...' : 'Save changes'}
+          </button>
+        </footer>
+      </section>
     </div>
   )
 }

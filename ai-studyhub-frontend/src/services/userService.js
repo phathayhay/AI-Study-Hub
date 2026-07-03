@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from './api'
+import { apiGet, apiPost, apiPut, uploadFileWithProgress } from './api'
 
 /**
  * Get current user profile

@@ -95,10 +95,11 @@ CREATE TABLE users (
     ) DEFAULT 'ACTIVE',
     
     verification_status ENUM(
+    'UNVERIFIED',
     'PENDING',
     'APPROVED',
     'REJECTED'
-	) DEFAULT 'PENDING',
+	) DEFAULT 'UNVERIFIED',
 
 	verified_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -176,6 +177,7 @@ CREATE TABLE student_verifications (
     user_id BIGINT NOT NULL UNIQUE,
     image_url VARCHAR(500) NOT NULL,
     status ENUM(
+        'UNVERIFIED',
         'PENDING',
         'APPROVED',
         'REJECTED'

@@ -139,15 +139,28 @@ function isSharedFoundationCourse(courseCode = '') {
   return SHARED_FOUNDATION_PREFIXES.some((prefix) => normalizedCourseCode.startsWith(prefix))
 }
 
+function getCourseMajorCodes(course, majorsList = []) {
+  const codesFromMajors = Array.isArray(course?.majors)
+    ? course.majors
+        .map((major) => resolveMajorCode(major?.majorCode || major?.majorName, majorsList))
+        .filter(Boolean)
+    : []
+
+  if (codesFromMajors.length > 0) {
+    return [...new Set(codesFromMajors)]
+  }
+
+  const fallbackCode = resolveMajorCode(course?.major?.majorCode || course?.major?.majorName, majorsList)
+  return fallbackCode ? [fallbackCode] : []
+}
+
 function isCourseEligibleForMajor(course, selectedMajor, majorsList = []) {
   const selectedMajorCode = resolveMajorCode(selectedMajor, majorsList)
   if (!selectedMajorCode || selectedMajorCode === 'ALL') return true
 
   if (isSharedFoundationCourse(course?.courseCode)) return true
 
-  const courseMajorCode = resolveMajorCode(course?.major?.majorCode || course?.major?.majorName, majorsList)
-  if (courseMajorCode === selectedMajorCode) return true
-  return false
+  return getCourseMajorCodes(course, majorsList).includes(selectedMajorCode)
 }
 
 function SkeletonCard() {
@@ -785,7 +798,7 @@ const UPLOAD_CATEGORY_MAP = {
   'Project': 5
 }
 
-export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate }) {
+export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate, defaultFolderId = null }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
   const [readStatus, setReadStatus] = useState('')
@@ -911,7 +924,8 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
         visibility,
         tags,
         courseId,
-        categoryId
+        categoryId,
+        folderId: defaultFolderId || undefined
       })
       const doc = res?.data || res
       setUploadSuccess(true)
@@ -921,11 +935,13 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
         if (onStudyFileUploaded) {
           onStudyFileUploaded({
             id: doc?.id || doc?.documentId,
+            documentId: doc?.id || doc?.documentId,
             name: title,
             attachmentName: selectedUploadFile.name,
             content: '',
             fileUrl: doc?.fileUrl || '',
             visibility: doc?.visibility || visibility || 'PRIVATE',
+            folderId: doc?.folderId ?? defaultFolderId ?? null,
           })
         }
         if (onNavigate) onNavigate('study')
@@ -1362,7 +1378,7 @@ function DocumentViewer({ doc, onBack }) {
     <section className="bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-5 transition-colors duration-300 ease-in-out">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap gap-2">
-          <Badge tone="blue">{doc.code || doc.id?.toString().slice(-6)}</Badge>
+          {doc.code ? <Badge tone="blue">{doc.code}</Badge> : null}
           <Badge>{doc.fileType || doc.type}</Badge>
         </div>
         <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white leading-tight tracking-tight mt-1">
@@ -1732,21 +1748,26 @@ function DocumentSidebar({
       <hr className="border-slate-100 dark:border-slate-800 my-0" />
 
       {/* Document Rating */}
-      <div className="flex flex-col items-center gap-2">
-        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Your rating</span>
-        <div className="rating-row flex gap-1.5 cursor-pointer text-2xl text-amber-400">
+      <div className="document-rating-panel flex flex-col items-center gap-2">
+        <span className="document-rating-label text-xs font-semibold text-slate-500 dark:text-slate-400">Your rating</span>
+        <div className="rating-row flex gap-1.5 cursor-pointer text-2xl">
           {[1, 2, 3, 4, 5].map((star) => (
             <span
               key={star}
               onClick={() => onRate(star)}
               onMouseEnter={() => setHoverRating(star)}
               onMouseLeave={() => setHoverRating(0)}
-              className="transition-transform duration-100 hover:scale-110"
+              className={`rating-star transition-transform duration-100 hover:scale-110 ${
+                star <= (hoverRating || userRating || Math.round(doc.rating || doc.averageRating || 0)) ? 'is-active' : ''
+              }`}
             >
               {star <= (hoverRating || userRating || Math.round(doc.rating || doc.averageRating || 0)) ? '★' : '☆'}
             </span>
           ))}
         </div>
+        <span className="document-rating-hint text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+          Tap a star to rate this document
+        </span>
       </div>
     </aside>
   )

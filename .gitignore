@@ -23,6 +23,7 @@ ai-studyhub-backend/src/main/resources/firebase-service-account.json
 .DS_Store
 
 **/run-project.ps1
+start_backend.ps1
 
 # Maven
 .mvn/wrapper/maven-wrapper.jar

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import {
@@ -13,6 +13,7 @@ import {
   getAdminActivityLogs,
   getAdminCourses,
   getAdminDashboardData,
+  getAdminReportDetail,
   getAdminDocuments,
   getAdminMajors,
   getAdminPlans,
@@ -134,10 +135,24 @@ const matchesSearch = (query, values) => {
 const matchesStatus = (selected, status) => !selected || normalizeStatus(status) === selected
 const compareText = (left, right) => String(left || '').localeCompare(String(right || ''), 'vi', { sensitivity: 'base' })
 const formatTypeLabel = (value) => ADMIN_LOG_TYPES.find(([type]) => type === value)?.[1] || String(value || 'All')
+const readCourseMajors = (course = {}) => {
+  if (Array.isArray(course.majors) && course.majors.length > 0) return course.majors
+  return course.major ? [course.major] : []
+}
 const compareDate = (left, right) => {
   const leftTime = left ? new Date(left).getTime() : 0
   const rightTime = right ? new Date(right).getTime() : 0
   return (Number.isNaN(leftTime) ? 0 : leftTime) - (Number.isNaN(rightTime) ? 0 : rightTime)
+}
+
+const getRenderableCloudinaryImage = (url) => {
+  const value = String(url || '').trim()
+  if (!value.includes('/image/upload/')) return value
+  if (value.includes('/image/upload/f_jpg,q_auto/')) return value
+  if (value.includes('/image/upload/f_auto,q_auto/')) {
+    return value.replace('/image/upload/f_auto,q_auto/', '/image/upload/f_jpg,q_auto/')
+  }
+  return value.replace('/image/upload/', '/image/upload/f_jpg,q_auto/')
 }
 
 function getStatusOptions(items, readStatus, defaults = []) {
@@ -201,7 +216,7 @@ export function AdminApp({ route, onNavigate, onLogout }) {
       {route === 'admin-documents' && <AdminDocuments />}
       {route === 'admin-courses' && <AdminCourses onEdit={setCourseModal} />}
       {route === 'admin-storage' && <AdminStorage />}
-      {route === 'admin-reports' && <AdminReports />}
+      {route === 'admin-reports' && <AdminReports onNavigate={onNavigate} />}
       {route === 'admin-logs' && <AdminLogs />}
       {route === 'admin-settings' && <AdminSettings />}
       {userModal && <AdminUserModal user={userModal} onClose={() => setUserModal(null)} />}
@@ -279,37 +294,62 @@ function AdminTopbar({ active }) {
 
 function AdminOverview({ onOpenUser }) {
   const [state, setState] = useState({ data: null, error: '', loading: true })
+  const isMountedRef = useRef(true)
 
-  useEffect(() => {
-    let cancelled = false
-    async function load() {
-      try {
-        const response = await getAdminDashboardData()
-        if (cancelled) return
-        setState({
-          data: {
-            users: unwrapList(response.users),
-            documents: unwrapList(response.documents),
-            reports: unwrapList(response.reports),
-            verifications: unwrapList(response.verifications),
-            plans: unwrapList(response.plans),
-            majors: unwrapList(response.majors),
-            courses: unwrapList(response.courses),
-            categories: unwrapList(response.categories),
-            analytics: unwrapPayload(response.analytics),
-          },
-          error: '',
-          loading: false,
-        })
-      } catch (err) {
-        if (!cancelled) setState({ data: null, error: err.message || 'Unable to load dashboard', loading: false })
-      }
+  const loadDashboard = useCallback(async (showLoading = false) => {
+    if (showLoading) {
+      setState((current) => ({ ...current, error: '', loading: true }))
     }
-    load()
-    return () => {
-      cancelled = true
+    try {
+      const response = await getAdminDashboardData()
+      if (!isMountedRef.current) return
+      setState({
+        data: {
+          users: unwrapList(response.users),
+          documents: unwrapList(response.documents),
+          reports: unwrapList(response.reports),
+          verifications: unwrapList(response.verifications),
+          plans: unwrapList(response.plans),
+          majors: unwrapList(response.majors),
+          courses: unwrapList(response.courses),
+          categories: unwrapList(response.categories),
+          analytics: unwrapPayload(response.analytics),
+        },
+        error: '',
+        loading: false,
+      })
+    } catch (err) {
+      if (!isMountedRef.current) return
+      setState((current) => ({
+        data: current.data,
+        error: formatAdminError(err),
+        loading: false,
+      }))
     }
   }, [])
+
+  useEffect(() => {
+    isMountedRef.current = true
+
+    loadDashboard(true)
+    const refreshTimer = window.setInterval(() => {
+      loadDashboard(false)
+    }, 30000)
+    const handleVisibilityChange = () => {
+      if (window.document.visibilityState === 'visible') {
+        loadDashboard(false)
+      }
+    }
+    window.addEventListener('focus', handleVisibilityChange)
+    window.document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      isMountedRef.current = false
+      window.clearInterval(refreshTimer)
+      window.removeEventListener('focus', handleVisibilityChange)
+      window.document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [loadDashboard])
 
   const data = state.data || {}
   const users = data.users || []
@@ -546,6 +586,24 @@ function AdminDocuments() {
 
 function AdminCourses({ onEdit }) {
   const { data: courses, error, loading, reload } = useAdminList(getAdminCourses)
+  const [query, setQuery] = useState('')
+  const [majorFilter, setMajorFilter] = useState('')
+  const majorOptions = useMemo(() => {
+    return [...new Set(courses.flatMap((course) => readCourseMajors(course).map((major) => major?.majorCode)).filter(Boolean))].sort((left, right) => compareText(left, right))
+  }, [courses])
+  const visibleCourses = useMemo(() => {
+    return courses.filter((course) => {
+      const courseMajorCodes = readCourseMajors(course).map((major) => String(major?.majorCode || '').toUpperCase()).filter(Boolean)
+      const matchesMajor = !majorFilter || courseMajorCodes.includes(majorFilter.toUpperCase())
+      const matchesCourseSearch = matchesSearch(query, [
+        course.courseCode,
+        course.courseName,
+        course.description,
+        ...readCourseMajors(course).flatMap((major) => [major?.majorCode, major?.majorName]),
+      ])
+      return matchesMajor && matchesCourseSearch
+    })
+  }, [courses, majorFilter, query])
 
   return (
     <main className="admin-page">
@@ -556,12 +614,15 @@ function AdminCourses({ onEdit }) {
           </button>
         </AdminSectionHeader>
         <div className="admin-search-row">
-          <AdminSearch placeholder="Search subjects..." />
-          <input placeholder="Major" />
+          <AdminSearch onChange={setQuery} placeholder="Search subjects..." value={query} />
+          <select aria-label="Filter by major" className="admin-filter-input" onChange={(event) => setMajorFilter(event.target.value)} value={majorFilter}>
+            <option value="">All majors</option>
+            {majorOptions.map((majorCode) => <option key={majorCode} value={majorCode}>{majorCode}</option>)}
+          </select>
         </div>
         <AdminTableState error={error} loading={loading} />
         <div className="course-grid">
-          {courses.map((course) => (
+          {visibleCourses.map((course) => (
             <article className="course-card" key={course.id || course.courseCode}>
               <div>
                 <h3>{course.courseCode}</h3>
@@ -573,10 +634,20 @@ function AdminCourses({ onEdit }) {
                   <StudyHubIcon name="archive" size={16} />
                 </button>
               </div>
-              <div><Badge tone="purple">{course.isActive ? 'Active' : 'Inactive'}</Badge><Badge tone="blue">{course.major?.majorCode || 'Major'}</Badge></div>
+              <div>
+                <Badge tone="purple">{course.isActive ? 'Active' : 'Inactive'}</Badge>
+                {readCourseMajors(course).length > 0
+                  ? readCourseMajors(course).map((major) => (
+                    <Badge key={`${course.id || course.courseCode}-${major?.id || major?.majorCode}`} tone="blue">
+                      {major?.majorCode || 'Major'}
+                    </Badge>
+                  ))
+                  : <Badge tone="blue">Major</Badge>}
+              </div>
               <footer><span>{course.description || 'No description'}</span></footer>
             </article>
           ))}
+          {!loading && !error && visibleCourses.length === 0 && <p className="admin-empty">No matching subjects</p>}
         </div>
       </section>
     </main>
@@ -628,14 +699,16 @@ function AdminStorage() {
   )
 }
 
-function AdminReports() {
+function AdminReports({ onNavigate }) {
   const { data: reports, error, loading, reload } = useAdminList(getAdminReports)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sortBy, setSortBy] = useState('date:desc')
-  const [detailReport, setDetailReport] = useState(null)
-  const [confirmAction, setConfirmAction] = useState(null)
-  const statusOptions = useMemo(() => getStatusOptions(reports, (report) => report.status, ['pending', 'resolved']), [reports])
+  const [reportModal, setReportModal] = useState(null)
+  const [reportDetail, setReportDetail] = useState(null)
+  const [reportDetailLoading, setReportDetailLoading] = useState(false)
+  const [reportDetailError, setReportDetailError] = useState('')
+  const statusOptions = useMemo(() => getStatusOptions(reports, (report) => report.status, ['pending', 'reviewing', 'resolved', 'rejected']), [reports])
   const visibleReports = useMemo(() => {
     const filtered = reports.filter((report) => {
       return matchesStatus(statusFilter, report.status) && matchesSearch(query, [
@@ -654,15 +727,43 @@ function AdminReports() {
     })
   }, [query, reports, sortBy, statusFilter])
 
-  const handleResolveReport = async () => {
-    if (!confirmAction?.report) return
-    const { rejectDocument, report } = confirmAction
+  const openReportDetail = async (report) => {
+    setReportModal(report)
+    setReportDetail(null)
+    setReportDetailError('')
+    setReportDetailLoading(true)
+    try {
+      const response = await getAdminReportDetail(report.id)
+      setReportDetail(unwrapPayload(response))
+    } catch (err) {
+      setReportDetailError(err.message || 'Unable to load report details')
+    } finally {
+      setReportDetailLoading(false)
+    }
+  }
+
+  const closeReportDetail = () => {
+    setReportModal(null)
+    setReportDetail(null)
+    setReportDetailError('')
+    setReportDetailLoading(false)
+  }
+
+  const openReportedDocument = () => {
+    const documentId = reportDetail?.documentId || reportModal?.documentId
+    if (!documentId) return
+    window.open(`/documents/${documentId}`, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleResolveFromModal = async (deleteDocument = false) => {
+    const activeReportId = reportDetail?.id || reportModal?.id
+    if (!activeReportId) return
     await runAdminAction(
-      () => resolveAdminReport(report.id, 'RESOLVED', rejectDocument),
+      () => resolveAdminReport(activeReportId, 'RESOLVED', deleteDocument),
       reload,
-      rejectDocument ? 'Report resolved and document rejected' : 'Report marked as resolved',
+      deleteDocument ? 'Report resolved and document rejected' : 'Report resolved',
     )
-    setConfirmAction(null)
+    closeReportDetail()
   }
 
   return (
@@ -693,9 +794,9 @@ function AdminReports() {
                 <td>{formatDate(report.createdAt)}</td>
                 <td><AdminStatus status={report.status} /></td>
                 <td className="admin-actions">
-                  <button aria-label="View report details" onClick={() => setDetailReport(report)} title="View report details" type="button"><StudyHubIcon name="eye" size={15} /></button>
-                  <button aria-label="Resolve report only" onClick={() => setConfirmAction({ rejectDocument: false, report })} title="Resolve report only" type="button"><StudyHubIcon name="check" size={15} /></button>
-                  <button aria-label="Resolve and reject document" onClick={() => setConfirmAction({ rejectDocument: true, report })} title="Resolve and reject document" type="button"><StudyHubIcon name="x" size={15} /></button>
+                  <button onClick={() => openReportDetail(report)} type="button"><StudyHubIcon name="eye" size={15} /></button>
+                  <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', false), reload, 'Report resolved')} type="button"><StudyHubIcon name="check" size={15} /></button>
+                  <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', true), reload, 'Report resolved and document rejected')} type="button"><StudyHubIcon name="x" size={15} /></button>
                 </td>
               </tr>
             ))}
@@ -703,13 +804,66 @@ function AdminReports() {
           </tbody>
         </table>
       </section>
-      {detailReport && <AdminReportModal report={detailReport} onClose={() => setDetailReport(null)} />}
-      {confirmAction && (
-        <AdminReportConfirmModal
-          action={confirmAction}
-          onCancel={() => setConfirmAction(null)}
-          onConfirm={handleResolveReport}
-        />
+      {reportModal && (
+        <div className="admin-modal-backdrop" onClick={closeReportDetail}>
+          <section className="admin-report-modal" onClick={(event) => event.stopPropagation()}>
+            <button className="admin-modal-close" onClick={closeReportDetail} type="button">x</button>
+            <div className="admin-report-modal__header">
+              <div>
+                <h2>Report Details</h2>
+                <small>Review the report context before taking action.</small>
+              </div>
+              <AdminStatus status={reportDetail?.status || reportModal.status} />
+            </div>
+
+            {reportDetailLoading && <p className="admin-empty">Loading report details...</p>}
+            {!reportDetailLoading && reportDetailError && <p className="admin-empty">{reportDetailError}</p>}
+            {!reportDetailLoading && !reportDetailError && (
+              <div className="admin-report-modal__body">
+                <section className="admin-report-panel">
+                  <h3>Report Summary</h3>
+                  <div className="admin-report-grid">
+                    <InfoBlock label="Reporter" value={reportDetail?.reporterFullName || reportDetail?.reporterEmail || reportModal.reporterEmail || '-'} />
+                    <InfoBlock label="Reporter Email" value={reportDetail?.reporterEmail || reportModal.reporterEmail || '-'} />
+                    <InfoBlock label="Violation Type" value={reportDetail?.reportType || reportModal.reportType || '-'} />
+                    <InfoBlock label="Reported At" value={formatDateTime(reportDetail?.createdAt || reportModal.createdAt)} />
+                  </div>
+                </section>
+
+                <section className="admin-report-panel">
+                  <h3>Reported Document</h3>
+                  <div className="admin-report-grid">
+                    <InfoBlock label="Title" value={reportDetail?.documentTitle || reportModal.documentTitle || '-'} />
+                    <InfoBlock label="Document ID" value={reportDetail?.documentId || reportModal.documentId || '-'} />
+                    <InfoBlock label="Uploader" value={reportDetail?.documentOwnerEmail || '-'} />
+                    <InfoBlock label="Course" value={reportDetail?.courseCode ? `${reportDetail.courseCode}${reportDetail.courseName ? ` - ${reportDetail.courseName}` : ''}` : (reportDetail?.courseName || '-')} />
+                    <InfoBlock label="Visibility" value={reportDetail?.documentVisibility || '-'} />
+                    <InfoBlock label="Moderation" value={reportDetail?.documentModerationStatus || '-'} />
+                    <InfoBlock label="Reports on this document" value={reportDetail?.documentReportCount ?? '-'} />
+                    <InfoBlock label="Uploaded At" value={formatDateTime(reportDetail?.documentCreatedAt)} />
+                  </div>
+                </section>
+
+                <section className="admin-report-panel">
+                  <h3>Reporter Note</h3>
+                  <div className="admin-report-reason">
+                    {reportDetail?.reportReason || reportModal.reportReason || 'No explanation provided by the reporter.'}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            <footer className="admin-report-modal__footer">
+              <button className="admin-secondary" onClick={openReportedDocument} type="button">
+                Open Document
+              </button>
+              <div className="admin-verification-actions">
+                <button onClick={() => handleResolveFromModal(false)} type="button">Resolve</button>
+                <button className="danger" onClick={() => handleResolveFromModal(true)} type="button">Reject Document</button>
+              </div>
+            </footer>
+          </section>
+        </div>
       )}
     </main>
   )
@@ -921,6 +1075,7 @@ function AdminSettings() {
   const plans = useAdminList(getAdminPlans)
   const majors = useAdminList(getAdminMajors)
   const verifications = useAdminList(getPendingVerifications)
+  const [previewVerification, setPreviewVerification] = useState(null)
 
   return (
     <main className="admin-page settings-page">
@@ -950,16 +1105,100 @@ function AdminSettings() {
       <section className="admin-card settings-card">
         <h2><StudyHubIcon name="lock" size={18} /> Pending Verifications</h2>
         <AdminTableState error={verifications.error} loading={verifications.loading} />
-        {verifications.data.map((item) => (
-          <div className="setting-row" key={item.id}>
-            <p><strong>{item.fullName || item.userEmail || `Request #${item.id}`}</strong><small>{item.studentCode || item.reviewNote || 'Student verification'}</small></p>
-            <span className="admin-actions">
-              <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'APPROVED', 'Approved by admin'), verifications.reload, 'Verification approved')} type="button"><StudyHubIcon name="check" size={16} /></button>
-              <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'REJECTED', 'Rejected by admin'), verifications.reload, 'Verification rejected')} type="button"><StudyHubIcon name="x" size={16} /></button>
-            </span>
-          </div>
-        ))}
+        {verifications.data.map((item) => {
+          const imageUrl = getRenderableCloudinaryImage(item.imageUrl)
+          return (
+            <div className="setting-row" key={item.id}>
+              <div className="verification-row-content">
+                {imageUrl ? (
+                  <button
+                    className="verification-thumb-button"
+                    onClick={() => setPreviewVerification(item)}
+                    type="button"
+                  >
+                    <img
+                      alt={`Student ID ${item.userFullName || item.userEmail || item.id}`}
+                      className="verification-thumb-image"
+                      src={imageUrl}
+                    />
+                  </button>
+                ) : (
+                  <div className="verification-thumb-placeholder" />
+                )}
+                <p>
+                  <strong>{item.userFullName || item.userEmail || `Request #${item.id}`}</strong>
+                  <small>{item.reviewNote || 'Student verification request'}</small>
+                  {imageUrl && (
+                    <button
+                      className="verification-link-button"
+                      onClick={() => setPreviewVerification(item)}
+                      type="button"
+                    >
+                      View student ID image
+                    </button>
+                  )}
+                </p>
+              </div>
+              <span className="admin-actions">
+                <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'APPROVED', 'Approved by admin'), verifications.reload, 'Verification approved')} type="button"><StudyHubIcon name="check" size={16} /></button>
+                <button onClick={() => runAdminAction(() => reviewVerification(item.id, 'REJECTED', 'Rejected by admin'), verifications.reload, 'Verification rejected')} type="button"><StudyHubIcon name="x" size={16} /></button>
+              </span>
+            </div>
+          )
+        })}
       </section>
+      {previewVerification && (
+        <div className="admin-modal-backdrop" onClick={() => setPreviewVerification(null)}>
+          <section className="admin-verification-modal" onClick={(event) => event.stopPropagation()}>
+            <button className="admin-modal-close" onClick={() => setPreviewVerification(null)} type="button">x</button>
+            <h2>Student ID Preview</h2>
+            <div className="admin-verification-meta">
+              <strong>{previewVerification.userFullName || previewVerification.userEmail || `Request #${previewVerification.id}`}</strong>
+              <small>{previewVerification.userEmail || 'Student verification request'}</small>
+            </div>
+            {getRenderableCloudinaryImage(previewVerification.imageUrl) ? (
+              <img
+                alt={`Student ID ${previewVerification.userFullName || previewVerification.userEmail || previewVerification.id}`}
+                className="admin-verification-preview-image"
+                src={getRenderableCloudinaryImage(previewVerification.imageUrl)}
+              />
+            ) : (
+              <div className="admin-verification-empty">No verification image available.</div>
+            )}
+            <footer>
+              <a
+                className="verification-link-button"
+                href={getRenderableCloudinaryImage(previewVerification.imageUrl)}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Open full image
+              </a>
+              <div className="admin-verification-actions">
+                <button
+                  onClick={() => {
+                    runAdminAction(() => reviewVerification(previewVerification.id, 'APPROVED', 'Approved by admin'), verifications.reload, 'Verification approved')
+                    setPreviewVerification(null)
+                  }}
+                  type="button"
+                >
+                  Approve
+                </button>
+                <button
+                  className="danger"
+                  onClick={() => {
+                    runAdminAction(() => reviewVerification(previewVerification.id, 'REJECTED', 'Rejected by admin'), verifications.reload, 'Verification rejected')
+                    setPreviewVerification(null)
+                  }}
+                  type="button"
+                >
+                  Reject
+                </button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      )}
     </main>
   )
 }
@@ -1275,17 +1514,19 @@ function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
   const edit = mode === 'edit'
   const majors = useAdminList(getAdminMajors)
   const hasMajors = majors.data.length > 0
+  const initialMajorIds = readCourseMajors(course).map((major) => String(major.id)).filter(Boolean)
   const [form, setForm] = useState(() => ({
     courseCode: course.courseCode || '',
     courseName: course.courseName || '',
     description: course.description || '',
-    majorId: course.major?.id || '',
+    majorIds: initialMajorIds,
     isActive: course.isActive ?? true,
   }))
 
   const submit = async (event) => {
     event.preventDefault()
-    const payload = { ...form, majorId: Number(form.majorId) }
+    const majorIds = form.majorIds.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+    const payload = { ...form, majorIds, majorId: majorIds[0] || null }
     await runAdminAction(
       () => (edit ? updateAdminCourse(course.id, payload) : createAdminCourse(payload)),
       onSaved,
@@ -1303,13 +1544,19 @@ function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
         <label>Course Name<input onChange={(e) => setForm({ ...form, courseName: e.target.value })} placeholder="e.g. Computer Architecture" required value={form.courseName} /></label>
         <label>Description<input onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Short description" value={form.description} /></label>
         <label>
-          Major
-          <select disabled={majors.loading || Boolean(majors.error) || !hasMajors} onChange={(e) => setForm({ ...form, majorId: e.target.value })} required value={form.majorId}>
-            <option value="">
-              {majors.loading ? 'Loading majors...' : majors.error ? 'Unable to load majors' : hasMajors ? 'Select major' : 'No majors available'}
-            </option>
+          Majors
+          <select
+            className="admin-multi-select"
+            disabled={majors.loading || Boolean(majors.error) || !hasMajors}
+            multiple
+            onChange={(e) => setForm({ ...form, majorIds: Array.from(e.target.selectedOptions, (option) => option.value) })}
+            required
+            size={Math.min(Math.max(majors.data.length, 8), 12)}
+            value={form.majorIds}
+          >
             {majors.data.map((major) => <option key={major.id} value={major.id}>{major.majorCode} - {major.majorName}</option>)}
           </select>
+          {!majors.loading && !majors.error && hasMajors && <small className="admin-field-help">Hold Ctrl or Shift to choose multiple majors. You can also drag the bottom edge to expand this list.</small>}
           {majors.error && <small className="admin-field-error">{majors.error}</small>}
           {!majors.loading && !majors.error && !hasMajors && <small className="admin-field-error">Please create a major in Settings first.</small>}
         </label>

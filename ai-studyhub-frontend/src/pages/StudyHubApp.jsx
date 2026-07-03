@@ -660,6 +660,7 @@ export default function StudyHubApp() {
       sizeLabel: file.sizeLabel || '',
       fileUrl: file.fileUrl || '',
       visibility: file.visibility || 'PRIVATE',
+      folderId: file.folderId ?? null,
     }
     setStudyFile(activeFile)
     addRecentItem({
@@ -814,7 +815,14 @@ export default function StudyHubApp() {
         onClearInitialFolderId={() => setInitialFolderId(null)}
       />
       )}
-      {route === 'upload' && <UploadPage mode={uploadMode} onStudyFileUploaded={handleStudyUpload} onNavigate={navigate} />}
+      {route === 'upload' && (
+        <UploadPage
+          mode={uploadMode}
+          onStudyFileUploaded={handleStudyUpload}
+          onNavigate={navigate}
+          defaultFolderId={previousRoute === 'folder-detail' ? selectedFolderId : null}
+        />
+      )}
       {route === 'profile' && <ProfilePage />}
       {route === 'pricing' && (
         <PricingPage 

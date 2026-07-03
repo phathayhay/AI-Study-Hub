@@ -4,7 +4,7 @@ import com.studyhub.admin.dto.*;
 import com.studyhub.admin.service.AdminService;
 import com.studyhub.common.ApiResponse;
 import com.studyhub.common.PageResponse;
-import com.studyhub.course.entity.Course;
+import com.studyhub.course.dto.CourseListResponse;
 import com.studyhub.course.entity.Major;
 import com.studyhub.document.entity.DocumentCategory;
 import com.studyhub.security.SecurityUtils;
@@ -139,6 +139,14 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok("All reports retrieved successfully", response));
     }
 
+    @GetMapping("/reports/{id}")
+    @Operation(summary = "Get report details", description = "Retrieves the full details for a specific user report.")
+    public ResponseEntity<ApiResponse<AdminReportDetailResponse>> getReportDetail(@PathVariable Long id) {
+        log.info("API Admin: Retrieving report detail for ID {}", id);
+        AdminReportDetailResponse response = adminService.getReportDetail(id);
+        return ResponseEntity.ok(ApiResponse.ok("Report details retrieved successfully", response));
+    }
+
     @PostMapping("/reports/{id}/resolve")
     @Operation(summary = "Resolve violation report", description = "Resolves a user report and optionally rejects/bans the reported document.")
     public ResponseEntity<ApiResponse<String>> resolveReport(
@@ -182,21 +190,21 @@ public class AdminController {
     // --- Courses CRUD
     @GetMapping("/courses")
     @Operation(summary = "List all courses config", description = "Retrieves all course configurations in the system.")
-    public ResponseEntity<ApiResponse<List<Course>>> getAllCourses() {
+    public ResponseEntity<ApiResponse<List<CourseListResponse>>> getAllCourses() {
         return ResponseEntity.ok(ApiResponse.ok("Courses retrieved successfully", adminService.getAllCourses()));
     }
 
     @PostMapping("/courses")
     @Operation(summary = "Create course config", description = "Adds a new course configuration linked to a Major.")
-    public ResponseEntity<ApiResponse<Course>> createCourse(@Valid @RequestBody CourseRequest request) {
-        Course response = adminService.createCourse(request);
+    public ResponseEntity<ApiResponse<CourseListResponse>> createCourse(@Valid @RequestBody CourseRequest request) {
+        CourseListResponse response = adminService.createCourse(request);
         return ResponseEntity.ok(ApiResponse.ok("Course created successfully", response));
     }
 
     @PutMapping("/courses/{id}")
     @Operation(summary = "Update course config", description = "Updates course properties by ID.")
-    public ResponseEntity<ApiResponse<Course>> updateCourse(@PathVariable Long id, @Valid @RequestBody CourseRequest request) {
-        Course response = adminService.updateCourse(id, request);
+    public ResponseEntity<ApiResponse<CourseListResponse>> updateCourse(@PathVariable Long id, @Valid @RequestBody CourseRequest request) {
+        CourseListResponse response = adminService.updateCourse(id, request);
         return ResponseEntity.ok(ApiResponse.ok("Course updated successfully", response));
     }
 

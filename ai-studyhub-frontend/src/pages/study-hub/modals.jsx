@@ -265,28 +265,48 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [uploadProgress, setUploadProgress] = useState(null)
-
-  // Password state
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-
-  // Profile states
   const [firstName, setFirstName] = useState(user?.firstName || '')
   const [lastName, setLastName] = useState(user?.lastName || '')
   const [campus, setCampus] = useState(user?.campus || 'HCM')
   const [majorId, setMajorId] = useState(user?.majorId || '')
   const [currentSemester, setCurrentSemester] = useState(user?.currentSemester || '')
   const [majorsList, setMajorsList] = useState([])
+  const [verificationFile, setVerificationFile] = useState(null)
+  const verificationRequestSubmitted = Boolean(user?.verificationRequestSubmitted)
+  const [verificationStatus, setVerificationStatus] = useState(() => {
+    const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
+    const fromUser = user?.verificationStatus ? vsMap[user.verificationStatus] : null
+    return fromUser || localStorage.getItem('verificationStatus') || 'unverified'
+  })
+
+  useEffect(() => {
+    const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
+    const fromUser = user?.verificationStatus ? vsMap[user.verificationStatus] : null
+    if (fromUser) {
+      setVerificationStatus(fromUser)
+      localStorage.setItem('verificationStatus', fromUser)
+    }
+  }, [user?.verificationStatus])
+
+  useEffect(() => {
+    setFirstName(user?.firstName || '')
+    setLastName(user?.lastName || '')
+    setCampus(user?.campus || 'HCM')
+    setMajorId(user?.majorId || '')
+    setCurrentSemester(user?.currentSemester || '')
+  }, [user])
 
   useEffect(() => {
     getMajors()
-      .then(res => {
+      .then((res) => {
         if (res?.success && Array.isArray(res?.data)) {
-          setMajorsList(res.data.filter(m => m.majorCode !== 'ALL'))
+          setMajorsList(res.data.filter((major) => major.majorCode !== 'ALL'))
         }
       })
-      .catch(err => console.error('Failed to load majors:', err))
+      .catch((err) => console.error('Failed to load majors:', err))
   }, [])
 
   const handleProfileSubmit = async (e) => {
@@ -299,19 +319,20 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
         firstName,
         lastName,
         campus,
-        majorId: majorId ? parseInt(majorId) : null,
-        currentSemester
+        majorId: majorId ? Number.parseInt(majorId, 10) : null,
+        currentSemester,
       })
       if (res?.success && res?.data) {
         onUserUpdate({
           ...user,
+          email: res.data.email || user?.email,
           firstName: res.data.firstName,
           lastName: res.data.lastName,
           fullName: res.data.fullName,
           campus: res.data.campus,
           majorId: res.data.majorId,
           majorName: res.data.majorName,
-          currentSemester: res.data.currentSemester
+          currentSemester: res.data.currentSemester,
         })
         setSuccessMsg('Profile updated successfully!')
       } else {
@@ -323,15 +344,6 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
       setLoading(false)
     }
   }
-
-  // Verification state - derive from user prop (backend truth), fallback to localStorage
-  const [verificationFile, setVerificationFile] = useState(null)
-  const [verificationStatus, setVerificationStatus] = useState(() => {
-    // Map backend enum values to frontend display values
-    const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified' }
-    const fromUser = user?.verificationStatus ? vsMap[user.verificationStatus] : null
-    return fromUser || localStorage.getItem('verificationStatus') || 'unverified'
-  })
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files[0]
@@ -346,8 +358,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
         setUploadProgress(progress)
       })
       if (res?.success && res?.data) {
-        const updatedUser = { ...user, avatarUrl: res.data }
-        onUserUpdate(updatedUser)
+        onUserUpdate({ ...user, avatarUrl: res.data })
         setSuccessMsg('Profile picture uploaded successfully!')
       } else {
         setErrorMsg('Unable to upload profile picture.')
@@ -386,7 +397,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
   const handleVerificationSubmit = async (e) => {
     e.preventDefault()
     if (!verificationFile) {
-      setErrorMsg('Please select your student ID Card image to upload.')
+      setErrorMsg('Please select your student ID card image to upload.')
       return
     }
 
@@ -399,7 +410,8 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
       await verifyStudent(formData)
       setVerificationStatus('pending')
       localStorage.setItem('verificationStatus', 'pending')
-      setSuccessMsg('Verification request submitted successfully! Please wait for admin approval.')
+      onUserUpdate?.({ ...user, verificationStatus: 'PENDING', verificationRequestSubmitted: true, verificationReviewNote: null })
+      setSuccessMsg('Verification request submitted successfully. Please wait for admin approval.')
       setVerificationFile(null)
     } catch (err) {
       setErrorMsg(err.message || 'Unable to submit verification request.')
@@ -415,7 +427,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
           <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <StudyHubIcon name="settings" size={20} /> Account Settings
           </h2>
-          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} type="button">×</button>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-200" style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} type="button">x</button>
         </header>
 
         <nav className="settings-modal-tabs bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 transition-colors duration-300">
@@ -461,33 +473,33 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
 
               <div className="settings-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">Họ và tên đệm *</label>
+                  <label className="text-slate-600 dark:text-slate-400">Last Name *</label>
                   <input required value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }} />
                 </div>
                 <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">Tên *</label>
+                  <label className="text-slate-600 dark:text-slate-400">First Name *</label>
                   <input required value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }} />
                 </div>
               </div>
 
               <div className="settings-input-group">
-                <label className="text-slate-600 dark:text-slate-400">Email đăng ký (Read-only)</label>
+                <label className="text-slate-600 dark:text-slate-400">Registered Email (Read-only)</label>
                 <input value={user?.email || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed" style={{ outline: 'none', padding: '8px 12px', borderRadius: '6px' }} />
               </div>
 
               <div className="settings-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">Cơ sở học tập *</label>
+                  <label className="text-slate-600 dark:text-slate-400">Campus *</label>
                   <select value={campus} onChange={(e) => setCampus(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }}>
-                    <option value="HCM">FPTU Hồ Chí Minh</option>
-                    <option value="HN">FPTU Hà Nội</option>
-                    <option value="DN">FPTU Đà Nẵng</option>
-                    <option value="CT">FPTU Cần Thơ</option>
-                    <option value="QN">FPTU Quy Nhơn</option>
+                    <option value="HCM">FPTU Ho Chi Minh City</option>
+                    <option value="HN">FPTU Hanoi</option>
+                    <option value="DN">FPTU Da Nang</option>
+                    <option value="CT">FPTU Can Tho</option>
+                    <option value="QN">FPTU Quy Nhon</option>
                   </select>
                 </div>
                 <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">Học kỳ hiện tại</label>
+                  <label className="text-slate-600 dark:text-slate-400">Current Semester</label>
                   <select value={currentSemester} onChange={(e) => setCurrentSemester(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }}>
                     <option value="">Select Semester</option>
                     {['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8', 'Semester 9'].map(sem => (
@@ -498,7 +510,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
               </div>
 
               <div className="settings-input-group">
-                <label className="text-slate-600 dark:text-slate-400">Chuyên ngành</label>
+                <label className="text-slate-600 dark:text-slate-400">Major</label>
                 <select value={majorId} onChange={(e) => setMajorId(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }}>
                   <option value="">Select Major</option>
                   {majorsList.map(major => (
@@ -540,10 +552,14 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
                 {verificationStatus === 'verified' && <span className="settings-status-badge verified">Verified</span>}
                 {verificationStatus === 'pending' && <span className="settings-status-badge pending">Pending</span>}
                 {verificationStatus === 'unverified' && <span className="settings-status-badge unverified">Unverified</span>}
+                {verificationStatus === 'rejected' && <span className="settings-status-badge rejected">Rejected</span>}
               </div>
 
-              {verificationStatus === 'unverified' && (
+              {((verificationStatus === 'unverified') || verificationStatus === 'rejected' || (verificationStatus === 'pending' && !verificationRequestSubmitted)) && (
                 <form onSubmit={handleVerificationSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', fontSize: '13px', lineHeight: '19px' }} className="dark:bg-blue-950/20 dark:border-blue-900/50 dark:text-blue-300 transition-colors duration-300">
+                    Please upload a clear photo of your student ID card so the admin team can review it. Accounts that stay unverified for more than 3 days after registration may be banned automatically.
+                  </div>
                   <div className="settings-input-group">
                     <label className="text-slate-600 dark:text-slate-400">Upload Student ID Card image (Front) *</label>
                     <div className="avatar-upload-container bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300">
@@ -561,9 +577,17 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
                 </form>
               )}
 
-              {verificationStatus === 'pending' && (
+              {verificationStatus === 'pending' && verificationRequestSubmitted && (
                 <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', color: '#b45309', fontSize: '13px', lineHeight: '18px' }} className="dark:bg-amber-950/20 dark:border-amber-900/50 dark:text-amber-300 transition-colors duration-300">
                   Your verification request has been submitted successfully. Admin will review and approve your student ID card within the next 24-48 hours.
+                </div>
+              )}
+
+              {verificationStatus === 'rejected' && (
+                <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '13px', lineHeight: '18px' }} className="dark:bg-rose-950/20 dark:border-rose-900/50 dark:text-rose-300 transition-colors duration-300">
+                  {user?.verificationReviewNote
+                    ? `Your previous verification request was rejected. Admin note: ${user.verificationReviewNote}`
+                    : 'Your previous verification request was rejected. Please upload a clearer student ID image and submit again.'}
                 </div>
               )}
 

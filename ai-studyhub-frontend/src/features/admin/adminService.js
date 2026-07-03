@@ -24,6 +24,10 @@ export function getAdminReports() {
   return apiGet('/admin/reports')
 }
 
+export function getAdminReportDetail(id) {
+  return apiGet(`/admin/reports/${id}`)
+}
+
 export function resolveAdminReport(id, status, deleteDocument = false) {
   return apiPost(`/admin/reports/${id}/resolve`, { status, deleteDocument })
 }

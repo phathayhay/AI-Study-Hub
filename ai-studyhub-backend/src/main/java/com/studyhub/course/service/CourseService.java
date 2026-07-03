@@ -2,8 +2,11 @@ package com.studyhub.course.service;
 
 import com.studyhub.common.enums.ModerationStatus;
 import com.studyhub.common.enums.Visibility;
+import com.studyhub.course.dto.CourseListResponse;
 import com.studyhub.course.dto.CourseResponse;
+import com.studyhub.course.dto.MajorSummaryResponse;
 import com.studyhub.course.entity.Course;
+import com.studyhub.course.entity.Major;
 import com.studyhub.course.repository.CourseRepository;
 import com.studyhub.document.repository.DocumentRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +48,34 @@ public class CourseService {
     }
 
     @Transactional(readOnly = true)
-    public List<Course> getAllCourses() {
-        return courseRepository.findAll();
+    public List<CourseListResponse> getAllCourses() {
+        return courseRepository.findAll().stream()
+                .map(this::toCourseListResponse)
+                .collect(Collectors.toList());
+    }
+
+    public CourseListResponse toCourseListResponse(Course course) {
+        return CourseListResponse.builder()
+                .id(course.getId())
+                .courseCode(course.getCourseCode())
+                .courseName(course.getCourseName())
+                .description(course.getDescription())
+                .isActive(course.getIsActive())
+                .major(toMajorSummary(course.getMajor()))
+                .majors(course.getMajors().stream()
+                        .map(this::toMajorSummary)
+                        .collect(Collectors.toList()))
+                .build();
+    }
+
+    private MajorSummaryResponse toMajorSummary(Major major) {
+        if (major == null) {
+            return null;
+        }
+        return MajorSummaryResponse.builder()
+                .id(major.getId())
+                .majorCode(major.getMajorCode())
+                .majorName(major.getMajorName())
+                .build();
     }
 }

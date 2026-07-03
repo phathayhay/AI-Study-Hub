@@ -12,10 +12,12 @@ import com.studyhub.common.enums.NotificationType;
 import com.studyhub.common.enums.ReportStatus;
 import com.studyhub.common.enums.UserStatus;
 import com.studyhub.common.enums.VerificationStatus;
+import com.studyhub.course.dto.CourseListResponse;
 import com.studyhub.course.entity.Course;
 import com.studyhub.course.entity.Major;
 import com.studyhub.course.repository.CourseRepository;
 import com.studyhub.course.repository.MajorRepository;
+import com.studyhub.course.service.CourseService;
 import com.studyhub.document.entity.Document;
 import com.studyhub.document.entity.DocumentDownload;
 import com.studyhub.document.entity.DocumentView;
@@ -50,10 +52,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.stream.Collectors;
@@ -77,6 +81,7 @@ public class AdminService {
     private final DocumentViewRepository documentViewRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatSessionRepository chatSessionRepository;
+    private final CourseService courseService;
 
     private static final DateTimeFormatter DAY_LABEL_FORMATTER = DateTimeFormatter.ofPattern("dd/MM");
     private static final DateTimeFormatter HOUR_LABEL_FORMATTER = DateTimeFormatter.ofPattern("HH:00");
@@ -327,6 +332,36 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public AdminReportDetailResponse getReportDetail(Long reportId) {
+        log.info("Admin: Fetching detail for report ID {}", reportId);
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Report not found"));
+
+        Document document = report.getDocument();
+        User reporter = report.getReporter();
+
+        return AdminReportDetailResponse.builder()
+                .id(report.getId())
+                .reporterEmail(reporter != null ? reporter.getEmail() : null)
+                .reporterFullName(reporter != null ? reporter.getFullName() : null)
+                .documentOwnerEmail(document != null && document.getUser() != null ? document.getUser().getEmail() : null)
+                .documentId(document != null ? document.getId() : null)
+                .documentTitle(document != null ? document.getTitle() : null)
+                .documentFileName(document != null ? document.getFileName() : null)
+                .documentVisibility(document != null && document.getVisibility() != null ? document.getVisibility().name() : null)
+                .documentModerationStatus(document != null && document.getModerationStatus() != null ? document.getModerationStatus().name() : null)
+                .courseCode(document != null && document.getCourse() != null ? document.getCourse().getCourseCode() : null)
+                .courseName(document != null && document.getCourse() != null ? document.getCourse().getCourseName() : null)
+                .documentReportCount(document != null ? reportRepository.countByDocumentId(document.getId()) : 0)
+                .reportType(report.getReportType() != null ? report.getReportType().name() : null)
+                .status(report.getStatus() != null ? report.getStatus().name() : null)
+                .reportReason(report.getReportReason())
+                .createdAt(report.getCreatedAt())
+                .documentCreatedAt(document != null ? document.getCreatedAt() : null)
+                .build();
+    }
+
     @Transactional
     public void resolveReport(Long reportId, ReportResolveRequest request) {
         log.info("Admin: Resolving report ID to status {}", reportId, request.getStatus());
@@ -385,36 +420,62 @@ public class AdminService {
 
     // --- Courses CRUD
     @Transactional(readOnly = true)
-    public List<Course> getAllCourses() {
-        return courseRepository.findAll();
+    public List<CourseListResponse> getAllCourses() {
+        return courseRepository.findAll().stream()
+                .map(courseService::toCourseListResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
-    public Course createCourse(CourseRequest request) {
-        Major major = majorRepository.findById(request.getMajorId())
-                .orElseThrow(() -> new IllegalArgumentException("Major not found"));
+    public CourseListResponse createCourse(CourseRequest request) {
+        List<Major> selectedMajors = resolveCourseMajors(request);
+        Major primaryMajor = selectedMajors.get(0);
         Course course = Course.builder()
                 .courseCode(request.getCourseCode().toUpperCase())
                 .courseName(request.getCourseName())
                 .description(request.getDescription())
-                .major(major)
+                .major(primaryMajor)
+                .majors(new LinkedHashSet<>(selectedMajors))
                 .isActive(request.getIsActive())
                 .build();
-        return courseRepository.save(course);
+        return courseService.toCourseListResponse(courseRepository.save(course));
     }
 
     @Transactional
-    public Course updateCourse(Long id, CourseRequest request) {
+    public CourseListResponse updateCourse(Long id, CourseRequest request) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found"));
-        Major major = majorRepository.findById(request.getMajorId())
-                .orElseThrow(() -> new IllegalArgumentException("Major not found"));
+        List<Major> selectedMajors = resolveCourseMajors(request);
 
         course.setCourseName(request.getCourseName());
         course.setDescription(request.getDescription());
-        course.setMajor(major);
+        course.setMajor(selectedMajors.get(0));
+        course.setMajors(new LinkedHashSet<>(selectedMajors));
         course.setIsActive(request.getIsActive());
-        return courseRepository.save(course);
+        return courseService.toCourseListResponse(courseRepository.save(course));
+    }
+
+    private List<Major> resolveCourseMajors(CourseRequest request) {
+        LinkedHashSet<Long> majorIds = new LinkedHashSet<>();
+        if (request.getMajorIds() != null) {
+            request.getMajorIds().stream()
+                    .filter(Objects::nonNull)
+                    .forEach(majorIds::add);
+        }
+        if (request.getMajorId() != null) {
+            majorIds.add(request.getMajorId());
+        }
+        if (majorIds.isEmpty()) {
+            throw new IllegalArgumentException("At least one major must be selected");
+        }
+
+        List<Major> selectedMajors = new ArrayList<>();
+        for (Long majorId : majorIds) {
+            Major major = majorRepository.findById(majorId)
+                    .orElseThrow(() -> new IllegalArgumentException("Major not found"));
+            selectedMajors.add(major);
+        }
+        return selectedMajors;
     }
 
     @Transactional

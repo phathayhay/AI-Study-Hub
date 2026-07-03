@@ -3,6 +3,7 @@ package com.studyhub.document.repository;
 import com.studyhub.common.enums.ModerationStatus;
 import com.studyhub.common.enums.Visibility;
 import com.studyhub.document.entity.Document;
+import com.studyhub.document.entity.Folder;
 import com.studyhub.course.entity.Course;
 import com.studyhub.document.entity.DocumentCategory;
 import com.studyhub.user.entity.User;
@@ -41,7 +42,12 @@ public class DocumentSpecifications {
             if (majorId == null) {
                 return null;
             }
-            return cb.equal(root.join("course").join("major").get("id"), majorId);
+            query.distinct(true);
+            Join<Document, Course> courseJoin = root.join("course", JoinType.LEFT);
+            return cb.or(
+                    cb.equal(courseJoin.join("major", JoinType.LEFT).get("id"), majorId),
+                    cb.equal(courseJoin.join("majors", JoinType.LEFT).get("id"), majorId)
+            );
         };
     }
 
@@ -64,9 +70,16 @@ public class DocumentSpecifications {
     }
 
     public static Specification<Document> isPublicAndApproved() {
-        return (root, query, cb) -> cb.and(
-                cb.equal(root.get("visibility"), Visibility.PUBLIC),
-                cb.equal(root.get("moderationStatus"), ModerationStatus.APPROVED)
-        );
+        return (root, query, cb) -> {
+            Join<Document, Folder> folderJoin = root.join("folder", JoinType.LEFT);
+            return cb.and(
+                    cb.equal(root.get("visibility"), Visibility.PUBLIC),
+                    cb.equal(root.get("moderationStatus"), ModerationStatus.APPROVED),
+                    cb.or(
+                            cb.isNull(root.get("folder")),
+                            cb.notEqual(folderJoin.get("visibility"), Visibility.PUBLIC)
+                    )
+            );
+        };
     }
 }
