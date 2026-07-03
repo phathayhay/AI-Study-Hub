@@ -3962,6 +3962,53 @@ body.dark-theme .rating-star.is-active {
   background: #f87171;
 }
 
+.delete-confirm-modal {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.rename-folder-modal {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.rename-folder-modal__label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 18px 20px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rename-folder-modal__label input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+  outline: none;
+}
+
+.rename-folder-modal__label input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.delete-confirm-modal__body strong {
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.delete-confirm-modal__body p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
 @media (max-width: 1100px) {
 
   .library-shell,
@@ -6845,6 +6892,24 @@ body.dark-theme .field input {
 body.dark-theme .cancel-button {
   background: #334155 !important;
   color: #f1f5f9 !important;
+}
+
+body.dark-theme .delete-confirm-modal__body strong {
+  color: #f8fafc !important;
+}
+
+body.dark-theme .delete-confirm-modal__body p {
+  color: #94a3b8 !important;
+}
+
+body.dark-theme .rename-folder-modal__label {
+  color: #e2e8f0 !important;
+}
+
+body.dark-theme .rename-folder-modal__label input {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
 }
 
 /* Upload Dropzone and Selected File */
