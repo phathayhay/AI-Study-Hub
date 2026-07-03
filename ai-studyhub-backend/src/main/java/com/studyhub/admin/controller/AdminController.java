@@ -139,6 +139,14 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.ok("All reports retrieved successfully", response));
     }
 
+    @GetMapping("/reports/{id}")
+    @Operation(summary = "Get report details", description = "Retrieves the full details for a specific user report.")
+    public ResponseEntity<ApiResponse<AdminReportDetailResponse>> getReportDetail(@PathVariable Long id) {
+        log.info("API Admin: Retrieving report detail for ID {}", id);
+        AdminReportDetailResponse response = adminService.getReportDetail(id);
+        return ResponseEntity.ok(ApiResponse.ok("Report details retrieved successfully", response));
+    }
+
     @PostMapping("/reports/{id}/resolve")
     @Operation(summary = "Resolve violation report", description = "Resolves a user report and optionally rejects/bans the reported document.")
     public ResponseEntity<ApiResponse<String>> resolveReport(

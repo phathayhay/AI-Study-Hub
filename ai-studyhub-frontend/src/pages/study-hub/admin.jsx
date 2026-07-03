@@ -15,6 +15,7 @@ import {
   getAdminActivityLogs,
   getAdminCourses,
   getAdminDashboardData,
+  getAdminReportDetail,
   getAdminDocuments,
   getAdminMajors,
   getAdminPlans,
@@ -218,7 +219,7 @@ export function AdminApp({ route, onNavigate, onLogout }) {
       {route === 'admin-documents' && <AdminDocuments />}
       {route === 'admin-courses' && <AdminCourses onEdit={setCourseModal} />}
       {route === 'admin-storage' && <AdminStorage />}
-      {route === 'admin-reports' && <AdminReports />}
+      {route === 'admin-reports' && <AdminReports onNavigate={onNavigate} />}
       {route === 'admin-logs' && <AdminLogs />}
       {route === 'admin-settings' && <AdminSettings />}
       {userModal && <AdminUserModal user={userModal} onClose={() => setUserModal(null)} />}
@@ -701,12 +702,16 @@ function AdminStorage() {
   )
 }
 
-function AdminReports() {
+function AdminReports({ onNavigate }) {
   const { data: reports, error, loading, reload } = useAdminList(getAdminReports)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sortBy, setSortBy] = useState('date:desc')
-  const statusOptions = useMemo(() => getStatusOptions(reports, (report) => report.status, ['pending', 'resolved']), [reports])
+  const [reportModal, setReportModal] = useState(null)
+  const [reportDetail, setReportDetail] = useState(null)
+  const [reportDetailLoading, setReportDetailLoading] = useState(false)
+  const [reportDetailError, setReportDetailError] = useState('')
+  const statusOptions = useMemo(() => getStatusOptions(reports, (report) => report.status, ['pending', 'reviewing', 'resolved', 'rejected']), [reports])
   const visibleReports = useMemo(() => {
     const filtered = reports.filter((report) => {
       return matchesStatus(statusFilter, report.status) && matchesSearch(query, [
@@ -724,6 +729,45 @@ function AdminReports() {
       status: (report) => report.status,
     })
   }, [query, reports, sortBy, statusFilter])
+
+  const openReportDetail = async (report) => {
+    setReportModal(report)
+    setReportDetail(null)
+    setReportDetailError('')
+    setReportDetailLoading(true)
+    try {
+      const response = await getAdminReportDetail(report.id)
+      setReportDetail(unwrapPayload(response))
+    } catch (err) {
+      setReportDetailError(err.message || 'Unable to load report details')
+    } finally {
+      setReportDetailLoading(false)
+    }
+  }
+
+  const closeReportDetail = () => {
+    setReportModal(null)
+    setReportDetail(null)
+    setReportDetailError('')
+    setReportDetailLoading(false)
+  }
+
+  const openReportedDocument = () => {
+    const documentId = reportDetail?.documentId || reportModal?.documentId
+    if (!documentId) return
+    window.open(`/documents/${documentId}`, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleResolveFromModal = async (deleteDocument = false) => {
+    const activeReportId = reportDetail?.id || reportModal?.id
+    if (!activeReportId) return
+    await runAdminAction(
+      () => resolveAdminReport(activeReportId, 'RESOLVED', deleteDocument),
+      reload,
+      deleteDocument ? 'Report resolved and document rejected' : 'Report resolved',
+    )
+    closeReportDetail()
+  }
 
   return (
     <main className="admin-page">
@@ -753,7 +797,7 @@ function AdminReports() {
                 <td>{formatDate(report.createdAt)}</td>
                 <td><AdminStatus status={report.status} /></td>
                 <td className="admin-actions">
-                  <button onClick={() => callToast(report.reportReason || 'No reason provided', 'info')} type="button"><StudyHubIcon name="eye" size={15} /></button>
+                  <button onClick={() => openReportDetail(report)} type="button"><StudyHubIcon name="eye" size={15} /></button>
                   <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', false), reload, 'Report resolved')} type="button"><StudyHubIcon name="check" size={15} /></button>
                   <button onClick={() => runAdminAction(() => resolveAdminReport(report.id, 'RESOLVED', true), reload, 'Report resolved and document rejected')} type="button"><StudyHubIcon name="x" size={15} /></button>
                 </td>
@@ -763,6 +807,67 @@ function AdminReports() {
           </tbody>
         </table>
       </section>
+      {reportModal && (
+        <div className="admin-modal-backdrop" onClick={closeReportDetail}>
+          <section className="admin-report-modal" onClick={(event) => event.stopPropagation()}>
+            <button className="admin-modal-close" onClick={closeReportDetail} type="button">x</button>
+            <div className="admin-report-modal__header">
+              <div>
+                <h2>Report Details</h2>
+                <small>Review the report context before taking action.</small>
+              </div>
+              <AdminStatus status={reportDetail?.status || reportModal.status} />
+            </div>
+
+            {reportDetailLoading && <p className="admin-empty">Loading report details...</p>}
+            {!reportDetailLoading && reportDetailError && <p className="admin-empty">{reportDetailError}</p>}
+            {!reportDetailLoading && !reportDetailError && (
+              <div className="admin-report-modal__body">
+                <section className="admin-report-panel">
+                  <h3>Report Summary</h3>
+                  <div className="admin-report-grid">
+                    <InfoBlock label="Reporter" value={reportDetail?.reporterFullName || reportDetail?.reporterEmail || reportModal.reporterEmail || '-'} />
+                    <InfoBlock label="Reporter Email" value={reportDetail?.reporterEmail || reportModal.reporterEmail || '-'} />
+                    <InfoBlock label="Violation Type" value={reportDetail?.reportType || reportModal.reportType || '-'} />
+                    <InfoBlock label="Reported At" value={formatDateTime(reportDetail?.createdAt || reportModal.createdAt)} />
+                  </div>
+                </section>
+
+                <section className="admin-report-panel">
+                  <h3>Reported Document</h3>
+                  <div className="admin-report-grid">
+                    <InfoBlock label="Title" value={reportDetail?.documentTitle || reportModal.documentTitle || '-'} />
+                    <InfoBlock label="Document ID" value={reportDetail?.documentId || reportModal.documentId || '-'} />
+                    <InfoBlock label="Uploader" value={reportDetail?.documentOwnerEmail || '-'} />
+                    <InfoBlock label="Course" value={reportDetail?.courseCode ? `${reportDetail.courseCode}${reportDetail.courseName ? ` - ${reportDetail.courseName}` : ''}` : (reportDetail?.courseName || '-')} />
+                    <InfoBlock label="Visibility" value={reportDetail?.documentVisibility || '-'} />
+                    <InfoBlock label="Moderation" value={reportDetail?.documentModerationStatus || '-'} />
+                    <InfoBlock label="Reports on this document" value={reportDetail?.documentReportCount ?? '-'} />
+                    <InfoBlock label="Uploaded At" value={formatDateTime(reportDetail?.documentCreatedAt)} />
+                  </div>
+                </section>
+
+                <section className="admin-report-panel">
+                  <h3>Reporter Note</h3>
+                  <div className="admin-report-reason">
+                    {reportDetail?.reportReason || reportModal.reportReason || 'No explanation provided by the reporter.'}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            <footer className="admin-report-modal__footer">
+              <button className="admin-secondary" onClick={openReportedDocument} type="button">
+                Open Document
+              </button>
+              <div className="admin-verification-actions">
+                <button onClick={() => handleResolveFromModal(false)} type="button">Resolve</button>
+                <button className="danger" onClick={() => handleResolveFromModal(true)} type="button">Reject Document</button>
+              </div>
+            </footer>
+          </section>
+        </div>
+      )}
     </main>
   )
 }

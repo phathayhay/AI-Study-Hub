@@ -332,6 +332,36 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public AdminReportDetailResponse getReportDetail(Long reportId) {
+        log.info("Admin: Fetching detail for report ID {}", reportId);
+        Report report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new IllegalArgumentException("Report not found"));
+
+        Document document = report.getDocument();
+        User reporter = report.getReporter();
+
+        return AdminReportDetailResponse.builder()
+                .id(report.getId())
+                .reporterEmail(reporter != null ? reporter.getEmail() : null)
+                .reporterFullName(reporter != null ? reporter.getFullName() : null)
+                .documentOwnerEmail(document != null && document.getUser() != null ? document.getUser().getEmail() : null)
+                .documentId(document != null ? document.getId() : null)
+                .documentTitle(document != null ? document.getTitle() : null)
+                .documentFileName(document != null ? document.getFileName() : null)
+                .documentVisibility(document != null && document.getVisibility() != null ? document.getVisibility().name() : null)
+                .documentModerationStatus(document != null && document.getModerationStatus() != null ? document.getModerationStatus().name() : null)
+                .courseCode(document != null && document.getCourse() != null ? document.getCourse().getCourseCode() : null)
+                .courseName(document != null && document.getCourse() != null ? document.getCourse().getCourseName() : null)
+                .documentReportCount(document != null ? reportRepository.countByDocumentId(document.getId()) : 0)
+                .reportType(report.getReportType() != null ? report.getReportType().name() : null)
+                .status(report.getStatus() != null ? report.getStatus().name() : null)
+                .reportReason(report.getReportReason())
+                .createdAt(report.getCreatedAt())
+                .documentCreatedAt(document != null ? document.getCreatedAt() : null)
+                .build();
+    }
+
     @Transactional
     public void resolveReport(Long reportId, ReportResolveRequest request) {
         log.info("Admin: Resolving report ID to status {}", reportId, request.getStatus());

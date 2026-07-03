@@ -798,7 +798,7 @@ const UPLOAD_CATEGORY_MAP = {
   'Project': 5
 }
 
-export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate }) {
+export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate, defaultFolderId = null }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
   const [readStatus, setReadStatus] = useState('')
@@ -924,7 +924,8 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
         visibility,
         tags,
         courseId,
-        categoryId
+        categoryId,
+        folderId: defaultFolderId || undefined
       })
       const doc = res?.data || res
       setUploadSuccess(true)
@@ -934,11 +935,13 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate 
         if (onStudyFileUploaded) {
           onStudyFileUploaded({
             id: doc?.id || doc?.documentId,
+            documentId: doc?.id || doc?.documentId,
             name: title,
             attachmentName: selectedUploadFile.name,
             content: '',
             fileUrl: doc?.fileUrl || '',
             visibility: doc?.visibility || visibility || 'PRIVATE',
+            folderId: doc?.folderId ?? defaultFolderId ?? null,
           })
         }
         if (onNavigate) onNavigate('study')
@@ -1375,7 +1378,7 @@ function DocumentViewer({ doc, onBack }) {
     <section className="bg-white dark:bg-[#1e293b] border border-slate-100 dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col gap-5 transition-colors duration-300 ease-in-out">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap gap-2">
-          <Badge tone="blue">{doc.code || doc.id?.toString().slice(-6)}</Badge>
+          {doc.code ? <Badge tone="blue">{doc.code}</Badge> : null}
           <Badge>{doc.fileType || doc.type}</Badge>
         </div>
         <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white leading-tight tracking-tight mt-1">

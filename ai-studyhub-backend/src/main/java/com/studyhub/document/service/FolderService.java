@@ -221,7 +221,7 @@ public class FolderService {
     }
 
     private FolderResponse mapToPublicResponse(Folder folder, boolean includeContents) {
-        List<Document> documents = filterPublicDocuments(documentRepository.findByFolderId(folder.getId()));
+        List<Document> documents = filterFolderAccessibleDocuments(documentRepository.findByFolderId(folder.getId()));
         return buildFolderResponse(folder, documents, includeContents, true);
     }
 
@@ -242,7 +242,7 @@ public class FolderService {
                 .publishedAt(folder.getPublishedAt())
                 .createdAt(folder.getCreatedAt())
                 .updatedAt(folder.getUpdatedAt())
-                .publicDocumentCount(filterPublicDocuments(documents).size())
+                .publicDocumentCount(filterFolderAccessibleDocuments(documents).size())
                 .totalDownloads(totalDownloads)
                 .publishReady(publishReady)
                 .publishBlockedReason(blockedReason)
@@ -295,27 +295,26 @@ public class FolderService {
     }
 
     private boolean isPublishReady(List<Document> documents) {
-        return !documents.isEmpty() && documents.stream().allMatch(this::isPublicApprovedDocument);
+        return !documents.isEmpty() && documents.stream().allMatch(this::isFolderAccessibleDocument);
     }
 
-    private List<Document> filterPublicDocuments(List<Document> documents) {
+    private List<Document> filterFolderAccessibleDocuments(List<Document> documents) {
         return documents.stream()
-                .filter(this::isPublicApprovedDocument)
+                .filter(this::isFolderAccessibleDocument)
                 .collect(Collectors.toList());
     }
 
-    private boolean isPublicApprovedDocument(Document document) {
-        return document.getVisibility() == Visibility.PUBLIC
-                && document.getModerationStatus() == ModerationStatus.APPROVED;
+    private boolean isFolderAccessibleDocument(Document document) {
+        return document.getModerationStatus() == ModerationStatus.APPROVED;
     }
 
     private String buildPublishBlockedReason(List<Document> documents) {
         if (documents.isEmpty()) {
-            return "This folder is empty. Add at least one approved public document before publishing.";
+            return "This folder is empty. Add at least one approved document before publishing.";
         }
 
         List<String> blockedTitles = documents.stream()
-                .filter(doc -> !isPublicApprovedDocument(doc))
+                .filter(doc -> !isFolderAccessibleDocument(doc))
                 .map(doc -> doc.getTitle() != null && !doc.getTitle().isBlank() ? doc.getTitle() : doc.getFileName())
                 .collect(Collectors.toList());
 
@@ -323,7 +322,7 @@ public class FolderService {
             return null;
         }
 
-        return "All documents in a public folder must be PUBLIC and APPROVED. Fix: "
+        return "All documents in a public folder must be APPROVED. Fix: "
                 + String.join(", ", blockedTitles);
     }
 

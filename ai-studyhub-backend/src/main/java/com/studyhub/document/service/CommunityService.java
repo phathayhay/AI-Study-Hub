@@ -1,8 +1,6 @@
 package com.studyhub.document.service;
 
-import com.studyhub.common.enums.ModerationStatus;
 import com.studyhub.common.enums.ReportStatus;
-import com.studyhub.common.enums.Visibility;
 import com.studyhub.document.dto.DocumentResponse;
 import com.studyhub.document.dto.RatingRequest;
 import com.studyhub.document.dto.ReportRequest;
@@ -50,7 +48,7 @@ public class CommunityService {
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
 
         // Không cho phép đánh giá nếu tài liệu chưa duyệt hoặc tài liệu private của người khác
-        if (doc.getVisibility() == Visibility.PRIVATE && !doc.getUser().getId().equals(user.getId())) {
+        if (!documentService.canAccessDocument(doc, user)) {
             throw new SecurityException("Bạn không có quyền đánh giá tài liệu này");
         }
 
@@ -96,7 +94,7 @@ public class CommunityService {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
 
-        if (doc.getVisibility() == Visibility.PRIVATE && !doc.getUser().getId().equals(user.getId())) {
+        if (!documentService.canAccessDocument(doc, user)) {
             throw new SecurityException("Bạn không có quyền yêu thích tài liệu này");
         }
 

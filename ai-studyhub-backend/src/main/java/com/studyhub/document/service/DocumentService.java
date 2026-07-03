@@ -176,10 +176,8 @@ public class DocumentService {
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
         }
 
-        if (doc.getVisibility() == Visibility.PRIVATE) {
-            if (user == null || !doc.getUser().getId().equals(user.getId())) {
-                throw new SecurityException("Permission denied for private document");
-            }
+        if (!canAccessDocument(doc, user)) {
+            throw new SecurityException("Permission denied for private document");
         }
 
         doc.setTotalViews(doc.getTotalViews() + 1);
@@ -267,10 +265,8 @@ public class DocumentService {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
 
-        if (doc.getVisibility() == Visibility.PRIVATE || doc.getModerationStatus() != ModerationStatus.APPROVED) {
-            if (!doc.getUser().getId().equals(user.getId())) {
-                throw new SecurityException("You are not allowed to download this document");
-            }
+        if (!canAccessDocument(doc, user)) {
+            throw new SecurityException("You are not allowed to download this document");
         }
 
         String downloadFileName = doc.getFileName() != null && !doc.getFileName().isBlank()
@@ -324,6 +320,27 @@ public class DocumentService {
                 .contentLength(fileBytes.length)
                 .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
                 .body(new ByteArrayResource(fileBytes));
+    }
+
+    public boolean canAccessDocument(Document document, User user) {
+        if (user != null && document.getUser() != null && document.getUser().getId().equals(user.getId())) {
+            return true;
+        }
+
+        return isDocumentPubliclyAccessible(document);
+    }
+
+    public boolean isDocumentPubliclyAccessible(Document document) {
+        if (document.getModerationStatus() != ModerationStatus.APPROVED) {
+            return false;
+        }
+
+        if (document.getVisibility() == Visibility.PUBLIC) {
+            return true;
+        }
+
+        Folder folder = document.getFolder();
+        return folder != null && folder.getVisibility() == Visibility.PUBLIC;
     }
 
     public DocumentResponse mapToResponse(Document doc) {

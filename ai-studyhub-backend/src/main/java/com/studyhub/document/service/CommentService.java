@@ -1,6 +1,5 @@
 package com.studyhub.document.service;
 
-import com.studyhub.common.enums.Visibility;
 import com.studyhub.document.dto.CommentRequest;
 import com.studyhub.document.dto.CommentResponse;
 import com.studyhub.document.entity.Comment;
@@ -30,6 +29,7 @@ public class CommentService {
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
     private final NotificationService notificationService;
+    private final DocumentService documentService;
 
     @Transactional
     public CommentResponse addComment(Long documentId, CommentRequest request, String email) {
@@ -42,7 +42,7 @@ public class CommentService {
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
 
         // Nếu là tài liệu PRIVATE, chỉ chủ sở hữu được bình luận (ngoại trừ trường hợp được share sẽ phát triển sau)
-        if (doc.getVisibility() == Visibility.PRIVATE && !doc.getUser().getId().equals(user.getId())) {
+        if (!documentService.canAccessDocument(doc, user)) {
             throw new SecurityException("Bạn không có quyền bình luận trên tài liệu này");
         }
 

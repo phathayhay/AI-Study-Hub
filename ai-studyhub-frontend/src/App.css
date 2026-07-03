@@ -5717,6 +5717,98 @@ body.dark-theme .rating-star.is-active {
   background: #ef4444;
 }
 
+.admin-report-modal {
+  position: relative;
+  width: min(900px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  padding: 28px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+  display: grid;
+  gap: 18px;
+  overflow-y: auto;
+}
+
+.admin-report-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-right: 36px;
+}
+
+.admin-report-modal__header h2,
+.admin-report-panel h3 {
+  margin: 0;
+}
+
+.admin-report-modal__header small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+}
+
+.admin-report-modal__body {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-report-panel {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.admin-report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-report-grid .info-block {
+  margin: 0;
+  padding: 14px 16px;
+  background: #ffffff;
+  border-radius: 10px;
+}
+
+.admin-report-reason {
+  min-height: 120px;
+  padding: 16px;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #dbe4ee;
+  border-radius: 10px;
+}
+
+.admin-report-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-secondary {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-weight: 800;
+  color: #0f172a;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.admin-secondary:hover {
+  background: #f8fafc;
+}
+
 .admin-user-modal h2 {
   margin: 0 0 26px;
   color: #8b00ff;
@@ -5878,6 +5970,15 @@ body.dark-theme .rating-star.is-active {
     background: linear-gradient(145deg, #2f78ff, #5b5cf0);
     border-radius: 12px;
     box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+  }
+
+  .admin-report-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-report-modal__footer {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
