@@ -69,6 +69,8 @@ public class DocumentService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
+        validateStorageQuota(user, file.getSize());
+
         String originalFilename = file.getOriginalFilename();
         if (originalFilename == null || !originalFilename.contains(".")) {
             throw new IllegalArgumentException("Invalid file name");
@@ -225,6 +227,10 @@ public class DocumentService {
             throw new SecurityException("Ban khong co quyen thay doi trang thai chia se cua tai lieu nay");
         }
 
+        if (visibility == Visibility.PUBLIC && !Boolean.TRUE.equals(user.getPlan().getCanPublishDocuments())) {
+            throw new IllegalArgumentException("Your current plan does not allow publishing documents.");
+        }
+
         doc.setVisibility(visibility);
         Document savedDoc = documentRepository.save(doc);
         log.info("Document ID {} visibility updated to {} by user {}", documentId, visibility, userEmail);
@@ -341,6 +347,25 @@ public class DocumentService {
 
         Folder folder = document.getFolder();
         return folder != null && folder.getVisibility() == Visibility.PUBLIC;
+    }
+
+    private void validateStorageQuota(User user, long incomingFileSizeBytes) {
+        Long storageLimitMb = user.getPlan() != null ? user.getPlan().getStorageLimitMb() : null;
+        if (storageLimitMb == null || storageLimitMb <= 0) {
+            return;
+        }
+
+        long currentUsageBytes = documentRepository.sumFileSizeByUserId(user.getId());
+        long storageLimitBytes = storageLimitMb * 1024L * 1024L;
+        if (currentUsageBytes + incomingFileSizeBytes > storageLimitBytes) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Your current plan storage is full. Limit: %d MB, used: %.2f MB.",
+                            storageLimitMb,
+                            currentUsageBytes / (1024d * 1024d)
+                    )
+            );
+        }
     }
 
     public DocumentResponse mapToResponse(Document doc) {

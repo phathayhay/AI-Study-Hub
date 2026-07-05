@@ -31,6 +31,9 @@ public interface DocumentRepository extends JpaRepository<Document, Long>, JpaSp
             @Param("visibility") Visibility visibility,
             @Param("status") ModerationStatus status);
 
+    @Query("SELECT COALESCE(SUM(d.fileSize), 0) FROM Document d WHERE d.user.id = :userId")
+    long sumFileSizeByUserId(@Param("userId") Long userId);
+
     @Modifying
     @Query("UPDATE Document d SET d.totalDownloads = d.totalDownloads + 1 WHERE d.id = :documentId")
     int incrementTotalDownloads(@Param("documentId") Long documentId);

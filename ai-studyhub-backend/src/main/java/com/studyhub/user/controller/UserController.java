@@ -1,10 +1,14 @@
 package com.studyhub.user.controller;
 
+import com.studyhub.chat.repository.ChatMessageRepository;
 import com.studyhub.common.ApiResponse;
+import com.studyhub.common.enums.SenderType;
 import com.studyhub.security.SecurityUtils;
+import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.dto.NotificationSummaryResponse;
 import com.studyhub.user.entity.StudentVerification;
+import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.StudentVerificationRepository;
 import com.studyhub.user.repository.UserRepository;
@@ -30,6 +34,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 
@@ -47,6 +52,8 @@ public class UserController {
     private final StudentVerificationRepository studentVerificationRepository;
     private final MajorRepository majorRepository;
     private final NotificationService notificationService;
+    private final DocumentRepository documentRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
     // API tải lên ảnh đại diện của người dùng
     @PostMapping(value = "/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -185,6 +192,18 @@ public class UserController {
                 .max(Comparator.naturalOrder())
                 .orElse(null);
 
+        SubscriptionPlan activePlan = user.getPlan();
+        long usedStorageBytes = documentRepository.sumFileSizeByUserId(user.getId());
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = startOfDay.plusDays(1);
+        long aiRequestsUsedToday = chatMessageRepository.countByUserIdAndSenderTypeBetween(
+                user.getId(),
+                SenderType.AI,
+                startOfDay,
+                endOfDay
+        );
+
         return UserProfileResponse.builder()
                 .id(user.getId())
                 .firstName(user.getFirstName())
@@ -195,8 +214,17 @@ public class UserController {
                 .campus(user.getCampus())
                 .majorName(user.getMajor() != null ? user.getMajor().getMajorName() : null)
                 .majorId(user.getMajor() != null ? user.getMajor().getId() : null)
-                .planName(user.getPlan() != null ? user.getPlan().getPlanName() : "FREE")
+                .planName(activePlan != null ? activePlan.getPlanName() : "FREE")
                 .planExpiresAt(planExpiresAt)
+                .planStorageLimitMb(activePlan != null ? activePlan.getStorageLimitMb() : null)
+                .planStorageUsedBytes(usedStorageBytes)
+                .planAiRequestsPerDay(activePlan != null ? activePlan.getAiRequestsPerDay() : null)
+                .planAiRequestsUsedToday(aiRequestsUsedToday)
+                .planCanUseAiSummary(activePlan != null ? activePlan.getCanUseAiSummary() : null)
+                .planCanUseFlashcards(activePlan != null ? activePlan.getCanUseFlashcards() : null)
+                .planCanUseQuizzes(activePlan != null ? activePlan.getCanUseQuizzes() : null)
+                .planCanPublishDocuments(activePlan != null ? activePlan.getCanPublishDocuments() : null)
+                .planCanPublishFolders(activePlan != null ? activePlan.getCanPublishFolders() : null)
                 .currentSemester(user.getCurrentSemester())
                 .status(user.getStatus())
                 .verificationStatus(effectiveVerificationStatus)

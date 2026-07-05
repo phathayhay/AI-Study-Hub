@@ -866,7 +866,7 @@ export default function StudyHubApp() {
 
 
       {showReport && <ReportModal onClose={() => setShowReport(false)} documentId={selectedDocId} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} user={user} onUserUpdate={setUser} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} user={user} onUserUpdate={setUser} onNavigate={navigate} />}
       {showFeatureRequest && <FeatureRequestModal onClose={() => setShowFeatureRequest(false)} />}
       {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
       {showExtension && <ChromeExtensionModal onClose={() => setShowExtension(false)} />}
