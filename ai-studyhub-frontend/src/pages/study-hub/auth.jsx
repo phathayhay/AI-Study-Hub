@@ -262,6 +262,12 @@ export function AuthLayout({ initialMode = 'signin', onLogin, onNavigate }) {
             />
           )}
 
+          <div className="mt-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/60 px-4 py-3 text-left">
+            <p className="text-[12px] leading-5 text-slate-500 dark:text-slate-400">
+              We use essential cookies to keep your account signed in, protect your session, and maintain core security features. These cookies are required for the platform to work properly.
+            </p>
+          </div>
+
           {/* Back Home link */}
           <div className="mt-4 border-t border-slate-100 dark:border-slate-800/60 pt-4 text-center">
             <button 
@@ -290,7 +296,9 @@ function InputField({
   required = true,
   revealable = false,
   maxLength,
-  minLength
+  minLength,
+  error = '',
+  inputMode
 }) {
   const [showPassword, setShowPassword] = useState(false)
   const inputType = revealable && showPassword ? 'text' : type
@@ -308,6 +316,7 @@ function InputField({
         )}
         <input
           type={inputType}
+          inputMode={inputMode}
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -315,7 +324,12 @@ function InputField({
           required={required}
           maxLength={maxLength}
           minLength={minLength}
-          className={`w-full ${Icon ? 'pl-11' : 'px-4'} ${revealable ? 'pr-11' : 'px-4'} py-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 focus:outline-none transition-all duration-200`}
+          aria-invalid={error ? 'true' : 'false'}
+          className={`w-full ${Icon ? 'pl-11' : 'px-4'} ${revealable ? 'pr-11' : 'px-4'} py-3 border rounded-xl bg-slate-50/50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 text-sm focus:outline-none transition-all duration-200 ${
+            error
+              ? 'border-rose-300 dark:border-rose-800 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10'
+              : 'border-slate-200 dark:border-slate-800 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10'
+          }`}
         />
         {revealable && (
           <button
@@ -327,8 +341,24 @@ function InputField({
           </button>
         )}
       </div>
+      {error && (
+        <div className="flex items-start gap-2 text-[12px] leading-5 text-rose-600 dark:text-rose-400 pl-1">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
     </div>
   )
+}
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const REMEMBERED_EMAIL_KEY = 'rememberedEmail'
+
+function getEmailError(value) {
+  const normalized = value.trim()
+  if (!normalized) return 'Please enter your email address.'
+  if (!EMAIL_REGEX.test(normalized)) return 'Please enter a valid email address.'
+  return ''
 }
 
 /* SIGN IN FORM SUB-COMPONENT */
@@ -336,13 +366,36 @@ function SignInForm({ onLogin, onLoading, onError, onToggleMode, onNavigate, loa
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
+  const [fieldErrors, setFieldErrors] = useState({})
+
+  useEffect(() => {
+    const rememberedEmail = localStorage.getItem(REMEMBERED_EMAIL_KEY) || ''
+    if (rememberedEmail) {
+      setEmail(rememberedEmail)
+      setRemember(true)
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const nextErrors = {}
+    const emailError = getEmailError(email)
+    if (emailError) nextErrors.email = emailError
+    if (!password) nextErrors.password = 'Please enter your password.'
+    setFieldErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) {
+      onError('')
+      return
+    }
     onLoading(true)
     onError('')
     try {
       const response = await apiLogin({ email: email.trim(), password })
+      if (remember) {
+        localStorage.setItem(REMEMBERED_EMAIL_KEY, email.trim())
+      } else {
+        localStorage.removeItem(REMEMBERED_EMAIL_KEY)
+      }
       onLogin(response, remember)
     } catch (err) {
       onError(err.message || 'Incorrect email or password.')
@@ -352,15 +405,20 @@ function SignInForm({ onLogin, onLoading, onError, onToggleMode, onNavigate, loa
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+    <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-3.5">
       <InputField 
         label="Email"
         icon={Mail}
-        type="email"
+        type="text"
+        inputMode="email"
         placeholder="name@fpt.edu.vn"
         value={email}
-        onChange={setEmail}
+        onChange={(value) => {
+          setEmail(value)
+          if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: '' }))
+        }}
         autoComplete="email"
+        error={fieldErrors.email}
       />
 
       <InputField 
@@ -369,9 +427,13 @@ function SignInForm({ onLogin, onLoading, onError, onToggleMode, onNavigate, loa
         type="password"
         placeholder="Enter your password"
         value={password}
-        onChange={setPassword}
+        onChange={(value) => {
+          setPassword(value)
+          if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: '' }))
+        }}
         autoComplete="current-password"
         revealable
+        error={fieldErrors.password}
       />
 
       <div className="flex items-center justify-between mt-1">
@@ -432,19 +494,29 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
     password: '',
     confirmPassword: ''
   })
+  const [fieldErrors, setFieldErrors] = useState({})
 
   const updateField = (key, val) => {
     setForm(prev => ({ ...prev, [key]: val }))
+    setFieldErrors(prev => ({ ...prev, [key]: '' }))
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const nextErrors = {}
+    if (!form.firstName.trim()) nextErrors.firstName = 'Please enter your first name.'
+    if (!form.lastName.trim()) nextErrors.lastName = 'Please enter your last name.'
+    const emailError = getEmailError(form.email)
+    if (emailError) nextErrors.email = emailError
     if (form.password.length < 6) {
-      onError('Password must be at least 6 characters long.')
-      return
+      nextErrors.password = 'Password must be at least 6 characters long.'
     }
     if (form.password !== form.confirmPassword) {
-      onError('Passwords do not match.')
+      nextErrors.confirmPassword = 'Passwords do not match.'
+    }
+    setFieldErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) {
+      onError('')
       return
     }
 
@@ -466,7 +538,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+    <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-3.5">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <InputField 
           label="First Name"
@@ -476,6 +548,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
           onChange={(val) => updateField('firstName', val)}
           autoComplete="given-name"
           maxLength={50}
+          error={fieldErrors.firstName}
         />
         <InputField 
           label="Last Name"
@@ -485,18 +558,21 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
           onChange={(val) => updateField('lastName', val)}
           autoComplete="family-name"
           maxLength={50}
+          error={fieldErrors.lastName}
         />
       </div>
 
       <InputField 
         label="Email Address"
         icon={Mail}
-        type="email"
+        type="text"
+        inputMode="email"
         placeholder="name@fpt.edu.vn"
         value={form.email}
         onChange={(val) => updateField('email', val)}
         autoComplete="email"
         maxLength={150}
+        error={fieldErrors.email}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -510,6 +586,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
           autoComplete="new-password"
           revealable
           minLength={6}
+          error={fieldErrors.password}
         />
         <InputField 
           label="Confirm"
@@ -520,6 +597,7 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
           onChange={(val) => updateField('confirmPassword', val)}
           autoComplete="new-password"
           revealable
+          error={fieldErrors.confirmPassword}
         />
       </div>
 
@@ -554,9 +632,18 @@ function SignUpForm({ onRegisterSuccess, onLoading, onError, onToggleMode, loadi
 
 function ForgotPasswordForm({ onLoading, onError, onSuccess, onToggleMode, loading }) {
   const [email, setEmail] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const emailError = getEmailError(email)
+    if (emailError) {
+      setFieldErrors({ email: emailError })
+      onError('')
+      onSuccess('')
+      return
+    }
+    setFieldErrors({})
     onLoading(true)
     onError('')
     onSuccess('')
@@ -573,15 +660,20 @@ function ForgotPasswordForm({ onLoading, onError, onSuccess, onToggleMode, loadi
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+    <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-3.5">
       <InputField
         label="Email"
         icon={Mail}
-        type="email"
+        type="text"
+        inputMode="email"
         placeholder="name@fpt.edu.vn"
         value={email}
-        onChange={setEmail}
+        onChange={(value) => {
+          setEmail(value)
+          if (fieldErrors.email) setFieldErrors({ email: '' })
+        }}
         autoComplete="email"
+        error={fieldErrors.email}
       />
 
       <button

@@ -521,7 +521,7 @@ export default function Sidebar({
                     ? `Active until ${formattedExpiry}`
                     : 'Usage follows your plan limits'}
                 </span>
-                <button type="button" onClick={() => onNavigate?.('settings')}>
+                <button type="button" onClick={() => onNavigate?.('settings', { tab: 'plan' })}>
                   Manage
                 </button>
               </div>

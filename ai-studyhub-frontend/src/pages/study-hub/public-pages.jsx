@@ -34,6 +34,7 @@ import {
   updateFolderVisibility
 } from '../../features/folders/folderService'
 import { getMajors, getCourses, getCategories } from '../../services/courseService'
+import { getToken } from '../../services/api'
 
 const uploadSelectFields = [
   {
@@ -438,6 +439,7 @@ export function ExplorePage({
   onOpenDocument, 
   onOpenFolder, 
   guest = false,
+  user = null,
   initialKeyword = '',
   initialMajor = 'ALL',
   initialCourse = null
@@ -490,14 +492,18 @@ export function ExplorePage({
   }, [])
 
   useEffect(() => {
-    if (guest) return
+    if (guest || !user?.id) {
+      setFavoriteIds(new Set())
+      return
+    }
+
     getFavoriteDocuments()
       .then((res) => {
         const list = res?.content || res?.data?.content || res?.data || res || []
         setFavoriteIds(new Set(list.map(item => item.id)))
       })
       .catch((err) => console.error('Failed to load favorites', err))
-  }, [guest])
+  }, [guest, user?.id])
 
   useEffect(() => {
     let active = true
@@ -798,7 +804,7 @@ const UPLOAD_CATEGORY_MAP = {
   'Project': 5
 }
 
-export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate, defaultFolderId = null }) {
+export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentUploaded, onNavigate, defaultFolderId = null }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
   const [readStatus, setReadStatus] = useState('')
@@ -931,8 +937,9 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate,
       setUploadSuccess(true)
       window.showToast?.('Document uploaded successfully', 'success')
       setTimeout(() => {
+        onDocumentUploaded?.(doc)
         clearSelectedFile()
-        if (onStudyFileUploaded) {
+        if (isStudyUpload && onStudyFileUploaded) {
           onStudyFileUploaded({
             id: doc?.id || doc?.documentId,
             documentId: doc?.id || doc?.documentId,
@@ -944,7 +951,9 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onNavigate,
             folderId: doc?.folderId ?? defaultFolderId ?? null,
           })
         }
-        if (onNavigate) onNavigate('study')
+        if (!isStudyUpload && onNavigate) {
+          onNavigate('doc-detail', { documentId: doc?.id || doc?.documentId })
+        }
       }, 1000)
     } catch (err) {
       const errMsg = err?.message || 'Upload failed'
@@ -1132,15 +1141,19 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
   const [publishing, setPublishing] = useState(false)
 
   useEffect(() => {
-    const hasToken = !!localStorage.getItem('accessToken')
-    if (!hasToken) return
+    const hasToken = !!getToken()
+    if (!hasToken || guest || !user?.id) {
+      setFavoriteIds(new Set())
+      return
+    }
+
     getFavoriteDocuments()
       .then((res) => {
         const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : res?.data?.content || res?.content || [])
         setFavoriteIds(new Set(list.map(item => item.id)))
       })
       .catch((err) => console.error('Failed to load favorites', err))
-  }, [])
+  }, [guest, user?.id])
 
   useEffect(() => {
     if (!id) return
@@ -1149,7 +1162,7 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
     setError('')
 
     const loadFolder = async () => {
-      const hasToken = !!localStorage.getItem('accessToken')
+      const hasToken = !!getToken()
 
       try {
         const publicRes = await getPublicFolder(id)
@@ -1811,7 +1824,7 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
       .catch((err) => console.error('Failed to load comments', err))
 
     // Check if favorited
-    if (!guest) {
+    if (!guest && user?.id) {
       getFavoriteDocuments()
         .then((res) => {
           const list = res?.content || res?.data?.content || res?.data || res || []
@@ -1819,8 +1832,10 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
           setIsFavorite(isFav)
         })
         .catch((err) => console.error('Failed to check favorites', err))
+    } else {
+      setIsFavorite(false)
     }
-  }, [id, guest])
+  }, [id, guest, user?.id])
 
   useEffect(() => {
     if (loading || window.location.hash !== '#comments') return

@@ -169,8 +169,18 @@ export function LibraryPage({
   }
 
   useEffect(() => {
+    if (!user?.id) {
+      setApiDocs([])
+      setApiSharedDocs([])
+      setApiFavoriteDocs([])
+      setApiHistoryDocs([])
+      setApiFolders([])
+      setLoading(false)
+      return
+    }
+
     loadLibraryData()
-  }, [])
+  }, [user?.id])
 
   // Reset folder selection when switching tabs (unless we are opening an initial folder)
   useEffect(() => {
@@ -1066,7 +1076,7 @@ function FolderFilesView({
       </div>
 
       {/* Content card */}
-      <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out">
+      <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-visible bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out">
         {combined.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center', color: '#94a3b8', fontSize: '14px' }}>
             This folder is empty
@@ -1123,19 +1133,18 @@ function ActionableFileRow({
   user,
   onTogglePublish
 }) {
-  const isActualFolder = isFolder || file.type === 'folder' || file.kind === 'folder';
-  const isOwner = isActualFolder || !file.userId || !user?.id || Number(file.userId) === Number(user?.id) || file.uploader === user?.fullName;
-  const fileRef = file.name.includes('.') ? file.name : file.subject;
-  const iconName = isActualFolder ? 'folder' : getFileIconName(fileRef);
-  const iconColor = isActualFolder ? '#818cf8' : getFileIconColor(fileRef);
-  const isPublicFolder = isActualFolder && file.visibility === 'PUBLIC';
+  const isActualFolder = isFolder || file.type === 'folder' || file.kind === 'folder'
+  const isOwner = isActualFolder || !file.userId || !user?.id || Number(file.userId) === Number(user?.id) || file.uploader === user?.fullName
+  const fileRef = file.name.includes('.') ? file.name : file.subject
+  const iconName = isActualFolder ? 'folder' : getFileIconName(fileRef)
+  const iconColor = isActualFolder ? '#818cf8' : getFileIconColor(fileRef)
+  const isPublicFolder = isActualFolder && file.visibility === 'PUBLIC'
 
   return (
     <div
       onClick={() => onOpenFile(file)}
       className="group flex items-center py-3 px-4 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors cursor-pointer relative"
     >
-      {/* Cột 1: Tên tài liệu */}
       <div className="flex-1 min-w-0 flex items-center gap-3 pr-4">
         <div style={{ color: iconColor }} className="flex-shrink-0 flex items-center justify-center">
           <StudyHubIcon name={iconName} size={20} />
@@ -1156,81 +1165,14 @@ function ActionableFileRow({
         )}
       </div>
 
-      {/* Cột 2: Loại tài liệu */}
       <span className="w-20 shrink-0 text-left text-sm text-slate-400 dark:text-slate-500 capitalize">
         {isActualFolder ? 'folder' : 'session'}
       </span>
 
-      {/* Cột 3: Hover Actions */}
-      <div 
-        className="w-40 shrink-0 flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button 
-          className="hover-action-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors" 
-          onClick={() => onPin(file)} 
-          type="button" 
-          title={isPinned ? 'Unpin' : 'Pin'} 
-          style={isPinned ? { color: '#6366f1' } : undefined}
-        >
-          <StudyHubIcon name="pin" size={15} />
-        </button>
-        <button 
-          className="hover-action-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors" 
-          onClick={() => onMove(file)} 
-          type="button" 
-          title="Move"
-        >
-          <StudyHubIcon name="move" size={15} />
-        </button>
-        <button 
-          className="hover-action-btn p-1 text-slate-400 hover:text-red-600 dark:text-slate-500 dark:hover:text-red-400 transition-colors" 
-          onClick={() => onDelete(file)} 
-          type="button" 
-          title="Delete"
-        >
-          <StudyHubIcon name="trash" size={15} />
-        </button>
-        {!isActualFolder && onShare && isOwner && (
-          <button 
-            className="hover-action-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors" 
-            onClick={() => onShare(file)} 
-            type="button" 
-            title="Share"
-          >
-            <StudyHubIcon name="share" size={15} />
-          </button>
-        )}
-        {isActualFolder && onTogglePublish && (
-          <button
-            className={`hover-action-btn p-1 transition-colors ${
-              isPublicFolder
-                ? 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300'
-                : 'text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400'
-            }`}
-            onClick={() => onTogglePublish(file)}
-            type="button"
-            title={isPublicFolder ? 'Make private' : 'Publish to Explore'}
-          >
-            <StudyHubIcon name={isPublicFolder ? 'lock' : 'globe'} size={15} />
-          </button>
-        )}
-        <button 
-          className="hover-action-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors" 
-          onClick={() => onRename(file)} 
-          type="button" 
-          title="Rename"
-        >
-          <StudyHubIcon name="edit" size={15} />
-        </button>
-      </div>
-
-      {/* Cột 4: Ngày tải lên */}
-      <span className="w-28 shrink-0 text-right text-sm text-slate-400 dark:text-slate-500">
+      <span className="w-28 shrink-0 ml-auto pr-2 text-right text-sm text-slate-400 dark:text-slate-500">
         {file.time || ''}
       </span>
 
-      {/* Cột 5: Nút 3 chấm / Menu */}
       <div className="w-8 shrink-0 flex justify-end ml-4 relative" onClick={(e) => e.stopPropagation()}>
         <button
           className="more-btn p-1 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-indigo-400 transition-colors"
@@ -1241,20 +1183,20 @@ function ActionableFileRow({
         </button>
 
         {openFileMenuId === file.id && (
-          <div className="file-action-menu bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out" style={{ position: 'absolute', right: '0', top: '100%', zIndex: 20, borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)', padding: '6px', display: 'flex', flexDirection: 'column', minWidth: '160px' }}>
-            <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onPin(file); onToggleFileMenu(null); }} type="button">
+          <div className="file-action-menu bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-slate-800 transition-colors duration-300 ease-in-out" style={{ position: 'absolute', right: '0', top: 'calc(100% + 8px)', zIndex: 40, borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)', padding: '6px', display: 'flex', flexDirection: 'column', minWidth: '180px' }}>
+            <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onPin(file); onToggleFileMenu(null) }} type="button">
               <StudyHubIcon name="pin" size={14} style={{ color: isPinned ? '#6366f1' : 'inherit' }} /> {isPinned ? 'Unpin' : 'Pin'}
             </button>
-            <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onMove(file); onToggleFileMenu(null); }} type="button">
+            <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onMove(file); onToggleFileMenu(null) }} type="button">
               <StudyHubIcon name="move" size={14} /> Move
             </button>
-            <button className="danger hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => { onDelete(file); onToggleFileMenu(null); }} type="button">
+            <button className="danger hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => { onDelete(file); onToggleFileMenu(null) }} type="button">
               <StudyHubIcon name="trash" size={14} /> Delete
             </button>
             {isActualFolder && onTogglePublish && (
               <button
                 className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700"
-                onClick={() => { onTogglePublish(file); onToggleFileMenu(null); }}
+                onClick={() => { onTogglePublish(file); onToggleFileMenu(null) }}
                 type="button"
                 title={file.publishBlockedReason || undefined}
               >
@@ -1263,11 +1205,11 @@ function ActionableFileRow({
               </button>
             )}
             {!isActualFolder && onShare && isOwner && (
-              <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onShare(file); onToggleFileMenu(null); }} type="button">
+              <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onShare(file); onToggleFileMenu(null) }} type="button">
                 <StudyHubIcon name="share" size={14} /> Share
               </button>
             )}
-            <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onRename(file); onToggleFileMenu(null); }} type="button">
+            <button className="text-slate-900 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => { onRename(file); onToggleFileMenu(null) }} type="button">
               <StudyHubIcon name="edit" size={14} /> Rename
             </button>
           </div>
@@ -1276,7 +1218,7 @@ function ActionableFileRow({
     </div>
   )
 }
- 
+
 function GroupedFiles({ 
   files, 
   onDeleteFile, 
@@ -1292,7 +1234,7 @@ function GroupedFiles({
 }) {
   const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
   return (
-    <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+    <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-visible bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
       {groups.map((group) => {
         const groupFiles = files.filter((file) => file.group === group)
         if (groupFiles.length === 0) return null;
@@ -1347,7 +1289,7 @@ function GroupedFolders({
 }) {
   const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
   return (
-    <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+    <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-visible bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
       {groups.map((group) => {
         const groupFolders = folders.filter((folder) => folder.group === group)
         if (groupFolders.length === 0) return null;
@@ -1403,7 +1345,7 @@ function SharedLibraryFiles({
   const groups = ['Pinned', 'Today', 'Yesterday', 'This Week', 'Older']
   const files = allFiles || []
   return (
-    <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+    <div className="border border-[#e8e8f0] dark:border-slate-800 rounded-xl overflow-visible bg-white dark:bg-[#1e293b] transition-colors duration-300 ease-in-out" style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
       {groups.map((group) => {
         const groupFiles = files.filter((file) => file.group === group)
         if (groupFiles.length === 0) return null;

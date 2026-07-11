@@ -1,4 +1,8 @@
 const API_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '')
+const AUTH_PERSIST_KEY = 'authPersistence'
+const TOKEN_KEY = 'accessToken'
+const REFRESH_TOKEN_KEY = 'refreshToken'
+const USER_KEY = 'user'
 
 export class ApiError extends Error {
   constructor(message, status, data, request = {}) {
@@ -12,8 +16,48 @@ export class ApiError extends Error {
   }
 }
 
-function getToken() {
-  return localStorage.getItem('accessToken')
+export function getAuthStorage() {
+  return localStorage.getItem(AUTH_PERSIST_KEY) === 'session' ? sessionStorage : localStorage
+}
+
+export function getToken() {
+  return getAuthStorage().getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY)
+}
+
+export function getRefreshToken() {
+  return getAuthStorage().getItem(REFRESH_TOKEN_KEY) || localStorage.getItem(REFRESH_TOKEN_KEY) || sessionStorage.getItem(REFRESH_TOKEN_KEY)
+}
+
+export function getStoredUser() {
+  return getAuthStorage().getItem(USER_KEY) || localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY)
+}
+
+export function persistAuthSession(user, remember = true) {
+  const targetStorage = remember ? localStorage : sessionStorage
+  const otherStorage = remember ? sessionStorage : localStorage
+
+  localStorage.setItem(AUTH_PERSIST_KEY, remember ? 'local' : 'session')
+  otherStorage.removeItem(TOKEN_KEY)
+  otherStorage.removeItem(REFRESH_TOKEN_KEY)
+  otherStorage.removeItem(USER_KEY)
+
+  targetStorage.setItem(TOKEN_KEY, user.accessToken)
+  if (user.refreshToken) {
+    targetStorage.setItem(REFRESH_TOKEN_KEY, user.refreshToken)
+  } else {
+    targetStorage.removeItem(REFRESH_TOKEN_KEY)
+  }
+  targetStorage.setItem(USER_KEY, JSON.stringify(user))
+}
+
+export function clearAuthSession() {
+  localStorage.removeItem(AUTH_PERSIST_KEY)
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(REFRESH_TOKEN_KEY)
+  localStorage.removeItem(USER_KEY)
+  sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY)
+  sessionStorage.removeItem(USER_KEY)
 }
 
 function buildHeaders(body, opts = {}) {

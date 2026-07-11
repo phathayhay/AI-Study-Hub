@@ -1,15 +1,46 @@
 import { useState, useEffect } from 'react'
 import { logout as apiLogout } from '../features/auth/authService'
 import { getUserProfile } from '../services/userService'
+import { clearAuthSession, getRefreshToken, getStoredUser, getToken, persistAuthSession } from '../services/api'
 
 export default function useAuth() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const buildSyncedUser = (baseUser, profile) => ({
+    ...baseUser,
+    id: profile.id,
+    email: profile.email || baseUser?.email,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    fullName: profile.fullName,
+    role: profile.role,
+    avatarUrl: profile.avatarUrl,
+    verificationStatus: profile.verificationStatus,
+    campus: profile.campus,
+    majorId: profile.majorId,
+    majorName: profile.majorName,
+    currentSemester: profile.currentSemester,
+    status: profile.status,
+    planName: profile.planName,
+    planExpiresAt: profile.planExpiresAt,
+    planStorageLimitMb: profile.planStorageLimitMb,
+    planStorageUsedBytes: profile.planStorageUsedBytes,
+    planAiRequestsPerDay: profile.planAiRequestsPerDay,
+    planAiRequestsUsedToday: profile.planAiRequestsUsedToday,
+    planCanUseAiSummary: profile.planCanUseAiSummary,
+    planCanUseFlashcards: profile.planCanUseFlashcards,
+    planCanUseQuizzes: profile.planCanUseQuizzes,
+    planCanPublishDocuments: profile.planCanPublishDocuments,
+    planCanPublishFolders: profile.planCanPublishFolders,
+    verificationRequestSubmitted: profile.verificationRequestSubmitted,
+    verificationReviewNote: profile.verificationReviewNote,
+  })
+
   useEffect(() => {
     // Check if user is logged in
-    const accessToken = localStorage.getItem('accessToken')
-    const savedUser = localStorage.getItem('user')
+    const accessToken = getToken()
+    const savedUser = getStoredUser()
     if (accessToken && savedUser) {
       try {
         const u = JSON.parse(savedUser)
@@ -27,35 +58,7 @@ export default function useAuth() {
           .then(res => {
             if (res?.success && res?.data) {
               const profile = res.data
-              const updatedUser = {
-                ...u,
-                id: profile.id,
-                email: profile.email || u.email,
-                firstName: profile.firstName,
-                lastName: profile.lastName,
-                fullName: profile.fullName,
-                role: profile.role,
-                avatarUrl: profile.avatarUrl,
-                verificationStatus: profile.verificationStatus,
-                campus: profile.campus,
-                majorId: profile.majorId,
-                majorName: profile.majorName,
-                currentSemester: profile.currentSemester,
-                status: profile.status,
-                planName: profile.planName,
-                planExpiresAt: profile.planExpiresAt,
-                planStorageLimitMb: profile.planStorageLimitMb,
-                planStorageUsedBytes: profile.planStorageUsedBytes,
-                planAiRequestsPerDay: profile.planAiRequestsPerDay,
-                planAiRequestsUsedToday: profile.planAiRequestsUsedToday,
-                planCanUseAiSummary: profile.planCanUseAiSummary,
-                planCanUseFlashcards: profile.planCanUseFlashcards,
-                planCanUseQuizzes: profile.planCanUseQuizzes,
-                planCanPublishDocuments: profile.planCanPublishDocuments,
-                planCanPublishFolders: profile.planCanPublishFolders,
-                verificationRequestSubmitted: profile.verificationRequestSubmitted,
-                verificationReviewNote: profile.verificationReviewNote,
-              }
+              const updatedUser = buildSyncedUser(u, profile)
               if (profile.avatarUrl) {
                 localStorage.setItem(`avatarUrl_${profile.email}`, profile.avatarUrl)
               } else {
@@ -66,7 +69,8 @@ export default function useAuth() {
                 const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
                 localStorage.setItem('verificationStatus', vsMap[profile.verificationStatus] || 'unverified')
               }
-              localStorage.setItem('user', JSON.stringify(updatedUser))
+              const remember = localStorage.getItem('authPersistence') !== 'session'
+              persistAuthSession(updatedUser, remember)
               setUser(updatedUser)
             }
           })
@@ -80,13 +84,9 @@ export default function useAuth() {
     setLoading(false)
   }, [])
 
-  const saveSession = (res) => {
+  const saveSession = async (res, remember = true) => {
     if (res?.data) {
       const u = res.data
-      localStorage.setItem('accessToken', u.accessToken)
-      if (u.refreshToken) {
-        localStorage.setItem('refreshToken', u.refreshToken)
-      }
       
       // Save avatar to cache if present, otherwise fallback to cache
       if (u.avatarUrl) {
@@ -112,23 +112,46 @@ export default function useAuth() {
         localStorage.setItem('verificationStatus', vsMap[u.verificationStatus] || 'unverified')
       }
 
-      localStorage.setItem('user', JSON.stringify(u))
+      persistAuthSession(u, remember)
       setUser(u)
+
+      try {
+        const profileRes = await getUserProfile()
+        const profile = profileRes?.data || profileRes
+        if (profile) {
+          const updatedUser = buildSyncedUser(u, profile)
+          if (profile.avatarUrl) {
+            localStorage.setItem(`avatarUrl_${profile.email}`, profile.avatarUrl)
+          } else if (profile.email) {
+            localStorage.removeItem(`avatarUrl_${profile.email}`)
+          }
+          if (profile.verificationStatus) {
+            const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
+            localStorage.setItem('verificationStatus', vsMap[profile.verificationStatus] || 'unverified')
+          }
+          persistAuthSession(updatedUser, remember)
+          setUser(updatedUser)
+          return updatedUser
+        }
+      } catch (err) {
+        console.error('Failed to fetch full profile after login:', err)
+      }
+
       return u
     }
     return null
   }
 
-  const login = async (res) => {
-    return saveSession(res)
+  const login = async (res, remember = true) => {
+    return await saveSession(res, remember)
   }
 
   const register = async (res) => {
-    return saveSession(res)
+    return await saveSession(res)
   }
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem('refreshToken')
+    const refreshToken = getRefreshToken()
     if (refreshToken) {
       try {
         await apiLogout(refreshToken)
@@ -136,9 +159,7 @@ export default function useAuth() {
         console.error('Logout API error:', err)
       }
     }
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
-    localStorage.removeItem('user')
+    clearAuthSession()
     setUser(null)
   }
 
@@ -153,9 +174,10 @@ export default function useAuth() {
           if (next.avatarUrl) {
             localStorage.setItem(`avatarUrl_${next.email}`, next.avatarUrl)
           }
-          localStorage.setItem('user', JSON.stringify(next))
+          const remember = localStorage.getItem('authPersistence') !== 'session'
+          persistAuthSession(next, remember)
         } else {
-          localStorage.removeItem('user')
+          clearAuthSession()
         }
         return next
       })
@@ -168,9 +190,10 @@ export default function useAuth() {
         if (u.avatarUrl) {
           localStorage.setItem(`avatarUrl_${u.email}`, u.avatarUrl)
         }
-        localStorage.setItem('user', JSON.stringify(u))
+        const remember = localStorage.getItem('authPersistence') !== 'session'
+        persistAuthSession(u, remember)
       } else {
-        localStorage.removeItem('user')
+        clearAuthSession()
       }
       setUser(u)
     }

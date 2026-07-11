@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import StudyHubIcon, { getFileIconName, getFileIconColor } from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
 import { favoriteDocument, unfavoriteDocument } from '../../features/documents/documentService'
+import { getToken } from '../../services/api'
 
 export function SectionTitle({ count, icon, title }) {
   return <h2 className="inline-section-title"><StudyHubIcon name={icon} size={18} /> {title} <small>({count})</small></h2>
@@ -49,7 +50,7 @@ export function DocumentCardMini({ document, doc, onOpen }) {
 
   const handleToggleFavorite = (event) => {
     event.stopPropagation()
-    const hasToken = !!localStorage.getItem('accessToken')
+    const hasToken = !!getToken()
     if (!hasToken) {
       window.showToast?.('Please login to add to favorites', 'info')
       return

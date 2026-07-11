@@ -19,6 +19,9 @@ import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.StudentVerificationRepository;
 import com.studyhub.user.repository.SubscriptionPlanRepository;
 import com.studyhub.user.repository.UserRepository;
+import com.studyhub.course.dto.CourseListResponse;
+import com.studyhub.course.service.CourseService;
+import com.studyhub.user.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,6 +57,10 @@ class AdminServiceTest {
     private DocumentCategoryRepository documentCategoryRepository;
     @Mock
     private SubscriptionPlanRepository subscriptionPlanRepository;
+    @Mock
+    private CourseService courseService;
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private AdminService adminService;
@@ -326,17 +333,21 @@ class AdminServiceTest {
     void testCRUDCourses() {
         // Create
         when(majorRepository.findById(10L)).thenReturn(Optional.of(mockMajor));
+        when(courseRepository.save(any(Course.class))).thenReturn(mockCourse);
+        when(courseService.toCourseListResponse(any(Course.class))).thenReturn(new CourseListResponse());
         CourseRequest req = CourseRequest.builder().courseCode("PRJ301").courseName("Java Web").majorId(10L).isActive(true).build();
         adminService.createCourse(req);
         verify(courseRepository, times(1)).save(any(Course.class));
 
         // Read
         when(courseRepository.findAll()).thenReturn(List.of(mockCourse));
-        List<Course> list = adminService.getAllCourses();
+        when(courseService.toCourseListResponse(mockCourse)).thenReturn(new CourseListResponse());
+        List<CourseListResponse> list = adminService.getAllCourses();
         assertEquals(1, list.size());
 
         // Update
         when(courseRepository.findById(20L)).thenReturn(Optional.of(mockCourse));
+        when(courseRepository.save(mockCourse)).thenReturn(mockCourse);
         CourseRequest updateReq = CourseRequest.builder().courseName("New Java Web").majorId(10L).isActive(false).build();
         adminService.updateCourse(20L, updateReq);
         assertEquals("New Java Web", mockCourse.getCourseName());

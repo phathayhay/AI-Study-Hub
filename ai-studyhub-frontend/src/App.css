@@ -3730,6 +3730,9 @@ body.dark-theme .rating-star.is-active {
   width: 430px;
   z-index: 30;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: min(78vh, 760px);
   background: #ffffff;
   border-radius: 18px;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
@@ -3791,6 +3794,13 @@ body.dark-theme .rating-star.is-active {
   color: #ef4444;
   background: #fee2e2;
   border-radius: 999px;
+}
+
+.notification-panel__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .notice-item {

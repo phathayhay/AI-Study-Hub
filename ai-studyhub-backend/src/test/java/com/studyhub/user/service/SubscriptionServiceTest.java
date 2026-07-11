@@ -35,6 +35,9 @@ class SubscriptionServiceTest {
     @Mock
     private UserSubscriptionRepository userSubscriptionRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     @InjectMocks
     private SubscriptionService subscriptionService;
 
@@ -96,10 +99,10 @@ class SubscriptionServiceTest {
         assertEquals(2L, response.getPlanId());
         assertEquals("PRO", response.getPlanName());
         assertEquals(BigDecimal.valueOf(99000), response.getAmount());
-        assertEquals("MB", response.getBankName());
-        assertEquals("1234567890", response.getAccountNumber());
+        assertEquals("TPBank", response.getBankName());
+        assertEquals("00004103937", response.getAccountNumber());
         assertTrue(response.getTransferContent().contains("SHUPGRADE"));
-        assertTrue(response.getQrCodeUrl().contains("https://img.vietqr.io/image/MB-1234567890-compact2.png"));
+        assertTrue(response.getQrCodeUrl().contains("https://img.vietqr.io/image/TPB-00004103937-compact2.png"));
     }
 
     @Test

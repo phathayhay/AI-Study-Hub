@@ -106,31 +106,33 @@ export function NotificationPanel({
           </button>
         ))}
       </nav>
-      {loading ? (
-        <div style={{ padding: '24px 22px', color: '#64748b' }}>Loading notifications...</div>
-      ) : filteredNotifications.length === 0 ? (
-        <div style={{ padding: '24px 22px', color: '#64748b' }}>No notifications yet.</div>
-      ) : (
-        filteredNotifications.map((item) => {
-          const visual = getNoticeVisual(item)
-          return (
-            <article
-              className={`notice-item notice-item--${visual.tone}`}
-              key={item.id}
-              onClick={() => onOpenNotification?.(item)}
-              style={{ cursor: 'pointer', opacity: item.isRead ? 0.82 : 1 }}
-            >
-              <span><StudyHubIcon name={visual.icon} size={22} /></span>
-              <div>
-                <h3>{item.title}</h3>
-                <p>{item.content}</p>
-                <strong>{item.notificationType === 'DOCUMENT' ? 'AI Study Hub' : 'Activity'}</strong> <small>{formatTimeAgo(item.createdAt)}</small>
-              </div>
-            </article>
-          )
-        })
-      )}
-      <button className="all-notifications" type="button">End of notifications</button>
+      <div className="notification-panel__body">
+        {loading ? (
+          <div style={{ padding: '24px 22px', color: '#64748b' }}>Loading notifications...</div>
+        ) : filteredNotifications.length === 0 ? (
+          <div style={{ padding: '24px 22px', color: '#64748b' }}>No notifications yet.</div>
+        ) : (
+          filteredNotifications.map((item) => {
+            const visual = getNoticeVisual(item)
+            return (
+              <article
+                className={`notice-item notice-item--${visual.tone}`}
+                key={item.id}
+                onClick={() => onOpenNotification?.(item)}
+                style={{ cursor: 'pointer', opacity: item.isRead ? 0.82 : 1 }}
+              >
+                <span><StudyHubIcon name={visual.icon} size={22} /></span>
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.content}</p>
+                  <strong>{item.notificationType === 'DOCUMENT' ? 'AI Study Hub' : 'Activity'}</strong> <small>{formatTimeAgo(item.createdAt)}</small>
+                </div>
+              </article>
+            )
+          })
+        )}
+        <button className="all-notifications" type="button">End of notifications</button>
+      </div>
     </aside>
   )
 }
@@ -259,8 +261,8 @@ export function ReportModal({ onClose, documentId }) {
   )
 }
 
-export function SettingsModal({ onClose, user, onUserUpdate, onNavigate }) {
-  const [activeTab, setActiveTab] = useState('profile')
+export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initialTab = 'profile' }) {
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [loading, setLoading] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
@@ -290,6 +292,10 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate }) {
       localStorage.setItem('verificationStatus', fromUser)
     }
   }, [user?.verificationStatus])
+
+  useEffect(() => {
+    setActiveTab(initialTab || 'profile')
+  }, [initialTab])
 
   useEffect(() => {
     setFirstName(user?.firstName || '')
