@@ -29,122 +29,30 @@ import {
   updateAdminPlan,
   exportAdminActivityLogs,
 } from '../../features/admin/adminService'
-import { adminNavItems } from './config'
+import { adminNavigation as adminNavItems } from '../../features/admin/constants/adminNavigation'
+import { useAdminResource as useAdminList } from '../../features/admin/hooks/useAdminResource'
+import { ADMIN_LOG_TYPES, ADMIN_STATUS_LABELS as STATUS_LABELS } from '../../features/admin/constants/adminStatus'
+import {
+  formatAdminError,
+  normalizeStatus,
+  unwrapList,
+  unwrapPage,
+  unwrapPayload,
+} from '../../features/admin/utils/adminNormalizers'
+import { formatBytes, formatDate, formatDateTime, getDocumentName, getInitial } from '../../features/admin/utils/adminFormatters'
+import { getStatusOptions, matchesSearch, matchesStatus, sortItems } from '../../features/admin/utils/adminSorters'
 import { InfoBlock } from './shared'
 
 const callToast = (message, tone = 'success') => {
   if (window.showToast) window.showToast(message, tone)
 }
 
-const unwrapList = (response) => {
-  const data = response?.data ?? response
-  if (Array.isArray(data)) return data
-  if (Array.isArray(data?.content)) return data.content
-  if (Array.isArray(data?.items)) return data.items
-  if (Array.isArray(data?.data)) return data.data
-  if (Array.isArray(data?.result)) return data.result
-  if (Array.isArray(data?.results)) return data.results
-  if (Array.isArray(data?.list)) return data.list
-  if (Array.isArray(data?.records)) return data.records
-  return []
-}
-
-const unwrapPayload = (response) => response?.data ?? response ?? null
-const unwrapPage = (response) => {
-  const data = unwrapPayload(response)
-  return {
-    content: Array.isArray(data?.content) ? data.content : [],
-    page: Number(data?.page || 0),
-    size: Number(data?.size || 10),
-    totalElements: Number(data?.totalElements || 0),
-    totalPages: Number(data?.totalPages || 0),
-    last: Boolean(data?.last),
-  }
-}
-
-const formatAdminError = (err) => {
-  const target = err.path ? `${err.method || 'GET'} ${err.path}` : 'admin data'
-  if (err.status >= 500) return `Server error while loading ${target}. Please check the backend logs.`
-  if (err.status === 403) return `You do not have permission to load ${target}. Please sign in with an admin account.`
-  if (err.status === 401) return `Your session expired while loading ${target}. Please sign in again.`
-  return err.message || 'Unable to load admin data'
-}
-
-const formatDate = (value) => {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleDateString('vi-VN')
-}
-
-const formatDateTime = (value) => {
-  if (!value) return '-'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return date.toLocaleString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-const formatBytes = (value = 0) => {
-  if (!value) return '0 MB'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let size = Number(value)
-  let index = 0
-  while (size >= 1024 && index < units.length - 1) {
-    size /= 1024
-    index += 1
-  }
-  return `${size.toFixed(size >= 10 || index === 0 ? 0 : 1)} ${units[index]}`
-}
-
-const normalizeStatus = (value) => String(value || 'pending').toLowerCase()
-const getInitial = (value = 'A') => value.trim().charAt(0).toUpperCase() || 'A'
-const getDocumentName = (doc = {}) => doc.title || doc.fileName || 'Untitled'
 const CHART_PALETTE = ['#2563eb', '#0f766e', '#ea580c', '#16a34a', '#f59e0b', '#7c3aed', '#64748b']
-const ADMIN_LOG_TYPES = [
-  ['user', 'Users'],
-  ['document', 'Documents'],
-  ['download', 'Downloads'],
-  ['report', 'Reports'],
-  ['ai', 'AI'],
-]
-const STATUS_LABELS = {
-  active: 'Active',
-  banned: 'Banned',
-  blocked: 'Banned',
-  suspended: 'Suspended',
-  inactive: 'Inactive',
-  pending: 'Pending',
-  approved: 'Approved',
-  rejected: 'Rejected',
-  resolved: 'Resolved',
-  success: 'Success',
-  started: 'Started',
-}
-
-const normalizeText = (value) => String(value || '').toLowerCase()
-const matchesSearch = (query, values) => {
-  const term = normalizeText(query).trim()
-  if (!term) return true
-  return values.some((value) => normalizeText(value).includes(term))
-}
-const matchesStatus = (selected, status) => !selected || normalizeStatus(status) === selected
-const compareText = (left, right) => String(left || '').localeCompare(String(right || ''), 'vi', { sensitivity: 'base' })
 const formatTypeLabel = (value) => ADMIN_LOG_TYPES.find(([type]) => type === value)?.[1] || String(value || 'All')
 const readCourseMajors = (course = {}) => {
   if (Array.isArray(course.majors) && course.majors.length > 0) return course.majors
   return course.major ? [course.major] : []
 }
-const compareDate = (left, right) => {
-  const leftTime = left ? new Date(left).getTime() : 0
-  const rightTime = right ? new Date(right).getTime() : 0
-  return (Number.isNaN(leftTime) ? 0 : leftTime) - (Number.isNaN(rightTime) ? 0 : rightTime)
-}
-
 const getRenderableCloudinaryImage = (url) => {
   const value = String(url || '').trim()
   if (!value.includes('/image/upload/')) return value
@@ -153,46 +61,6 @@ const getRenderableCloudinaryImage = (url) => {
     return value.replace('/image/upload/f_auto,q_auto/', '/image/upload/f_jpg,q_auto/')
   }
   return value.replace('/image/upload/', '/image/upload/f_jpg,q_auto/')
-}
-
-function getStatusOptions(items, readStatus, defaults = []) {
-  const options = new Set(defaults)
-  items.forEach((item) => {
-    const status = readStatus(item)
-    if (status) options.add(normalizeStatus(status))
-  })
-  return [...options]
-}
-
-function sortItems(items, sortValue, readers) {
-  const [field, direction = 'asc'] = sortValue.split(':')
-  const multiplier = direction === 'desc' ? -1 : 1
-  return [...items].sort((left, right) => {
-    if (field === 'date') return compareDate(readers.date(left), readers.date(right)) * multiplier
-    if (field === 'status') return compareText(normalizeStatus(readers.status(left)), normalizeStatus(readers.status(right))) * multiplier
-    return compareText(readers.name(left), readers.name(right)) * multiplier
-  })
-}
-
-function useAdminList(loader) {
-  const [state, setState] = useState({ data: [], error: '', loading: true })
-
-  const load = useCallback(async () => {
-    setState((current) => ({ ...current, error: '', loading: true }))
-    try {
-      const response = await loader()
-      setState({ data: unwrapList(response), error: '', loading: false })
-    } catch (err) {
-      setState({ data: [], error: formatAdminError(err), loading: false })
-    }
-  }, [loader])
-
-  useEffect(() => {
-    const timer = window.setTimeout(load, 0)
-    return () => window.clearTimeout(timer)
-  }, [load])
-
-  return { ...state, reload: load }
 }
 
 async function runAdminAction(action, refresh, successMessage) {
@@ -232,7 +100,7 @@ export function AdminApp({ route, onNavigate, onLogout }) {
   )
 }
 
-function AdminLayout({ active, children, onNavigate, onLogout }) {
+export function AdminLayout({ active, children, onNavigate, onLogout }) {
   return (
     <div className="admin-shell">
       <AdminSidebar active={active} onNavigate={onNavigate} onLogout={onLogout} />
@@ -244,7 +112,7 @@ function AdminLayout({ active, children, onNavigate, onLogout }) {
   )
 }
 
-function AdminSidebar({ active, onNavigate, onLogout }) {
+export function AdminSidebar({ active, onNavigate, onLogout }) {
   return (
     <aside className="admin-sidebar">
       <div className="admin-brand">
@@ -275,7 +143,7 @@ function AdminSidebar({ active, onNavigate, onLogout }) {
   )
 }
 
-function AdminTopbar({ active }) {
+export function AdminTopbar({ active }) {
   const currentPage = adminNavItems.find((item) => item.id === active)
 
   return (
@@ -292,7 +160,7 @@ function AdminTopbar({ active }) {
   )
 }
 
-function AdminOverview({ onOpenUser }) {
+export function AdminOverview({ onOpenUser }) {
   const [state, setState] = useState({ data: null, error: '', loading: true })
   const isMountedRef = useRef(true)
 
@@ -441,7 +309,7 @@ function AdminOverview({ onOpenUser }) {
   )
 }
 
-function AdminUsers({ onOpenUser }) {
+export function AdminUsers({ onOpenUser }) {
   const { data: users, error, loading, reload } = useAdminList(getAdminUsers)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -516,7 +384,7 @@ function AdminUsers({ onOpenUser }) {
   )
 }
 
-function AdminDocuments() {
+export function AdminDocuments() {
   const { data: documents, error, loading, reload } = useAdminList(getAdminDocuments)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -584,7 +452,7 @@ function AdminDocuments() {
   )
 }
 
-function AdminCourses({ onEdit }) {
+export function AdminCourses({ onEdit }) {
   const { data: courses, error, loading, reload } = useAdminList(getAdminCourses)
   const [query, setQuery] = useState('')
   const [majorFilter, setMajorFilter] = useState('')
@@ -654,7 +522,7 @@ function AdminCourses({ onEdit }) {
   )
 }
 
-function AdminStorage() {
+export function AdminStorage() {
   const { data: documents, error, loading } = useAdminList(getAdminDocuments)
   const totalBytes = documents.reduce((sum, doc) => sum + Number(doc.fileSize || 0), 0)
   const largest = useMemo(() => {
@@ -699,7 +567,7 @@ function AdminStorage() {
   )
 }
 
-function AdminReports({ onNavigate }) {
+export function AdminReports({ onNavigate }) {
   const { data: reports, error, loading, reload } = useAdminList(getAdminReports)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -938,7 +806,7 @@ function AdminReportConfirmModal({ action, onCancel, onConfirm }) {
   )
 }
 
-function AdminLogs() {
+export function AdminLogs() {
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -1071,7 +939,7 @@ function AdminLogs() {
   )
 }
 
-function AdminSettings() {
+export function AdminSettings() {
   const plans = useAdminList(getAdminPlans)
   const majors = useAdminList(getAdminMajors)
   const verifications = useAdminList(getPendingVerifications)
@@ -1675,7 +1543,7 @@ function StorageMetric({ label, sub, tone, value }) {
   return <article className={`storage-metric storage-metric--${tone}`}><span>{label}</span><strong>{value}</strong>{sub && <small>{sub}</small>}</article>
 }
 
-function AdminUserModal({ onClose, user }) {
+export function AdminUserModal({ onClose, user }) {
   return (
     <div className="admin-modal-backdrop">
       <section className="admin-user-modal">
@@ -1695,7 +1563,7 @@ function AdminUserModal({ onClose, user }) {
   )
 }
 
-function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
+export function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
   const edit = mode === 'edit'
   const majors = useAdminList(getAdminMajors)
   const hasMajors = majors.data.length > 0

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import AppLayout from '../components/layout/AppLayout'
-import { AdminApp } from './study-hub/admin'
+import { AdminApp, hasRole } from '../features/admin'
 import { ForgotPasswordPage, LoginPage, RegisterPage, ResetPasswordPage, VerifyEmailPage } from './study-hub/auth'
 import { LibraryPage } from './study-hub/library'
 import { NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal, UpgradePaymentModal } from './study-hub/modals'
@@ -26,10 +26,9 @@ const defaultStudyFile = {
 }
 
 const getUserRole = (user) => {
+  if (hasRole(user, 'ADMIN')) return 'admin'
   const rawRole = user?.role || user?.roleName || user?.authority || ''
-  const role = String(rawRole).toUpperCase()
-  if (role.includes('ADMIN')) return 'admin'
-  if (role) return 'student'
+  if (rawRole) return 'student'
   return null
 }
 

@@ -37,17 +37,6 @@ export const pricingPlans = [
   },
 ]
 
-export const adminNavItems = [
-  { id: 'admin-overview', label: 'Overview', icon: 'trend' },
-  { id: 'admin-users', label: 'Users', icon: 'users' },
-  { id: 'admin-documents', label: 'Documents', icon: 'file' },
-  { id: 'admin-courses', label: 'Courses', icon: 'book' },
-  { id: 'admin-storage', label: 'Storage', icon: 'archive' },
-  { id: 'admin-reports', label: 'Reports', icon: 'flag' },
-  { id: 'admin-logs', label: 'Activity Logs', icon: 'trend' },
-  { id: 'admin-settings', label: 'Settings', icon: 'sparkle' },
-]
-
 export const adminUsers = [
   { initial: 'N', name: 'Nguyen Van A', email: 'studenta@fpt.edu.vn', joined: '20/5/2024', docs: 12, status: 'active' },
   { initial: 'T', name: 'Tran Thi B', email: 'studentb@fpt.edu.vn', joined: '19/5/2024', docs: 8, status: 'active' },
