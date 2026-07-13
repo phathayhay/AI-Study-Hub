@@ -2,6 +2,7 @@ package com.studyhub.user.service;
 
 import com.studyhub.user.entity.Role;
 import com.studyhub.user.entity.SubscriptionPlan;
+import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.RoleRepository;
 import com.studyhub.user.repository.SubscriptionPlanRepository;
 import com.studyhub.user.repository.UserRepository;
@@ -9,9 +10,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Slf4j
 @Component
@@ -21,6 +24,25 @@ public class SubscriptionPlanInitializer implements ApplicationRunner {
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    @Value("${app.demo-account.enabled:false}")
+    private boolean demoAccountEnabled;
+
+    @Value("${app.demo-account.email:demo@studyhub.local}")
+    private String demoAccountEmail;
+
+    @Value("${app.demo-account.password:StudyHub@123}")
+    private String demoAccountPassword;
+
+    @Value("${app.demo-admin.enabled:false}")
+    private boolean demoAdminEnabled;
+
+    @Value("${app.demo-admin.email:admin@studyhub.local}")
+    private String demoAdminEmail;
+
+    @Value("${app.demo-admin.password:Admin@123}")
+    private String demoAdminPassword;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -42,6 +64,70 @@ public class SubscriptionPlanInitializer implements ApplicationRunner {
                 userRepository.save(user);
             }
         });
+
+        if (demoAccountEnabled) {
+            seedDemoAccount();
+        }
+
+        if (demoAdminEnabled) {
+            seedDemoAdmin();
+        }
+    }
+
+    private void seedDemoAccount() {
+        String email = demoAccountEmail.trim().toLowerCase();
+        if (userRepository.existsByEmail(email)) {
+            log.info("Demo account already exists: {}", email);
+            return;
+        }
+
+        Role userRole = roleRepository.findByRoleName("USER")
+                .orElseThrow(() -> new IllegalStateException("USER role must exist before seeding demo account"));
+        SubscriptionPlan freePlan = subscriptionPlanRepository.findByPlanName("FREE")
+                .orElseThrow(() -> new IllegalStateException("FREE plan must exist before seeding demo account"));
+
+        User demoUser = User.builder()
+                .firstName("Demo")
+                .lastName("User")
+                .email(email)
+                .passwordHash(passwordEncoder.encode(demoAccountPassword))
+                .plan(freePlan)
+                .role(userRole)
+                .status(com.studyhub.common.enums.UserStatus.ACTIVE)
+                .verificationStatus(com.studyhub.common.enums.VerificationStatus.APPROVED)
+                .verifiedAt(LocalDateTime.now())
+                .build();
+
+        userRepository.save(demoUser);
+        log.warn("Seeded dev demo account {}. Do not enable app.demo-account.enabled in production.", email);
+    }
+
+    private void seedDemoAdmin() {
+        String email = demoAdminEmail.trim().toLowerCase();
+        if (userRepository.existsByEmail(email)) {
+            log.info("Demo admin account already exists: {}", email);
+            return;
+        }
+
+        Role adminRole = roleRepository.findByRoleName("ADMIN")
+                .orElseThrow(() -> new IllegalStateException("ADMIN role must exist before seeding demo admin account"));
+        SubscriptionPlan freePlan = subscriptionPlanRepository.findByPlanName("FREE")
+                .orElseThrow(() -> new IllegalStateException("FREE plan must exist before seeding demo admin account"));
+
+        User demoAdmin = User.builder()
+                .firstName("Demo")
+                .lastName("Admin")
+                .email(email)
+                .passwordHash(passwordEncoder.encode(demoAdminPassword))
+                .plan(freePlan)
+                .role(adminRole)
+                .status(com.studyhub.common.enums.UserStatus.ACTIVE)
+                .verificationStatus(com.studyhub.common.enums.VerificationStatus.APPROVED)
+                .verifiedAt(LocalDateTime.now())
+                .build();
+
+        userRepository.save(demoAdmin);
+        log.warn("Seeded dev demo admin account {}. Do not enable app.demo-admin.enabled in production.", email);
     }
 
     private void initializePlan(
