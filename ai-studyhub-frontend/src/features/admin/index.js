@@ -1,4 +1,3 @@
-export { AdminApp } from './AdminApp'
 export { adminUserApi } from './api/adminUserApi'
 export { adminDocumentApi } from './api/adminDocumentApi'
 export { adminCourseApi } from './api/adminCourseApi'

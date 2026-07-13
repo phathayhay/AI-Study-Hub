@@ -29,7 +29,7 @@ export function sortItems(items, sortValue, readers) {
   })
 }
 
-function compareText(left, right) {
+export function compareText(left, right) {
   return String(left || '').localeCompare(String(right || ''), 'vi', { sensitivity: 'base' })
 }
 
@@ -38,4 +38,3 @@ function compareDate(left, right) {
   const rightTime = right ? new Date(right).getTime() : 0
   return (Number.isNaN(leftTime) ? 0 : leftTime) - (Number.isNaN(rightTime) ? 0 : rightTime)
 }
-

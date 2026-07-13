@@ -1,2 +1,1 @@
-export { AdminSidebar as default, AdminSidebar } from '../../../pages/study-hub/admin'
-
+export { AdminSidebar as default, AdminSidebar } from './layout/AdminLayout'

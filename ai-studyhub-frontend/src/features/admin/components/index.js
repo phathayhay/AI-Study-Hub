@@ -6,4 +6,4 @@ export { AdminResourceState, AdminNoResults } from './AdminResourceState'
 export { AdminStatus } from './AdminStatus'
 export { AdminSearch, AdminStatusFilter } from './AdminFilters'
 export { AdminSectionHeader } from './AdminSectionHeader'
-
+export { AdminSortableTh } from './AdminSortableTh'

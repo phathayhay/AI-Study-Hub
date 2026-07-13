@@ -1,16 +1,16 @@
 import { useState } from 'react'
-import { AdminLayout } from './components/AdminLayout'
-import { AdminCourseModal } from './components/modals/AdminCourseModal'
-import { AdminUserModal } from './components/modals/AdminUserModal'
-import AdminOverviewPage from './pages/AdminOverviewPage'
-import AdminUsersPage from './pages/AdminUsersPage'
-import AdminDocumentsPage from './pages/AdminDocumentsPage'
-import AdminCoursesPage from './pages/AdminCoursesPage'
-import AdminStoragePage from './pages/AdminStoragePage'
-import AdminReportsPage from './pages/AdminReportsPage'
-import AdminLogsPage from './pages/AdminLogsPage'
-import AdminSettingsPage from './pages/AdminSettingsPage'
-import { ADMIN_ROUTES } from './constants/adminRoutes'
+import { AdminLayout } from '../../../features/admin/components/AdminLayout'
+import { AdminCourseModal } from '../../../features/admin/components/modals/AdminCourseModal'
+import { AdminUserModal } from '../../../features/admin/components/modals/AdminUserModal'
+import AdminOverviewPage from './AdminOverviewPage'
+import AdminUsersPage from './AdminUsersPage'
+import AdminDocumentsPage from './AdminDocumentsPage'
+import AdminCoursesPage from './AdminCoursesPage'
+import AdminStoragePage from './AdminStoragePage'
+import AdminReportsPage from './AdminReportsPage'
+import AdminLogsPage from './AdminLogsPage'
+import AdminSettingsPage from './AdminSettingsPage'
+import { ADMIN_ROUTES } from '../../../features/admin/constants/adminRoutes'
 
 const pageByRoute = {
   [ADMIN_ROUTES.overview]: AdminOverviewPage,
@@ -45,4 +45,3 @@ export function AdminApp({ route, onNavigate, onLogout }) {
 }
 
 export default AdminApp
-

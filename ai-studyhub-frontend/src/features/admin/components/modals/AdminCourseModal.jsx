@@ -1,2 +1,1 @@
-export { AdminCourseModal as default, AdminCourseModal } from '../../../../pages/study-hub/admin'
-
+export { AdminCourseModal as default, AdminCourseModal } from './AdminAccountModals'

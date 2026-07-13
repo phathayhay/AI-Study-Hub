@@ -32,3 +32,14 @@ export function getDocumentName(doc = {}) {
   return doc.title || doc.fileName || 'Untitled'
 }
 
+export function formatTypeLabel(value, types = []) {
+  return types.find(([type]) => type === value)?.[1] || String(value || 'All')
+}
+
+export function getRenderableCloudinaryImage(url) {
+  const value = String(url || '').trim()
+  if (!value.includes('/image/upload/')) return value
+  if (value.includes('/image/upload/f_jpg,q_auto/')) return value
+  if (value.includes('/image/upload/f_auto,q_auto/')) return value.replace('/image/upload/f_auto,q_auto/', '/image/upload/f_jpg,q_auto/')
+  return value.replace('/image/upload/', '/image/upload/f_jpg,q_auto/')
+}

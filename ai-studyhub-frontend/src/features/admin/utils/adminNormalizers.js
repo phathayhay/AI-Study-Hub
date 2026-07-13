@@ -31,6 +31,11 @@ export function normalizeStatus(value) {
   return String(value || 'pending').toLowerCase()
 }
 
+export function readCourseMajors(course = {}) {
+  if (Array.isArray(course.majors) && course.majors.length > 0) return course.majors
+  return course.major ? [course.major] : []
+}
+
 export function formatAdminError(err) {
   const target = err?.path ? `${err.method || 'GET'} ${err.path}` : 'admin data'
   if (err?.status >= 500) return `Server error while loading ${target}. Please check the backend logs.`
@@ -38,4 +43,3 @@ export function formatAdminError(err) {
   if (err?.status === 401) return `Your session expired while loading ${target}. Please sign in again.`
   return err?.message || 'Unable to load admin data'
 }
-
