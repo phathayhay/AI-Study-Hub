@@ -15,4 +15,10 @@ public class SubscriptionPlanResponse {
     private BigDecimal price;
     private Long storageLimitMb;
     private Integer aiRequestsPerDay;
+    private Integer durationDays;
+    private Boolean canUseAiSummary;
+    private Boolean canUseFlashcards;
+    private Boolean canUseQuizzes;
+    private Boolean canPublishDocuments;
+    private Boolean canPublishFolders;
 }

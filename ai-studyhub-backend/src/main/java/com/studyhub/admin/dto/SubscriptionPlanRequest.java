@@ -25,6 +25,25 @@ public class SubscriptionPlanRequest {
     @NotNull(message = "AI requests limit cannot be null")
     private Integer aiRequestsPerDay;
 
+    @NotNull(message = "Plan duration cannot be null")
+    @Builder.Default
+    private Integer durationDays = 30;
+
+    @Builder.Default
+    private Boolean canUseAiSummary = true;
+
+    @Builder.Default
+    private Boolean canUseFlashcards = true;
+
+    @Builder.Default
+    private Boolean canUseQuizzes = true;
+
+    @Builder.Default
+    private Boolean canPublishDocuments = false;
+
+    @Builder.Default
+    private Boolean canPublishFolders = false;
+
     @Builder.Default
     private Boolean isActive = true;
 }

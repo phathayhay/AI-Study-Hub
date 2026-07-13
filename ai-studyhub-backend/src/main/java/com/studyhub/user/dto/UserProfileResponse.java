@@ -24,6 +24,15 @@ public class UserProfileResponse {
     private Long majorId;
     private String planName;
     private LocalDateTime planExpiresAt;
+    private Long planStorageLimitMb;
+    private Long planStorageUsedBytes;
+    private Integer planAiRequestsPerDay;
+    private Long planAiRequestsUsedToday;
+    private Boolean planCanUseAiSummary;
+    private Boolean planCanUseFlashcards;
+    private Boolean planCanUseQuizzes;
+    private Boolean planCanPublishDocuments;
+    private Boolean planCanPublishFolders;
     private String currentSemester;
     private UserStatus status;
     private VerificationStatus verificationStatus;

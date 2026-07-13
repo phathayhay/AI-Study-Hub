@@ -73,6 +73,21 @@ export default function Sidebar({
   const formattedExpiry = hasValidExpiry
     ? planExpiresAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     : null
+  const storageLimitMb = Number(user?.planStorageLimitMb || 0)
+  const storageUsedBytes = Number(user?.planStorageUsedBytes || 0)
+  const storageUsedMb = storageUsedBytes / (1024 * 1024)
+  const storagePercent = storageLimitMb > 0 ? Math.min((storageUsedMb / storageLimitMb) * 100, 100) : 0
+  const aiDailyLimit = Number(user?.planAiRequestsPerDay || 0)
+  const aiUsedToday = Number(user?.planAiRequestsUsedToday || 0)
+  const aiPercent = aiDailyLimit > 0 ? Math.min((aiUsedToday / aiDailyLimit) * 100, 100) : 0
+
+  const formatPlanStorage = (valueMb) => {
+    if (!Number.isFinite(valueMb) || valueMb <= 0) return '0 MB'
+    if (valueMb >= 1024) {
+      return `${(valueMb / 1024).toFixed(valueMb >= 10240 ? 0 : 1)} GB`
+    }
+    return `${valueMb.toFixed(valueMb >= 100 ? 0 : 1)} MB`
+  }
 
   const renderNavButton = (routeKey, icon, label) => {
     const isActive = active === routeKey
@@ -464,52 +479,52 @@ export default function Sidebar({
           style={{ padding: collapsed ? '10px 8px' : '12px 14px', display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}
         >
           {!collapsed ? (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                padding: '12px',
-                borderRadius: '12px',
-                background: isDark ? 'rgba(30, 41, 59, 0.88)' : '#f8fafc',
-                border: `1px solid ${isDark ? '#334155' : '#e2e8f0'}`
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'linear-gradient(135deg, #a78bfa, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', flexShrink: 0 }}>
+            <div className="sidebar-plan-card">
+              <div className="sidebar-plan-card__header">
+                <div className="sidebar-plan-card__badge">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.44 2.5 2.5 0 0 1 0-3.12 3 3 0 0 1 0-7.88 2.5 2.5 0 0 1 2.46-6.06z" />
                     <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.44 2.5 2.5 0 0 0 0-3.12 3 3 0 0 0 0-7.88 2.5 2.5 0 0 0-2.46-6.06z" />
                   </svg>
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: isDark ? '#94a3b8' : '#64748b' }}>
-                    Current plan
+                  <div className="sidebar-plan-card__eyebrow">Current plan</div>
+                  <div className="sidebar-plan-card__title">{planLabel}</div>
+                </div>
+              </div>
+
+              <div className="sidebar-plan-card__usage">
+                <div className="sidebar-plan-card__row">
+                  <div className="sidebar-plan-card__labels">
+                    <strong>Storage</strong>
+                    <span>{formatPlanStorage(storageUsedMb)} / {formatPlanStorage(storageLimitMb)}</span>
                   </div>
-                  <div style={{ fontSize: '14px', fontWeight: 700, color: isDark ? '#f8fafc' : '#0f172a' }}>
-                    {planLabel}
+                  <div className="sidebar-plan-card__progress">
+                    <div className="sidebar-plan-card__progress-fill sidebar-plan-card__progress-fill--storage" style={{ width: `${storagePercent}%` }} />
+                  </div>
+                </div>
+
+                <div className="sidebar-plan-card__row">
+                  <div className="sidebar-plan-card__labels">
+                    <strong>AI today</strong>
+                    <span>{aiUsedToday} / {aiDailyLimit || 0}</span>
+                  </div>
+                  <div className="sidebar-plan-card__progress">
+                    <div className="sidebar-plan-card__progress-fill sidebar-plan-card__progress-fill--ai" style={{ width: `${aiPercent}%` }} />
                   </div>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span style={{ fontSize: '12px', color: isDark ? '#cbd5e1' : '#475569' }}>
-                  {hasPaidPlan
-                    ? (formattedExpiry ? `Active until ${formattedExpiry}` : 'Paid plan is active')
-                    : 'Free plan with basic features'}
+              <div className="sidebar-plan-card__footer">
+                <span>
+                  {hasPaidPlan && formattedExpiry
+                    ? `Active until ${formattedExpiry}`
+                    : 'Usage follows your plan limits'}
                 </span>
-                {hasPaidPlan && formattedExpiry && (
-                  <span style={{ fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b' }}>
-                    Renewal date: {formattedExpiry}
-                  </span>
-                )}
-              </div>
-
-              {normalizedPlan !== 'PREMIUM' && (
-                <button onClick={() => onNavigate?.('pricing')} style={{ width: '100%', padding: '8px', backgroundColor: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'background-color 0.2s' }}>
-                  {hasPaidPlan ? 'Change plan' : 'Upgrade'}
+                <button type="button" onClick={() => onNavigate?.('settings', { tab: 'plan' })}>
+                  Manage
                 </button>
-              )}
+              </div>
             </div>
           ) : (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate?.('pricing')} title={formattedExpiry ? `${planLabel} - active until ${formattedExpiry}` : `${planLabel} plan`}>

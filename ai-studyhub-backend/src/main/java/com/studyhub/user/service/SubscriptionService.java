@@ -1,7 +1,10 @@
 package com.studyhub.user.service;
 
-import com.studyhub.user.dto.*;
 import com.studyhub.common.enums.NotificationType;
+import com.studyhub.user.dto.BillingHistoryResponse;
+import com.studyhub.user.dto.SimulatePaymentRequest;
+import com.studyhub.user.dto.SubscriptionPlanResponse;
+import com.studyhub.user.dto.UpgradePaymentResponse;
 import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.entity.UserSubscription;
@@ -31,9 +34,6 @@ public class SubscriptionService {
     private final UserSubscriptionRepository userSubscriptionRepository;
     private final NotificationService notificationService;
 
-    /**
-     * Lấy danh sách các gói dịch vụ đang hoạt động.
-     */
     @Transactional(readOnly = true)
     public List<SubscriptionPlanResponse> getActivePlans() {
         log.info("Fetching active subscription plans");
@@ -46,13 +46,16 @@ public class SubscriptionService {
                         .price(plan.getPrice())
                         .storageLimitMb(plan.getStorageLimitMb())
                         .aiRequestsPerDay(plan.getAiRequestsPerDay())
+                        .durationDays(plan.getDurationDays())
+                        .canUseAiSummary(plan.getCanUseAiSummary())
+                        .canUseFlashcards(plan.getCanUseFlashcards())
+                        .canUseQuizzes(plan.getCanUseQuizzes())
+                        .canPublishDocuments(plan.getCanPublishDocuments())
+                        .canPublishFolders(plan.getCanPublishFolders())
                         .build())
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Tạo thông tin thanh toán giả lập với mã QR chuyển khoản VietQR động.
-     */
     @Transactional(readOnly = true)
     public UpgradePaymentResponse getUpgradePaymentInfo(Long planId, String email) {
         log.info("Generating payment info for plan {} and user {}", planId, email);
@@ -60,29 +63,45 @@ public class SubscriptionService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        SubscriptionPlan plan = subscriptionPlanRepository.findById(planId)
+        SubscriptionPlan targetPlan = subscriptionPlanRepository.findById(planId)
                 .orElseThrow(() -> new IllegalArgumentException("Subscription plan not found"));
 
-        if ("FREE".equalsIgnoreCase(plan.getPlanName())) {
-            throw new IllegalArgumentException("Cannot purchase/upgrade to FREE plan");
+        if ("FREE".equalsIgnoreCase(targetPlan.getPlanName())) {
+            throw new IllegalArgumentException("Cannot purchase or upgrade to FREE plan");
         }
 
-        // Tạo nội dung chuyển khoản ngẫu nhiên nhưng đặc trưng
+        SubscriptionPlan currentPlan = user.getPlan();
+        BigDecimal currentPlanPrice = currentPlan != null && currentPlan.getPrice() != null
+                ? currentPlan.getPrice()
+                : BigDecimal.ZERO;
+
+        if (currentPlan != null && targetPlan.getPlanName().equalsIgnoreCase(currentPlan.getPlanName())) {
+            throw new IllegalArgumentException("You are already using this plan.");
+        }
+
+        if (currentPlan != null && targetPlan.getPrice().compareTo(currentPlanPrice) < 0) {
+            throw new IllegalArgumentException("Downgrade is not supported in this flow.");
+        }
+
+        BigDecimal amountDue = targetPlan.getPrice().subtract(currentPlanPrice).max(BigDecimal.ZERO);
+
         int randomCode = 1000 + new Random().nextInt(9000);
-        String transferContent = String.format("SHUPGRADE %d %d %d", user.getId(), plan.getId(), randomCode);
+        String transferContent = String.format("SHUPGRADE %d %d %d", user.getId(), targetPlan.getId(), randomCode);
 
         String accountName = "CONG TY AI STUDYHUB FPT";
         String bankName = "TPBank";
         String accountNumber = "00004103937";
-        BigDecimal price = plan.getPrice();
-
-        // Xây dựng VietQR Image Link
-        String qrCodeUrl = buildVietQrUrl(bankName, accountNumber, price, transferContent, accountName);
+        String qrCodeUrl = buildVietQrUrl(bankName, accountNumber, amountDue, transferContent, accountName);
 
         return UpgradePaymentResponse.builder()
-                .planId(plan.getId())
-                .planName(plan.getPlanName())
-                .amount(price)
+                .planId(targetPlan.getId())
+                .planName(targetPlan.getPlanName())
+                .currentPlanName(currentPlan != null ? currentPlan.getPlanName() : "FREE")
+                .amount(amountDue)
+                .currentPlanPrice(currentPlanPrice)
+                .targetPlanPrice(targetPlan.getPrice())
+                .creditApplied(currentPlanPrice)
+                .durationDays(targetPlan.getDurationDays())
                 .accountName(accountName)
                 .bankName(bankName)
                 .accountNumber(accountNumber)
@@ -91,9 +110,6 @@ public class SubscriptionService {
                 .build();
     }
 
-    /**
-     * Giả lập thanh toán thành công chuyển khoản để nâng cấp gói tức thì.
-     */
     @Transactional
     public void simulatePaymentSuccess(SimulatePaymentRequest request, String email) {
         log.info("Simulating payment success for user {} and plan {}", email, request.getPlanId());
@@ -101,26 +117,39 @@ public class SubscriptionService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        SubscriptionPlan plan = subscriptionPlanRepository.findById(request.getPlanId())
+        SubscriptionPlan targetPlan = subscriptionPlanRepository.findById(request.getPlanId())
                 .orElseThrow(() -> new IllegalArgumentException("Subscription plan not found"));
 
-        // 1. Tắt toàn bộ gói dịch vụ cũ đang hoạt động của người dùng
+        SubscriptionPlan currentPlan = user.getPlan();
+        if (currentPlan != null && targetPlan.getPlanName().equalsIgnoreCase(currentPlan.getPlanName())) {
+            throw new IllegalArgumentException("You are already using this plan.");
+        }
+
         List<UserSubscription> activeSubs = userSubscriptionRepository.findByUser_IdAndIsActiveTrue(user.getId());
+        LocalDateTime preservedEndDate = activeSubs.stream()
+                .map(UserSubscription::getEndDate)
+                .filter(endDate -> endDate != null && endDate.isAfter(LocalDateTime.now()))
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
+
         for (UserSubscription sub : activeSubs) {
             sub.setIsActive(false);
             userSubscriptionRepository.save(sub);
         }
 
-        // 2. Cập nhật gói dịch vụ trực tiếp trong bảng người dùng
-        user.setPlan(plan);
+        user.setPlan(targetPlan);
         userRepository.save(user);
 
-        // 3. Lưu lịch sử giao dịch và thời gian hoạt động gói mới
+        LocalDateTime startDate = LocalDateTime.now();
+        LocalDateTime endDate = preservedEndDate != null
+                ? preservedEndDate
+                : startDate.plusDays(targetPlan.getDurationDays() != null ? targetPlan.getDurationDays() : 30L);
+
         UserSubscription newSub = UserSubscription.builder()
                 .user(user)
-                .plan(plan)
-                .startDate(LocalDateTime.now())
-                .endDate(LocalDateTime.now().plusDays(30)) // Gói có giá trị trong 30 ngày
+                .plan(targetPlan)
+                .startDate(startDate)
+                .endDate(endDate)
                 .isActive(true)
                 .build();
 
@@ -128,15 +157,12 @@ public class SubscriptionService {
         notificationService.createNotification(
                 user,
                 "Plan Upgraded",
-                String.format("Your %s plan is now active until %s.", plan.getPlanName(), newSub.getEndDate().toLocalDate()),
+                String.format("Your %s plan is now active until %s.", targetPlan.getPlanName(), newSub.getEndDate().toLocalDate()),
                 NotificationType.SYSTEM
         );
-        log.info("Successfully upgraded user {} to plan {}", email, plan.getPlanName());
+        log.info("Successfully upgraded user {} to plan {}", email, targetPlan.getPlanName());
     }
 
-    /**
-     * Lấy lịch sử giao dịch thanh toán của người dùng hiện tại.
-     */
     @Transactional(readOnly = true)
     public List<BillingHistoryResponse> getBillingHistory(String email) {
         log.info("Fetching billing history for user {}", email);
@@ -151,9 +177,6 @@ public class SubscriptionService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Hỗ trợ sinh URL VietQR
-     */
     private String buildVietQrUrl(String bank, String account, BigDecimal amount, String content, String name) {
         try {
             String encodedContent = URLEncoder.encode(content, StandardCharsets.UTF_8.toString());
@@ -164,7 +187,6 @@ public class SubscriptionService {
             );
         } catch (Exception e) {
             log.error("Failed to build VietQR URL: {}", e.getMessage());
-            // Fallback URL
             return String.format(
                     "https://img.vietqr.io/image/%s-%s-compact2.png?amount=%s&addInfo=%s",
                     mapBankCode(bank), account, amount.toPlainString(), content

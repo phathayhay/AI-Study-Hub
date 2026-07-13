@@ -106,31 +106,33 @@ export function NotificationPanel({
           </button>
         ))}
       </nav>
-      {loading ? (
-        <div style={{ padding: '24px 22px', color: '#64748b' }}>Loading notifications...</div>
-      ) : filteredNotifications.length === 0 ? (
-        <div style={{ padding: '24px 22px', color: '#64748b' }}>No notifications yet.</div>
-      ) : (
-        filteredNotifications.map((item) => {
-          const visual = getNoticeVisual(item)
-          return (
-            <article
-              className={`notice-item notice-item--${visual.tone}`}
-              key={item.id}
-              onClick={() => onOpenNotification?.(item)}
-              style={{ cursor: 'pointer', opacity: item.isRead ? 0.82 : 1 }}
-            >
-              <span><StudyHubIcon name={visual.icon} size={22} /></span>
-              <div>
-                <h3>{item.title}</h3>
-                <p>{item.content}</p>
-                <strong>{item.notificationType === 'DOCUMENT' ? 'AI Study Hub' : 'Activity'}</strong> <small>{formatTimeAgo(item.createdAt)}</small>
-              </div>
-            </article>
-          )
-        })
-      )}
-      <button className="all-notifications" type="button">End of notifications</button>
+      <div className="notification-panel__body">
+        {loading ? (
+          <div style={{ padding: '24px 22px', color: '#64748b' }}>Loading notifications...</div>
+        ) : filteredNotifications.length === 0 ? (
+          <div style={{ padding: '24px 22px', color: '#64748b' }}>No notifications yet.</div>
+        ) : (
+          filteredNotifications.map((item) => {
+            const visual = getNoticeVisual(item)
+            return (
+              <article
+                className={`notice-item notice-item--${visual.tone}`}
+                key={item.id}
+                onClick={() => onOpenNotification?.(item)}
+                style={{ cursor: 'pointer', opacity: item.isRead ? 0.82 : 1 }}
+              >
+                <span><StudyHubIcon name={visual.icon} size={22} /></span>
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.content}</p>
+                  <strong>{item.notificationType === 'DOCUMENT' ? 'AI Study Hub' : 'Activity'}</strong> <small>{formatTimeAgo(item.createdAt)}</small>
+                </div>
+              </article>
+            )
+          })
+        )}
+        <button className="all-notifications" type="button">End of notifications</button>
+      </div>
     </aside>
   )
 }
@@ -259,8 +261,8 @@ export function ReportModal({ onClose, documentId }) {
   )
 }
 
-export function SettingsModal({ onClose, user, onUserUpdate }) {
-  const [activeTab, setActiveTab] = useState('profile')
+export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initialTab = 'profile' }) {
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [loading, setLoading] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
@@ -292,6 +294,10 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
   }, [user?.verificationStatus])
 
   useEffect(() => {
+    setActiveTab(initialTab || 'profile')
+  }, [initialTab])
+
+  useEffect(() => {
     setFirstName(user?.firstName || '')
     setLastName(user?.lastName || '')
     setCampus(user?.campus || 'HCM')
@@ -308,6 +314,35 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
       })
       .catch((err) => console.error('Failed to load majors:', err))
   }, [])
+
+  const normalizedPlan = String(user?.planName || 'FREE').toUpperCase()
+  const planExpiresAt = user?.planExpiresAt ? new Date(user.planExpiresAt) : null
+  const hasValidExpiry = planExpiresAt && !Number.isNaN(planExpiresAt.getTime())
+  const formattedExpiry = hasValidExpiry
+    ? planExpiresAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    : null
+  const storageLimitMb = Number(user?.planStorageLimitMb || 0)
+  const storageUsedBytes = Number(user?.planStorageUsedBytes || 0)
+  const storageUsedMb = storageUsedBytes / (1024 * 1024)
+  const storagePercent = storageLimitMb > 0 ? Math.min((storageUsedMb / storageLimitMb) * 100, 100) : 0
+  const aiDailyLimit = Number(user?.planAiRequestsPerDay || 0)
+  const aiUsedToday = Number(user?.planAiRequestsUsedToday || 0)
+  const aiPercent = aiDailyLimit > 0 ? Math.min((aiUsedToday / aiDailyLimit) * 100, 100) : 0
+  const planRights = [
+    { label: 'AI Summary', enabled: Boolean(user?.planCanUseAiSummary) },
+    { label: 'Flashcards', enabled: Boolean(user?.planCanUseFlashcards) },
+    { label: 'Quizzes', enabled: Boolean(user?.planCanUseQuizzes) },
+    { label: 'Public documents', enabled: Boolean(user?.planCanPublishDocuments) },
+    { label: 'Public folders', enabled: Boolean(user?.planCanPublishFolders) },
+  ]
+
+  const formatStorageText = (valueMb) => {
+    if (!Number.isFinite(valueMb) || valueMb <= 0) return '0 MB'
+    if (valueMb >= 1024) {
+      return `${(valueMb / 1024).toFixed(valueMb >= 10240 ? 0 : 1)} GB`
+    }
+    return `${valueMb.toFixed(valueMb >= 100 ? 0 : 1)} MB`
+  }
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault()
@@ -432,6 +467,7 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
 
         <nav className="settings-modal-tabs bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 transition-colors duration-300">
           <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => { setActiveTab('profile'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Profile</button>
+          <button className={activeTab === 'plan' ? 'active' : ''} onClick={() => { setActiveTab('plan'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Plan</button>
           <button className={activeTab === 'password' ? 'active' : ''} onClick={() => { setActiveTab('password'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Security</button>
           <button className={activeTab === 'verification' ? 'active' : ''} onClick={() => { setActiveTab('verification'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Verification</button>
         </nav>
@@ -523,6 +559,74 @@ export function SettingsModal({ onClose, user, onUserUpdate }) {
                 {loading ? 'Saving...' : 'Save Profile Changes'}
               </button>
             </form>
+          )}
+
+          {activeTab === 'plan' && (
+            <div className="settings-plan-panel">
+              <div className="settings-plan-hero">
+                <div>
+                  <span className="settings-plan-eyebrow">Current plan</span>
+                  <h3>{normalizedPlan}</h3>
+                  <p>
+                    {formattedExpiry
+                      ? `Your plan is active until ${formattedExpiry}.`
+                      : 'Your current plan is active.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="settings-plan-upgrade-btn"
+                  onClick={() => {
+                    onClose?.()
+                    onNavigate?.('pricing')
+                  }}
+                >
+                  Compare plans
+                </button>
+              </div>
+
+              <div className="settings-plan-usage-grid">
+                <div className="settings-plan-usage-card">
+                  <div className="settings-plan-usage-head">
+                    <strong>Storage</strong>
+                    <span>{formatStorageText(storageUsedMb)} / {formatStorageText(storageLimitMb)}</span>
+                  </div>
+                  <div className="settings-plan-progress">
+                    <div className="settings-plan-progress__fill settings-plan-progress__fill--storage" style={{ width: `${storagePercent}%` }} />
+                  </div>
+                  <small>{formatStorageText(Math.max(storageLimitMb - storageUsedMb, 0))} remaining</small>
+                </div>
+
+                <div className="settings-plan-usage-card">
+                  <div className="settings-plan-usage-head">
+                    <strong>AI usage today</strong>
+                    <span>{aiUsedToday} / {aiDailyLimit || 0} requests</span>
+                  </div>
+                  <div className="settings-plan-progress">
+                    <div className="settings-plan-progress__fill settings-plan-progress__fill--ai" style={{ width: `${aiPercent}%` }} />
+                  </div>
+                  <small>{Math.max(aiDailyLimit - aiUsedToday, 0)} AI requests left today</small>
+                </div>
+              </div>
+
+              <div className="settings-plan-rights">
+                <div className="settings-plan-rights__header">
+                  <strong>Included features</strong>
+                  <small>What this plan unlocks for your workspace.</small>
+                </div>
+                <div className="settings-plan-rights__grid">
+                  {planRights.map((right) => (
+                    <div
+                      key={right.label}
+                      className={`settings-plan-right ${right.enabled ? 'is-enabled' : 'is-disabled'}`}
+                    >
+                      <span>{right.label}</span>
+                      <strong>{right.enabled ? 'Included' : 'Locked'}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
 
           {activeTab === 'password' && (
@@ -831,6 +935,10 @@ export function UpgradePaymentModal({ onClose, user, plan, paymentInfo, onUpgrad
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [copiedField, setCopiedField] = useState(null)
+  const currentPlanName = paymentInfo?.currentPlanName || user?.planName || 'FREE'
+  const fullPrice = Number(paymentInfo?.targetPlanPrice || paymentInfo?.amount || 0)
+  const creditApplied = Number(paymentInfo?.creditApplied || 0)
+  const amountDue = Number(paymentInfo?.amount || 0)
 
   const handleCopy = (text, fieldName) => {
     navigator.clipboard.writeText(text)
@@ -927,7 +1035,30 @@ export function UpgradePaymentModal({ onClose, user, plan, paymentInfo, onUpgrad
           ) : (
             <>
               <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 text-blue-800 dark:text-blue-300 transition-colors duration-300" style={{ padding: '12px 16px', borderRadius: '8px', fontSize: '13px', lineHeight: '18px' }}>
-                Please transfer the exact amount and use the exact payment description below so the system can match your upgrade request automatically.
+                This payment reflects the upgrade difference only. Please transfer the exact amount and use the exact payment description below so the system can match your request automatically.
+              </div>
+
+              <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 transition-colors duration-300" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', padding: '14px 16px', borderRadius: '12px' }}>
+                <div style={{ display: 'grid', gap: '4px' }}>
+                  <span className="text-slate-500 dark:text-slate-400" style={{ fontSize: '12px', fontWeight: 600 }}>Current plan</span>
+                  <strong className="text-slate-900 dark:text-white" style={{ fontSize: '14px' }}>{currentPlanName}</strong>
+                </div>
+                <div style={{ display: 'grid', gap: '4px' }}>
+                  <span className="text-slate-500 dark:text-slate-400" style={{ fontSize: '12px', fontWeight: 600 }}>Target plan</span>
+                  <strong className="text-slate-900 dark:text-white" style={{ fontSize: '14px' }}>{paymentInfo.planName}</strong>
+                </div>
+                <div style={{ display: 'grid', gap: '4px' }}>
+                  <span className="text-slate-500 dark:text-slate-400" style={{ fontSize: '12px', fontWeight: 600 }}>Full plan price</span>
+                  <strong className="text-slate-900 dark:text-white" style={{ fontSize: '14px' }}>{fullPrice.toLocaleString('en-US')} VND</strong>
+                </div>
+                <div style={{ display: 'grid', gap: '4px' }}>
+                  <span className="text-slate-500 dark:text-slate-400" style={{ fontSize: '12px', fontWeight: 600 }}>Credit applied</span>
+                  <strong className="text-emerald-600 dark:text-emerald-400" style={{ fontSize: '14px' }}>{creditApplied.toLocaleString('en-US')} VND</strong>
+                </div>
+                <div style={{ display: 'grid', gap: '4px', gridColumn: '1 / -1' }}>
+                  <span className="text-slate-500 dark:text-slate-400" style={{ fontSize: '12px', fontWeight: 600 }}>Amount due now</span>
+                  <strong className="text-slate-950 dark:text-white" style={{ fontSize: '18px' }}>{amountDue.toLocaleString('en-US')} VND</strong>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '24px', alignItems: 'center' }}>
@@ -981,7 +1112,7 @@ export function UpgradePaymentModal({ onClose, user, plan, paymentInfo, onUpgrad
                     <span className="text-slate-465 dark:text-slate-500" style={{ fontSize: '12px', fontWeight: 500 }}>Transfer amount</span>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }} className="dark:bg-slate-900 dark:border-slate-700">
                       <span className="text-emerald-600 dark:text-emerald-400 font-bold" style={{ fontSize: '15px' }}>
-                        {Number(paymentInfo.amount).toLocaleString('en-US')} VND
+                        {amountDue.toLocaleString('en-US')} VND
                       </span>
                       <button
                         onClick={() => handleCopyEnglish(String(paymentInfo.amount), 'Transfer amount')}

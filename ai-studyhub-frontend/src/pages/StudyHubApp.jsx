@@ -15,7 +15,8 @@ import { getFolder } from '../features/folders/folderService'
 import { getDocument, searchDocuments } from '../features/documents/documentService'
 import { register as apiRegister } from '../features/auth/authService'
 import { ROUTES, ROUTE_PATHS, fillRoute } from '../constants/routes'
-import { getNotifications as getUserNotifications, markAllNotificationsAsRead, markNotificationAsRead } from '../services/userService'
+import { getNotifications as getUserNotifications, getUserProfile, markAllNotificationsAsRead, markNotificationAsRead } from '../services/userService'
+import { getToken } from '../services/api'
 
 const defaultStudyFile = {
   name: '漢字--JPD316 Lesson 5-NEW.pptx',
@@ -61,6 +62,7 @@ export default function StudyHubApp() {
   const [showReport, setShowReport] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState('profile')
   const [showFeatureRequest, setShowFeatureRequest] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
   const [showExtension, setShowExtension] = useState(false)
@@ -232,6 +234,46 @@ export default function StudyHubApp() {
       console.error('Failed to load notifications', err)
     } finally {
       setNotificationLoading(false)
+    }
+  }
+
+  const refreshCurrentUserProfile = async () => {
+    if (!user) return
+    try {
+      const res = await getUserProfile()
+      const profile = res?.data || res
+      if (!profile) return
+      setUser((current) => ({
+        ...current,
+        id: profile.id,
+        email: profile.email || current?.email,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        fullName: profile.fullName,
+        role: profile.role,
+        avatarUrl: profile.avatarUrl,
+        verificationStatus: profile.verificationStatus,
+        campus: profile.campus,
+        majorId: profile.majorId,
+        majorName: profile.majorName,
+        currentSemester: profile.currentSemester,
+        status: profile.status,
+        planName: profile.planName,
+        planExpiresAt: profile.planExpiresAt,
+        planStorageLimitMb: profile.planStorageLimitMb,
+        planStorageUsedBytes: profile.planStorageUsedBytes,
+        planAiRequestsPerDay: profile.planAiRequestsPerDay,
+        planAiRequestsUsedToday: profile.planAiRequestsUsedToday,
+        planCanUseAiSummary: profile.planCanUseAiSummary,
+        planCanUseFlashcards: profile.planCanUseFlashcards,
+        planCanUseQuizzes: profile.planCanUseQuizzes,
+        planCanPublishDocuments: profile.planCanPublishDocuments,
+        planCanPublishFolders: profile.planCanPublishFolders,
+        verificationRequestSubmitted: profile.verificationRequestSubmitted,
+        verificationReviewNote: profile.verificationReviewNote,
+      }))
+    } catch (err) {
+      console.error('Failed to refresh user profile after upload:', err)
     }
   }
 
@@ -483,7 +525,11 @@ export default function StudyHubApp() {
 
   const navigate = (nextRoute, params = {}) => {
     if (nextRoute === 'logout') { handleLogout(); return }
-    if (nextRoute === 'settings') { setShowSettings(true); return }
+    if (nextRoute === 'settings') {
+      setSettingsInitialTab(params.tab || 'profile')
+      setShowSettings(true)
+      return
+    }
     if (nextRoute === 'feature-request') { setShowFeatureRequest(true); return }
     if (nextRoute === 'support') { setShowSupport(true); return }
     if (nextRoute === 'chrome-extension') { setShowExtension(true); return }
@@ -492,7 +538,7 @@ export default function StudyHubApp() {
     if (nextRoute !== 'folder-detail') setCurrentFolder(null)
 
     // Enforce route guards
-    const hasToken = !!localStorage.getItem('accessToken')
+    const hasToken = !!getToken()
     const isGuest = !user && !hasToken
     const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']
     let targetBaseRoute = nextRoute
@@ -605,8 +651,8 @@ export default function StudyHubApp() {
     }
   }
 
-  const handleLogin = async (res) => {
-    const u = await authLogin(res)
+  const handleLogin = async (res, remember = true) => {
+    const u = await authLogin(res, remember)
     if (u) {
       migrateGuestHistoryToUser(u.id || u.email || 'user')
     }
@@ -775,6 +821,7 @@ export default function StudyHubApp() {
       {route === 'explore' && (
         <ExplorePage 
           guest={guest} 
+          user={user}
           onNavigate={navigate} 
           initialKeyword={exploreFilters.keyword}
           initialMajor={exploreFilters.majorCode}
@@ -819,6 +866,7 @@ export default function StudyHubApp() {
         <UploadPage
           mode={uploadMode}
           onStudyFileUploaded={handleStudyUpload}
+          onDocumentUploaded={refreshCurrentUserProfile}
           onNavigate={navigate}
           defaultFolderId={previousRoute === 'folder-detail' ? selectedFolderId : null}
         />
@@ -866,7 +914,7 @@ export default function StudyHubApp() {
 
 
       {showReport && <ReportModal onClose={() => setShowReport(false)} documentId={selectedDocId} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} user={user} onUserUpdate={setUser} />}
+      {showSettings && <SettingsModal initialTab={settingsInitialTab} onClose={() => setShowSettings(false)} user={user} onUserUpdate={setUser} onNavigate={navigate} />}
       {showFeatureRequest && <FeatureRequestModal onClose={() => setShowFeatureRequest(false)} />}
       {showSupport && <SupportModal onClose={() => setShowSupport(false)} />}
       {showExtension && <ChromeExtensionModal onClose={() => setShowExtension(false)} />}

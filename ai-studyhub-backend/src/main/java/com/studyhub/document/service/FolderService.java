@@ -192,6 +192,9 @@ public class FolderService {
         Visibility nextVisibility = visibility != null ? visibility : Visibility.PRIVATE;
 
         if (nextVisibility == Visibility.PUBLIC) {
+            if (!Boolean.TRUE.equals(user.getPlan().getCanPublishFolders())) {
+                throw new IllegalArgumentException("Your current plan does not allow publishing folders.");
+            }
             validateFolderCanBePublished(folder);
             folder.setVisibility(Visibility.PUBLIC);
             if (folder.getPublishedAt() == null) {

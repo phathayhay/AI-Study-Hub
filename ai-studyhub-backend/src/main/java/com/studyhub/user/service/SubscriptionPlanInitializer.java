@@ -26,17 +26,15 @@ public class SubscriptionPlanInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         log.info("Checking subscription plans database initialization...");
 
-        initializePlan("FREE", "Gói học tập cơ bản miễn phí", BigDecimal.ZERO, 500L, 10);
-        initializePlan("PRO", "Gói học tập nâng cao cho sinh viên", BigDecimal.valueOf(99000), 5120L, 100);
-        initializePlan("PREMIUM", "Gói học tập không giới hạn cho Thủ khoa", BigDecimal.valueOf(199000), 20480L, 1000);
+        initializePlan("FREE", "Starter plan for new students", BigDecimal.ZERO, 50L, 10, 30, true, true, true, false, false);
+        initializePlan("PRO", "More storage and publishing tools for active learners", BigDecimal.valueOf(99000), 500L, 100, 30, true, true, true, true, true);
+        initializePlan("PREMIUM", "Highest storage and AI capacity for heavy study workflows", BigDecimal.valueOf(199000), 2048L, 1000, 30, true, true, true, true, true);
 
-        // Đảm bảo có vai trò ADMIN và USER trong Database
         Role adminRole = roleRepository.findByRoleName("ADMIN")
                 .orElseGet(() -> roleRepository.save(new Role(null, "ADMIN")));
         roleRepository.findByRoleName("USER")
                 .orElseGet(() -> roleRepository.save(new Role(null, "USER")));
 
-        // Tự động nâng cấp tài khoản test của bạn lên ADMIN
         userRepository.findByEmail("sd160020@fpt.edu.vn").ifPresent(user -> {
             if (user.getRole() == null || !"ADMIN".equalsIgnoreCase(user.getRole().getRoleName())) {
                 log.info("System: Upgrading user {} to ADMIN role for testing", user.getEmail());
@@ -46,7 +44,19 @@ public class SubscriptionPlanInitializer implements ApplicationRunner {
         });
     }
 
-    private void initializePlan(String planName, String description, BigDecimal price, Long storageLimitMb, Integer aiRequestsPerDay) {
+    private void initializePlan(
+            String planName,
+            String description,
+            BigDecimal price,
+            Long storageLimitMb,
+            Integer aiRequestsPerDay,
+            Integer durationDays,
+            Boolean canUseAiSummary,
+            Boolean canUseFlashcards,
+            Boolean canUseQuizzes,
+            Boolean canPublishDocuments,
+            Boolean canPublishFolders
+    ) {
         subscriptionPlanRepository.findByPlanName(planName).orElseGet(() -> {
             log.info("Seeding subscription plan: {}", planName);
             SubscriptionPlan plan = SubscriptionPlan.builder()
@@ -55,6 +65,12 @@ public class SubscriptionPlanInitializer implements ApplicationRunner {
                     .price(price)
                     .storageLimitMb(storageLimitMb)
                     .aiRequestsPerDay(aiRequestsPerDay)
+                    .durationDays(durationDays)
+                    .canUseAiSummary(canUseAiSummary)
+                    .canUseFlashcards(canUseFlashcards)
+                    .canUseQuizzes(canUseQuizzes)
+                    .canPublishDocuments(canPublishDocuments)
+                    .canPublishFolders(canPublishFolders)
                     .isActive(true)
                     .build();
             return subscriptionPlanRepository.save(plan);

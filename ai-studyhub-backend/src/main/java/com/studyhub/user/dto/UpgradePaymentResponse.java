@@ -11,7 +11,12 @@ import java.math.BigDecimal;
 public class UpgradePaymentResponse {
     private Long planId;
     private String planName;
+    private String currentPlanName;
     private BigDecimal amount;
+    private BigDecimal currentPlanPrice;
+    private BigDecimal targetPlanPrice;
+    private BigDecimal creditApplied;
+    private Integer durationDays;
     private String accountName;
     private String bankName;
     private String accountNumber;

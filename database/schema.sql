@@ -23,6 +23,12 @@ CREATE TABLE subscription_plans (
     price DECIMAL(10,2) NOT NULL DEFAULT 0,
     storage_limit_mb BIGINT NOT NULL,
     ai_requests_per_day INT NOT NULL,
+    duration_days INT NOT NULL DEFAULT 30,
+    can_use_ai_summary BOOLEAN NOT NULL DEFAULT TRUE,
+    can_use_flashcards BOOLEAN NOT NULL DEFAULT TRUE,
+    can_use_quizzes BOOLEAN NOT NULL DEFAULT TRUE,
+    can_publish_documents BOOLEAN NOT NULL DEFAULT FALSE,
+    can_publish_folders BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

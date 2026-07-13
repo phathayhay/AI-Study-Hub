@@ -530,6 +530,12 @@ public class AdminService {
                 .price(request.getPrice())
                 .storageLimitMb(request.getStorageLimitMb())
                 .aiRequestsPerDay(request.getAiRequestsPerDay())
+                .durationDays(request.getDurationDays())
+                .canUseAiSummary(request.getCanUseAiSummary())
+                .canUseFlashcards(request.getCanUseFlashcards())
+                .canUseQuizzes(request.getCanUseQuizzes())
+                .canPublishDocuments(request.getCanPublishDocuments())
+                .canPublishFolders(request.getCanPublishFolders())
                 .isActive(request.getIsActive())
                 .build();
         return subscriptionPlanRepository.save(plan);
@@ -545,6 +551,12 @@ public class AdminService {
         plan.setPrice(request.getPrice());
         plan.setStorageLimitMb(request.getStorageLimitMb());
         plan.setAiRequestsPerDay(request.getAiRequestsPerDay());
+        plan.setDurationDays(request.getDurationDays());
+        plan.setCanUseAiSummary(request.getCanUseAiSummary());
+        plan.setCanUseFlashcards(request.getCanUseFlashcards());
+        plan.setCanUseQuizzes(request.getCanUseQuizzes());
+        plan.setCanPublishDocuments(request.getCanPublishDocuments());
+        plan.setCanPublishFolders(request.getCanPublishFolders());
         plan.setIsActive(request.getIsActive());
         return subscriptionPlanRepository.save(plan);
     }

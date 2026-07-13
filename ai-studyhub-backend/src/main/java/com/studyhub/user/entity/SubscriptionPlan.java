@@ -30,6 +30,30 @@ public class SubscriptionPlan {
     @Column(name = "ai_requests_per_day", nullable = false)
     private Integer aiRequestsPerDay;
 
+    @Column(name = "duration_days", nullable = false)
+    @Builder.Default
+    private Integer durationDays = 30;
+
+    @Column(name = "can_use_ai_summary", nullable = false)
+    @Builder.Default
+    private Boolean canUseAiSummary = true;
+
+    @Column(name = "can_use_flashcards", nullable = false)
+    @Builder.Default
+    private Boolean canUseFlashcards = true;
+
+    @Column(name = "can_use_quizzes", nullable = false)
+    @Builder.Default
+    private Boolean canUseQuizzes = true;
+
+    @Column(name = "can_publish_documents", nullable = false)
+    @Builder.Default
+    private Boolean canPublishDocuments = false;
+
+    @Column(name = "can_publish_folders", nullable = false)
+    @Builder.Default
+    private Boolean canPublishFolders = false;
+
     @Column(name = "is_active")
     @Builder.Default
     private Boolean isActive = true;
