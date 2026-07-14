@@ -47,6 +47,20 @@ Run → Edit Configurations → Active profiles: dev
 ```
 Hoặc: `mvn spring-boot:run -Dspring-boot.run.profiles=dev`
 
+Khi chạy profile `dev`, ứng dụng tự seed một tài khoản demo nếu tài khoản chưa tồn tại:
+```text
+Email: demo@studyhub.local
+Password: StudyHub@123
+```
+Có thể đổi bằng biến môi trường `DEMO_ACCOUNT_EMAIL` và `DEMO_ACCOUNT_PASSWORD`.
+
+Tài khoản admin dev:
+```text
+Email: admin@studyhub.local
+Password: Admin@123
+```
+Có thể đổi bằng biến môi trường `DEMO_ADMIN_EMAIL` và `DEMO_ADMIN_PASSWORD`.
+
 ### 6. Truy cập Swagger UI
 ```
 http://localhost:8080/swagger-ui.html

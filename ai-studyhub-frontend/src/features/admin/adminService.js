@@ -1,151 +1,46 @@
-import { apiDelete, apiDownload, apiGet, apiPost, apiPut } from '../../services/api'
+import { adminCategoryApi, adminMajorApi, adminPlanApi } from './api/adminPlanApi'
+import { adminCourseApi } from './api/adminCourseApi'
+import { adminDashboardApi } from './api/adminDashboardApi'
+import { adminDocumentApi } from './api/adminDocumentApi'
+import { adminLogApi } from './api/adminLogApi'
+import { adminReportApi } from './api/adminReportApi'
+import { adminUserApi } from './api/adminUserApi'
 
-export function getAdminUsers() {
-  return apiGet('/admin/users')
-}
+// Backward-compatible exports for screens that are being migrated incrementally.
+export const getAdminUsers = adminUserApi.list
+export const banAdminUser = adminUserApi.ban
+export const unbanAdminUser = adminUserApi.unban
 
-export function banAdminUser(id) {
-  return apiPost(`/admin/users/${id}/ban`)
-}
+export const getAdminDocuments = adminDocumentApi.list
+export const moderateAdminDocument = adminDocumentApi.moderate
 
-export function unbanAdminUser(id) {
-  return apiPost(`/admin/users/${id}/unban`)
-}
+export const getAdminReports = adminReportApi.list
+export const getAdminReportDetail = adminReportApi.getById
+export const resolveAdminReport = adminReportApi.resolve
+export const getPendingVerifications = adminReportApi.pendingVerifications
+export const reviewVerification = adminReportApi.reviewVerification
 
-export function getAdminDocuments() {
-  return apiGet('/admin/documents')
-}
+export const getAdminPlans = adminPlanApi.list
+export const createAdminPlan = adminPlanApi.create
+export const updateAdminPlan = adminPlanApi.update
+export const deleteAdminPlan = adminPlanApi.remove
 
-export function moderateAdminDocument(id, status) {
-  return apiPost(`/admin/documents/${id}/moderate`, { status })
-}
+export const getAdminMajors = adminMajorApi.list
+export const createAdminMajor = adminMajorApi.create
+export const updateAdminMajor = adminMajorApi.update
+export const deleteAdminMajor = adminMajorApi.remove
 
-export function getAdminReports() {
-  return apiGet('/admin/reports')
-}
+export const getAdminCourses = adminCourseApi.list
+export const createAdminCourse = adminCourseApi.create
+export const updateAdminCourse = adminCourseApi.update
+export const deleteAdminCourse = adminCourseApi.remove
 
-export function getAdminReportDetail(id) {
-  return apiGet(`/admin/reports/${id}`)
-}
+export const getAdminCategories = adminCategoryApi.list
+export const createAdminCategory = adminCategoryApi.create
+export const updateAdminCategory = adminCategoryApi.update
+export const deleteAdminCategory = adminCategoryApi.remove
 
-export function resolveAdminReport(id, status, deleteDocument = false) {
-  return apiPost(`/admin/reports/${id}/resolve`, { status, deleteDocument })
-}
-
-export function getPendingVerifications() {
-  return apiGet('/admin/verifications/pending')
-}
-
-export function reviewVerification(id, status, reviewNote = '') {
-  return apiPost(`/admin/verifications/${id}/review`, { status, reviewNote })
-}
-
-export function getAdminPlans() {
-  return apiGet('/admin/plans')
-}
-
-export function createAdminPlan(body) {
-  return apiPost('/admin/plans', body)
-}
-
-export function updateAdminPlan(id, body) {
-  return apiPut(`/admin/plans/${id}`, body)
-}
-
-export function deleteAdminPlan(id) {
-  return apiDelete(`/admin/plans/${id}`)
-}
-
-export function getAdminMajors() {
-  return apiGet('/admin/majors')
-}
-
-export function createAdminMajor(body) {
-  return apiPost('/admin/majors', body)
-}
-
-export function updateAdminMajor(id, body) {
-  return apiPut(`/admin/majors/${id}`, body)
-}
-
-export function deleteAdminMajor(id) {
-  return apiDelete(`/admin/majors/${id}`)
-}
-
-export function getAdminCourses() {
-  return apiGet('/admin/courses')
-}
-
-export function createAdminCourse(body) {
-  return apiPost('/admin/courses', body)
-}
-
-export function updateAdminCourse(id, body) {
-  return apiPut(`/admin/courses/${id}`, body)
-}
-
-export function deleteAdminCourse(id) {
-  return apiDelete(`/admin/courses/${id}`)
-}
-
-export function getAdminCategories() {
-  return apiGet('/admin/categories')
-}
-
-export function getAdminDashboardAnalytics() {
-  return apiGet('/admin/dashboard/analytics')
-}
-
-export function getAdminActivityLogs(params = {}) {
-  const search = new URLSearchParams()
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') search.set(key, value)
-  })
-  const queryString = search.toString()
-  return apiGet(`/admin/activity-logs${queryString ? `?${queryString}` : ''}`)
-}
-
-export function exportAdminActivityLogs(params = {}) {
-  const search = new URLSearchParams()
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') search.set(key, value)
-  })
-  const queryString = search.toString()
-  return apiDownload(`/admin/activity-logs/export${queryString ? `?${queryString}` : ''}`)
-}
-
-export function createAdminCategory(body) {
-  return apiPost('/admin/categories', body)
-}
-
-export function updateAdminCategory(id, body) {
-  return apiPut(`/admin/categories/${id}`, body)
-}
-
-export function deleteAdminCategory(id) {
-  return apiDelete(`/admin/categories/${id}`)
-}
-
-export function getAdminDashboardData() {
-  return Promise.all([
-    getAdminUsers(),
-    getAdminDocuments(),
-    getAdminReports(),
-    getPendingVerifications(),
-    getAdminPlans(),
-    getAdminMajors(),
-    getAdminCourses(),
-    getAdminCategories(),
-    getAdminDashboardAnalytics(),
-  ]).then(([users, documents, reports, verifications, plans, majors, courses, categories, analytics]) => ({
-    users,
-    documents,
-    reports,
-    verifications,
-    plans,
-    majors,
-    courses,
-    categories,
-    analytics,
-  }))
-}
+export const getAdminDashboardAnalytics = adminDashboardApi.analytics
+export const getAdminActivityLogs = adminLogApi.list
+export const exportAdminActivityLogs = adminLogApi.export
+export const getAdminDashboardData = adminDashboardApi.all
