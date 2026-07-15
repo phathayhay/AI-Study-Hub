@@ -91,3 +91,10 @@ app:
   upload:
     allowed-types: PDF,DOCX,PPTX
     max-size-bytes: 52428800  # 50 MB
+  payment:
+    provider-name: ${PAYMENT_PROVIDER_NAME:BANK_TRANSFER}
+    bank-name: ${PAYMENT_BANK_NAME:TPBank}
+    account-name: ${PAYMENT_ACCOUNT_NAME:CONG TY AI STUDYHUB FPT}
+    account-number: ${PAYMENT_ACCOUNT_NUMBER:00004103937}
+    order-expiry-minutes: ${PAYMENT_ORDER_EXPIRY_MINUTES:30}
+    webhook-secret: ${PAYMENT_WEBHOOK_SECRET:}

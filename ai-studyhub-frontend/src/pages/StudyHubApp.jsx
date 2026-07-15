@@ -261,7 +261,9 @@ export default function StudyHubApp() {
         planName: profile.planName,
         planExpiresAt: profile.planExpiresAt,
         planStorageLimitMb: profile.planStorageLimitMb,
+        planStorageLimitBytes: profile.planStorageLimitBytes,
         planStorageUsedBytes: profile.planStorageUsedBytes,
+        planStorageUsedMb: profile.planStorageUsedMb,
         planAiRequestsPerDay: profile.planAiRequestsPerDay,
         planAiRequestsUsedToday: profile.planAiRequestsUsedToday,
         planCanUseAiSummary: profile.planCanUseAiSummary,
@@ -269,6 +271,10 @@ export default function StudyHubApp() {
         planCanUseQuizzes: profile.planCanUseQuizzes,
         planCanPublishDocuments: profile.planCanPublishDocuments,
         planCanPublishFolders: profile.planCanPublishFolders,
+        storageStatus: profile.storageStatus,
+        overQuota: profile.overQuota,
+        canUpload: profile.canUpload,
+        storageMessage: profile.storageMessage,
         verificationRequestSubmitted: profile.verificationRequestSubmitted,
         verificationReviewNote: profile.verificationReviewNote,
       }))
@@ -865,6 +871,7 @@ export default function StudyHubApp() {
       {route === 'upload' && (
         <UploadPage
           mode={uploadMode}
+          user={user}
           onStudyFileUploaded={handleStudyUpload}
           onDocumentUploaded={refreshCurrentUserProfile}
           onNavigate={navigate}

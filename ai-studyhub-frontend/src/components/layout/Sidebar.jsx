@@ -75,11 +75,17 @@ export default function Sidebar({
     : null
   const storageLimitMb = Number(user?.planStorageLimitMb || 0)
   const storageUsedBytes = Number(user?.planStorageUsedBytes || 0)
-  const storageUsedMb = storageUsedBytes / (1024 * 1024)
+  const storageUsedMb = Number.isFinite(user?.planStorageUsedMb) ? Number(user.planStorageUsedMb) : storageUsedBytes / (1024 * 1024)
   const storagePercent = storageLimitMb > 0 ? Math.min((storageUsedMb / storageLimitMb) * 100, 100) : 0
   const aiDailyLimit = Number(user?.planAiRequestsPerDay || 0)
   const aiUsedToday = Number(user?.planAiRequestsUsedToday || 0)
   const aiPercent = aiDailyLimit > 0 ? Math.min((aiUsedToday / aiDailyLimit) * 100, 100) : 0
+  const isOverQuota = Boolean(user?.overQuota)
+  const storageFooterMessage = isOverQuota
+    ? 'Uploads are paused until you free up storage or upgrade.'
+    : hasPaidPlan && formattedExpiry
+      ? `Active until ${formattedExpiry}`
+      : 'Usage follows your plan limits'
 
   const formatPlanStorage = (valueMb) => {
     if (!Number.isFinite(valueMb) || valueMb <= 0) return '0 MB'
@@ -494,6 +500,22 @@ export default function Sidebar({
               </div>
 
               <div className="sidebar-plan-card__usage">
+                {isOverQuota && (
+                  <div
+                    className="sidebar-plan-card__alert"
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '12px',
+                      background: 'rgba(245, 158, 11, 0.12)',
+                      color: '#b45309',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      lineHeight: 1.5
+                    }}
+                  >
+                    Storage limit exceeded. You can still view, download, and delete files.
+                  </div>
+                )}
                 <div className="sidebar-plan-card__row">
                   <div className="sidebar-plan-card__labels">
                     <strong>Storage</strong>
@@ -516,11 +538,7 @@ export default function Sidebar({
               </div>
 
               <div className="sidebar-plan-card__footer">
-                <span>
-                  {hasPaidPlan && formattedExpiry
-                    ? `Active until ${formattedExpiry}`
-                    : 'Usage follows your plan limits'}
-                </span>
+                <span>{storageFooterMessage}</span>
                 <button type="button" onClick={() => onNavigate?.('settings', { tab: 'plan' })}>
                   Manage
                 </button>

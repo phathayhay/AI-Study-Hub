@@ -115,7 +115,7 @@ class AdminServiceTest {
         mockPlan = SubscriptionPlan.builder()
                 .id(40L)
                 .planName("PRO")
-                .price(BigDecimal.valueOf(99000))
+                .price(BigDecimal.valueOf(29000))
                 .storageLimitMb(5120L)
                 .aiRequestsPerDay(100)
                 .isActive(true)

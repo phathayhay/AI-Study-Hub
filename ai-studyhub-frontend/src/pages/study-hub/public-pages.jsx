@@ -804,7 +804,7 @@ const UPLOAD_CATEGORY_MAP = {
   'Project': 5
 }
 
-export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentUploaded, onNavigate, defaultFolderId = null }) {
+export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentUploaded, onNavigate, defaultFolderId = null, user = null }) {
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
   const [readStatus, setReadStatus] = useState('')
@@ -839,6 +839,19 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
   const visibilityRef = useRef(null)
   const tagsRef = useRef(null)
   const isStudyUpload = mode === 'study'
+  const storageLimitMb = Number(user?.planStorageLimitMb || 0)
+  const storageUsedBytes = Number(user?.planStorageUsedBytes || 0)
+  const storageUsedMb = Number.isFinite(user?.planStorageUsedMb) ? Number(user.planStorageUsedMb) : storageUsedBytes / (1024 * 1024)
+  const remainingStorageBytes = Math.max((storageLimitMb * 1024 * 1024) - storageUsedBytes, 0)
+  const selectedFileSize = Number(selectedUploadFile?.size || 0)
+  const isOverQuota = Boolean(user?.overQuota)
+  const wouldExceedQuota = !isOverQuota && selectedFileSize > 0 && selectedFileSize > remainingStorageBytes
+  const uploadBlocked = isOverQuota || wouldExceedQuota
+  const quotaWarningMessage = isOverQuota
+    ? (user?.storageMessage || 'Your current storage usage exceeds the FREE plan limit. You can still view, download, and delete your existing documents, but uploading new documents is temporarily disabled.')
+    : wouldExceedQuota
+      ? 'This file would push your storage beyond the current plan limit. Delete some files or upgrade your plan before uploading.'
+      : ''
 
   const handleFileSelect = async (files) => {
     const [file] = Array.from(files ?? [])
@@ -887,6 +900,12 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
 
   const handleUpload = async () => {
     if (!selectedUploadFile) return
+    if (uploadBlocked) {
+      const message = quotaWarningMessage || 'Storage limit exceeded. Delete existing files or upgrade your plan.'
+      setUploadError(message)
+      window.showToast?.(message, 'error')
+      return
+    }
     if (selectedUploadFile.size > 10 * 1024 * 1024) {
       setUploadError('File size exceeds the limit of 10MB. Please select a smaller file.')
       window.showToast?.('File size exceeds 10MB limit', 'error')
@@ -969,6 +988,27 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
         subtitle={isStudyUpload ? 'Upload a file to let AI create a study workspace from your content' : 'Share study documents with the FPTU community or store them privately'}
       />
       <section className="upload-card">
+        {(isOverQuota || wouldExceedQuota) && (
+          <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-left text-sm text-amber-900">
+            <strong className="block text-sm font-semibold">Storage attention needed</strong>
+            <p className="mt-2 mb-0 leading-6">
+              {quotaWarningMessage}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3 text-sm">
+              <span><strong>Current plan:</strong> {user?.planName || 'FREE'}</span>
+              <span><strong>Used:</strong> {formatFileSize(storageUsedBytes)}</span>
+              <span><strong>Limit:</strong> {formatFileSize(storageLimitMb * 1024 * 1024)}</span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button className="file-picker-button" onClick={() => onNavigate?.('library')} type="button">
+                Manage Documents
+              </button>
+              <button className="cancel-button" onClick={() => onNavigate?.('pricing')} type="button">
+                Upgrade Plan
+              </button>
+            </div>
+          </div>
+        )}
         {!selectedUploadFile ? (
           <>
             <input
@@ -989,12 +1029,12 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
               <StudyHubIcon name="upload" size={46} />
               <h3>Drag and drop files or folders here</h3>
               <p>or</p>
-              <button className="file-picker-button" onClick={() => fileInputRef.current?.click()} type="button">
+              <button className="file-picker-button" disabled={isOverQuota} onClick={() => fileInputRef.current?.click()} type="button">
                 <StudyHubIcon name="file" size={18} /> Select File
               </button>
               <small>Supported formats: PDF, Word, PowerPoint, ZIP (max 10MB)</small>
             </div>
-            <button className="upload-submit" onClick={() => fileInputRef.current?.click()} type="button">Upload</button>
+            <button className="upload-submit" disabled={isOverQuota} onClick={() => fileInputRef.current?.click()} type="button">Upload</button>
           </>
         ) : (
           <div className="upload-form">
@@ -1068,8 +1108,12 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
               <label>Tags (separated by commas)<input ref={tagsRef} placeholder="SWP, Study, ..." /></label>
             </div>
             <div className="upload-form__actions">
-              <button className="upload-submit" onClick={isStudyUpload ? startStudySession : handleUpload} type="button" disabled={uploading}>
-                {uploading ? 'Uploading...' : isStudyUpload ? 'Start Studying with AI' : 'Upload'}
+              <button className="upload-submit" onClick={isStudyUpload ? startStudySession : handleUpload} type="button" disabled={uploading || uploadBlocked}>
+                {uploading
+                  ? 'Uploading...'
+                  : uploadBlocked
+                    ? (isOverQuota ? 'Upload disabled' : 'Over plan limit')
+                    : (isStudyUpload ? 'Start Studying with AI' : 'Upload')}
               </button>
               <button className="cancel-button" onClick={clearSelectedFile} type="button">Cancel</button>
             </div>

@@ -5448,6 +5448,40 @@ body.dark-theme .rating-star.is-active {
   gap: 10px;
 }
 
+.admin-date-range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  padding: 0 2px;
+}
+
+.admin-date-range__field {
+  display: flex;
+  align-items: center;
+}
+
+.admin-date-range__label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.admin-date-range__separator {
+  color: #94a3b8;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  transform: translateY(1px);
+}
+
+.admin-date-range .admin-filter-input {
+  min-width: 190px;
+}
+
 .admin-table {
   border-collapse: separate;
   border-spacing: 0;

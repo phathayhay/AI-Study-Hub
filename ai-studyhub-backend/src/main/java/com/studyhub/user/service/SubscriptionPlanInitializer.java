@@ -49,8 +49,8 @@ public class SubscriptionPlanInitializer implements ApplicationRunner {
         log.info("Checking subscription plans database initialization...");
 
         initializePlan("FREE", "Starter plan for new students", BigDecimal.ZERO, 50L, 10, 30, true, true, true, false, false);
-        initializePlan("PRO", "More storage and publishing tools for active learners", BigDecimal.valueOf(99000), 500L, 100, 30, true, true, true, true, true);
-        initializePlan("PREMIUM", "Highest storage and AI capacity for heavy study workflows", BigDecimal.valueOf(199000), 2048L, 1000, 30, true, true, true, true, true);
+        initializePlan("PRO", "More storage and publishing tools for active learners", BigDecimal.valueOf(29000), 500L, 100, 30, true, true, true, true, true);
+        initializePlan("PREMIUM", "Highest storage and AI capacity for heavy study workflows", BigDecimal.valueOf(69000), 2048L, 1000, 30, true, true, true, true, true);
 
         Role adminRole = roleRepository.findByRoleName("ADMIN")
                 .orElseGet(() -> roleRepository.save(new Role(null, "ADMIN")));
@@ -143,23 +143,39 @@ public class SubscriptionPlanInitializer implements ApplicationRunner {
             Boolean canPublishDocuments,
             Boolean canPublishFolders
     ) {
-        subscriptionPlanRepository.findByPlanName(planName).orElseGet(() -> {
-            log.info("Seeding subscription plan: {}", planName);
-            SubscriptionPlan plan = SubscriptionPlan.builder()
-                    .planName(planName)
-                    .description(description)
-                    .price(price)
-                    .storageLimitMb(storageLimitMb)
-                    .aiRequestsPerDay(aiRequestsPerDay)
-                    .durationDays(durationDays)
-                    .canUseAiSummary(canUseAiSummary)
-                    .canUseFlashcards(canUseFlashcards)
-                    .canUseQuizzes(canUseQuizzes)
-                    .canPublishDocuments(canPublishDocuments)
-                    .canPublishFolders(canPublishFolders)
-                    .isActive(true)
-                    .build();
-            return subscriptionPlanRepository.save(plan);
-        });
+        subscriptionPlanRepository.findByPlanName(planName)
+                .map(existingPlan -> {
+                    existingPlan.setDescription(description);
+                    existingPlan.setPrice(price);
+                    existingPlan.setStorageLimitMb(storageLimitMb);
+                    existingPlan.setAiRequestsPerDay(aiRequestsPerDay);
+                    existingPlan.setDurationDays(durationDays);
+                    existingPlan.setCanUseAiSummary(canUseAiSummary);
+                    existingPlan.setCanUseFlashcards(canUseFlashcards);
+                    existingPlan.setCanUseQuizzes(canUseQuizzes);
+                    existingPlan.setCanPublishDocuments(canPublishDocuments);
+                    existingPlan.setCanPublishFolders(canPublishFolders);
+                    existingPlan.setIsActive(true);
+                    log.info("Updating subscription plan: {}", planName);
+                    return subscriptionPlanRepository.save(existingPlan);
+                })
+                .orElseGet(() -> {
+                    log.info("Seeding subscription plan: {}", planName);
+                    SubscriptionPlan plan = SubscriptionPlan.builder()
+                            .planName(planName)
+                            .description(description)
+                            .price(price)
+                            .storageLimitMb(storageLimitMb)
+                            .aiRequestsPerDay(aiRequestsPerDay)
+                            .durationDays(durationDays)
+                            .canUseAiSummary(canUseAiSummary)
+                            .canUseFlashcards(canUseFlashcards)
+                            .canUseQuizzes(canUseQuizzes)
+                            .canPublishDocuments(canPublishDocuments)
+                            .canPublishFolders(canPublishFolders)
+                            .isActive(true)
+                            .build();
+                    return subscriptionPlanRepository.save(plan);
+                });
     }
 }

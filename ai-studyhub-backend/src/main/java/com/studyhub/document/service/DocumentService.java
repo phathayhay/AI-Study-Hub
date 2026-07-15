@@ -23,6 +23,7 @@ import com.studyhub.document.repository.TagRepository;
 import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.UserRepository;
+import com.studyhub.user.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
@@ -63,6 +64,7 @@ public class DocumentService {
     private final CloudinaryStorageService storageService;
     private final DocumentViewRepository documentViewRepository;
     private final DocumentDownloadRepository documentDownloadRepository;
+    private final SubscriptionService subscriptionService;
 
     @Transactional
     public DocumentResponse uploadDocument(MultipartFile file, DocumentUploadRequest request, String userEmail) throws IOException {
@@ -261,6 +263,9 @@ public class DocumentService {
 
         storageService.deleteFile(doc.getFileUrl());
         documentRepository.delete(doc);
+        documentRepository.flush();
+        subscriptionService.syncStorageStatus(user);
+        userRepository.save(user);
     }
 
     @Transactional
@@ -350,22 +355,7 @@ public class DocumentService {
     }
 
     private void validateStorageQuota(User user, long incomingFileSizeBytes) {
-        Long storageLimitMb = user.getPlan() != null ? user.getPlan().getStorageLimitMb() : null;
-        if (storageLimitMb == null || storageLimitMb <= 0) {
-            return;
-        }
-
-        long currentUsageBytes = documentRepository.sumFileSizeByUserId(user.getId());
-        long storageLimitBytes = storageLimitMb * 1024L * 1024L;
-        if (currentUsageBytes + incomingFileSizeBytes > storageLimitBytes) {
-            throw new IllegalArgumentException(
-                    String.format(
-                            "Your current plan storage is full. Limit: %d MB, used: %.2f MB.",
-                            storageLimitMb,
-                            currentUsageBytes / (1024d * 1024d)
-                    )
-            );
-        }
+        subscriptionService.validateUploadAllowed(user, incomingFileSizeBytes);
     }
 
     public DocumentResponse mapToResponse(Document doc) {

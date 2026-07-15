@@ -90,7 +90,7 @@ public class AuthService {
                             .planName("FREE")
                             .description("Gói mặc định miễn phí")
                             .price(BigDecimal.ZERO)
-                            .storageLimitMb(500L)
+                            .storageLimitMb(50L)
                             .aiRequestsPerDay(10)
                             .isActive(true)
                             .build();

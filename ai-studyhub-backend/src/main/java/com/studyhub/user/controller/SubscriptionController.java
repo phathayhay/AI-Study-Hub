@@ -41,6 +41,14 @@ public class SubscriptionController {
         return ResponseEntity.ok(ApiResponse.ok("Checkout details generated successfully", response));
     }
 
+    @GetMapping("/payments/{paymentCode}")
+    @Operation(summary = "Get payment request status", description = "Retrieves the current status of the authenticated user's subscription payment request.")
+    public ResponseEntity<ApiResponse<PaymentStatusResponse>> getPaymentStatus(@PathVariable String paymentCode) {
+        String email = SecurityUtils.getCurrentUserEmail();
+        PaymentStatusResponse response = subscriptionService.getPaymentStatus(paymentCode, email);
+        return ResponseEntity.ok(ApiResponse.ok("Payment status retrieved successfully", response));
+    }
+
     @PostMapping("/simulate-payment")
     @Operation(summary = "Simulate payment webhook/callback success", description = "Simulates successful transfer receipt to instantly upgrade user's active plan.")
     public ResponseEntity<ApiResponse<String>> simulatePaymentSuccess(
@@ -49,6 +57,16 @@ public class SubscriptionController {
         log.info("API: Simulating payment success callback for plan ID {} by user {}", request.getPlanId(), email);
         subscriptionService.simulatePaymentSuccess(request, email);
         return ResponseEntity.ok(ApiResponse.ok("Subscription plan upgraded successfully"));
+    }
+
+    @PostMapping("/webhook/bank-transfer")
+    @Operation(summary = "Process bank transfer webhook", description = "Accepts a verified bank transfer callback and activates the matching subscription payment.")
+    public ResponseEntity<ApiResponse<String>> processBankTransferWebhook(
+            @RequestHeader(value = "X-Webhook-Secret", required = false) String secret,
+            @Valid @RequestBody PaymentWebhookRequest request
+    ) {
+        subscriptionService.processPaymentWebhook(request, secret);
+        return ResponseEntity.ok(ApiResponse.ok("Webhook processed successfully"));
     }
 
     @GetMapping("/history")

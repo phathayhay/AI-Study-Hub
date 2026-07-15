@@ -1,6 +1,7 @@
 package com.studyhub.user.dto;
 
 import com.studyhub.common.enums.Campus;
+import com.studyhub.common.enums.StorageStatus;
 import com.studyhub.common.enums.VerificationStatus;
 import lombok.*;
 
@@ -28,4 +29,12 @@ public class TokenResponse {
     private VerificationStatus verificationStatus;
     private String planName;
     private LocalDateTime planExpiresAt;
+    private Long planStorageLimitMb;
+    private Long planStorageLimitBytes;
+    private Long planStorageUsedBytes;
+    private Double planStorageUsedMb;
+    private StorageStatus storageStatus;
+    private Boolean overQuota;
+    private Boolean canUpload;
+    private String storageMessage;
 }

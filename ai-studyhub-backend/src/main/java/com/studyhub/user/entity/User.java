@@ -1,6 +1,7 @@
 package com.studyhub.user.entity;
 
 import com.studyhub.common.enums.Campus;
+import com.studyhub.common.enums.StorageStatus;
 import com.studyhub.common.enums.UserStatus;
 import com.studyhub.common.enums.VerificationStatus;
 import com.studyhub.course.entity.Major;
@@ -66,6 +67,11 @@ public class User {
     @Column(name = "verification_status", nullable = false)
     @Builder.Default
     private VerificationStatus verificationStatus = VerificationStatus.UNVERIFIED;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "storage_status", nullable = false)
+    @Builder.Default
+    private StorageStatus storageStatus = StorageStatus.NORMAL;
 
     @Column(name = "verified_at")
     private LocalDateTime verifiedAt;

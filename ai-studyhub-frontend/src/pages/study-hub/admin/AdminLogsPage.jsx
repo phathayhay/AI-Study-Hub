@@ -92,8 +92,28 @@ export function AdminLogs() {
               <option value="">All types</option>
               {ADMIN_LOG_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <input className="admin-filter-input" onChange={(event) => setDateFrom(event.target.value)} type="date" value={dateFrom} />
-            <input className="admin-filter-input" onChange={(event) => setDateTo(event.target.value)} type="date" value={dateTo} />
+            <div className="admin-date-range" aria-label="Filter by date range">
+              <span className="admin-date-range__label">Date range</span>
+              <div className="admin-date-range__field">
+                <input
+                  aria-label="From date"
+                  className="admin-filter-input"
+                  onChange={(event) => setDateFrom(event.target.value)}
+                  type="date"
+                  value={dateFrom}
+                />
+              </div>
+              <span className="admin-date-range__separator" aria-hidden="true">-</span>
+              <div className="admin-date-range__field">
+                <input
+                  aria-label="To date"
+                  className="admin-filter-input"
+                  onChange={(event) => setDateTo(event.target.value)}
+                  type="date"
+                  value={dateTo}
+                />
+              </div>
+            </div>
             <button className="admin-primary" onClick={handleExport} type="button">Export CSV</button>
           </div>
         </AdminSectionHeader>

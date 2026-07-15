@@ -25,7 +25,9 @@ export default function useAuth() {
     planName: profile.planName,
     planExpiresAt: profile.planExpiresAt,
     planStorageLimitMb: profile.planStorageLimitMb,
+    planStorageLimitBytes: profile.planStorageLimitBytes,
     planStorageUsedBytes: profile.planStorageUsedBytes,
+    planStorageUsedMb: profile.planStorageUsedMb,
     planAiRequestsPerDay: profile.planAiRequestsPerDay,
     planAiRequestsUsedToday: profile.planAiRequestsUsedToday,
     planCanUseAiSummary: profile.planCanUseAiSummary,
@@ -33,6 +35,10 @@ export default function useAuth() {
     planCanUseQuizzes: profile.planCanUseQuizzes,
     planCanPublishDocuments: profile.planCanPublishDocuments,
     planCanPublishFolders: profile.planCanPublishFolders,
+    storageStatus: profile.storageStatus,
+    overQuota: profile.overQuota,
+    canUpload: profile.canUpload,
+    storageMessage: profile.storageMessage,
     verificationRequestSubmitted: profile.verificationRequestSubmitted,
     verificationReviewNote: profile.verificationReviewNote,
   })
@@ -76,6 +82,10 @@ export default function useAuth() {
           })
           .catch(err => {
             console.error('Failed to sync user profile:', err)
+            if (err?.status === 401 || err?.status === 403) {
+              clearAuthSession()
+              setUser(null)
+            }
           })
       } catch (e) {
         console.error('Error parsing cached user:', e)

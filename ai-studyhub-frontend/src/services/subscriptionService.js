@@ -32,11 +32,20 @@ export function getUpgradePaymentInfo(body) {
 }
 
 /**
- * Simulate payment webhook/callback success
- * Simulates successful transfer receipt to instantly upgrade user's active plan.
+ * Get subscription payment status
+ * Retrieves the current status of a subscription payment request for the authenticated user.
+ * Method: GET
+ * Path: /api/subscriptions/payments/{paymentCode}
+ */
+export function getPaymentStatus(paymentCode) {
+  return apiGet(`/subscriptions/payments/${paymentCode}`);
+}
+
+/**
+ * Demo payment confirmation
+ * Simulates a successful payment callback so the plan is upgraded immediately for demo/testing.
  * Method: POST
  * Path: /api/subscriptions/simulate-payment
- * @param {any} body - Request body
  */
 export function simulatePaymentSuccess(body) {
   return apiPost(`/subscriptions/simulate-payment`, body);

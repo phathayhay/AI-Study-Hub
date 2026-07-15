@@ -1,27 +1,41 @@
 package com.studyhub.user.service;
 
 import com.studyhub.common.enums.NotificationType;
+import com.studyhub.common.enums.PaymentStatus;
+import com.studyhub.common.enums.StorageStatus;
+import com.studyhub.common.StorageQuotaExceededException;
+import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.user.dto.BillingHistoryResponse;
+import com.studyhub.user.dto.PaymentStatusResponse;
+import com.studyhub.user.dto.PaymentWebhookRequest;
 import com.studyhub.user.dto.SimulatePaymentRequest;
 import com.studyhub.user.dto.SubscriptionPlanResponse;
 import com.studyhub.user.dto.UpgradePaymentResponse;
 import com.studyhub.user.entity.SubscriptionPlan;
+import com.studyhub.user.entity.SubscriptionPayment;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.entity.UserSubscription;
 import com.studyhub.user.repository.SubscriptionPlanRepository;
+import com.studyhub.user.repository.SubscriptionPaymentRepository;
 import com.studyhub.user.repository.UserRepository;
 import com.studyhub.user.repository.UserSubscriptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.temporal.ChronoUnit;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Random;
+import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,7 +46,27 @@ public class SubscriptionService {
     private final UserRepository userRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final UserSubscriptionRepository userSubscriptionRepository;
+    private final SubscriptionPaymentRepository subscriptionPaymentRepository;
     private final NotificationService notificationService;
+    private final DocumentRepository documentRepository;
+
+    @Value("${app.payment.bank-name:TPBank}")
+    private String paymentBankName;
+
+    @Value("${app.payment.account-name:CONG TY AI STUDYHUB FPT}")
+    private String paymentAccountName;
+
+    @Value("${app.payment.account-number:00004103937}")
+    private String paymentAccountNumber;
+
+    @Value("${app.payment.provider-name:BANK_TRANSFER}")
+    private String paymentProviderName;
+
+    @Value("${app.payment.order-expiry-minutes:30}")
+    private long paymentOrderExpiryMinutes;
+
+    @Value("${app.payment.webhook-secret:}")
+    private String webhookSecret;
 
     @Transactional(readOnly = true)
     public List<SubscriptionPlanResponse> getActivePlans() {
@@ -56,7 +90,7 @@ public class SubscriptionService {
                 .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public UpgradePaymentResponse getUpgradePaymentInfo(Long planId, String email) {
         log.info("Generating payment info for plan {} and user {}", planId, email);
 
@@ -66,47 +100,33 @@ public class SubscriptionService {
         SubscriptionPlan targetPlan = subscriptionPlanRepository.findById(planId)
                 .orElseThrow(() -> new IllegalArgumentException("Subscription plan not found"));
 
-        if ("FREE".equalsIgnoreCase(targetPlan.getPlanName())) {
-            throw new IllegalArgumentException("Cannot purchase or upgrade to FREE plan");
-        }
-
         SubscriptionPlan currentPlan = user.getPlan();
-        BigDecimal currentPlanPrice = currentPlan != null && currentPlan.getPrice() != null
-                ? currentPlan.getPrice()
-                : BigDecimal.ZERO;
+        UserSubscription currentSubscription = findCurrentActiveSubscription(user.getId());
+        UpgradeQuote quote = calculateUpgradeQuote(currentPlan, targetPlan, currentSubscription, LocalDateTime.now());
+        expirePendingPayment(user.getId(), targetPlan.getId());
 
-        if (currentPlan != null && targetPlan.getPlanName().equalsIgnoreCase(currentPlan.getPlanName())) {
-            throw new IllegalArgumentException("You are already using this plan.");
-        }
-
-        if (currentPlan != null && targetPlan.getPrice().compareTo(currentPlanPrice) < 0) {
-            throw new IllegalArgumentException("Downgrade is not supported in this flow.");
-        }
-
-        BigDecimal amountDue = targetPlan.getPrice().subtract(currentPlanPrice).max(BigDecimal.ZERO);
-
-        int randomCode = 1000 + new Random().nextInt(9000);
-        String transferContent = String.format("SHUPGRADE %d %d %d", user.getId(), targetPlan.getId(), randomCode);
-
-        String accountName = "CONG TY AI STUDYHUB FPT";
-        String bankName = "TPBank";
-        String accountNumber = "00004103937";
-        String qrCodeUrl = buildVietQrUrl(bankName, accountNumber, amountDue, transferContent, accountName);
+        SubscriptionPayment payment = createPendingPayment(user, currentPlan, targetPlan, quote);
 
         return UpgradePaymentResponse.builder()
                 .planId(targetPlan.getId())
                 .planName(targetPlan.getPlanName())
                 .currentPlanName(currentPlan != null ? currentPlan.getPlanName() : "FREE")
-                .amount(amountDue)
-                .currentPlanPrice(currentPlanPrice)
+                .amount(payment.getAmount())
+                .currentPlanPrice(quote.currentPlanPrice())
                 .targetPlanPrice(targetPlan.getPrice())
-                .creditApplied(currentPlanPrice)
+                .creditApplied(quote.creditApplied())
+                .remainingDays(quote.remainingDays())
+                .billingCycleDays(quote.billingCycleDays())
+                .currentPeriodEndDate(quote.currentPeriodEndDate())
                 .durationDays(targetPlan.getDurationDays())
-                .accountName(accountName)
-                .bankName(bankName)
-                .accountNumber(accountNumber)
-                .transferContent(transferContent)
-                .qrCodeUrl(qrCodeUrl)
+                .accountName(payment.getAccountName())
+                .bankName(payment.getBankName())
+                .accountNumber(payment.getAccountNumber())
+                .paymentCode(payment.getPaymentCode())
+                .transferContent(payment.getTransferContent())
+                .qrCodeUrl(payment.getQrCodeUrl())
+                .paymentStatus(payment.getStatus().name())
+                .expiresAt(payment.getExpiresAt())
                 .build();
     }
 
@@ -114,53 +134,89 @@ public class SubscriptionService {
     public void simulatePaymentSuccess(SimulatePaymentRequest request, String email) {
         log.info("Simulating payment success for user {} and plan {}", email, request.getPlanId());
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        SubscriptionPayment payment = subscriptionPaymentRepository.findByTransferContent(request.getTransferContent())
+                .orElseThrow(() -> new IllegalArgumentException("Payment request not found"));
 
-        SubscriptionPlan targetPlan = subscriptionPlanRepository.findById(request.getPlanId())
-                .orElseThrow(() -> new IllegalArgumentException("Subscription plan not found"));
-
-        SubscriptionPlan currentPlan = user.getPlan();
-        if (currentPlan != null && targetPlan.getPlanName().equalsIgnoreCase(currentPlan.getPlanName())) {
-            throw new IllegalArgumentException("You are already using this plan.");
+        if (!Objects.equals(payment.getUser().getEmail(), email)) {
+            throw new IllegalArgumentException("You do not have permission to confirm this payment request");
         }
 
-        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUser_IdAndIsActiveTrue(user.getId());
-        LocalDateTime preservedEndDate = activeSubs.stream()
-                .map(UserSubscription::getEndDate)
-                .filter(endDate -> endDate != null && endDate.isAfter(LocalDateTime.now()))
-                .max(LocalDateTime::compareTo)
-                .orElse(null);
-
-        for (UserSubscription sub : activeSubs) {
-            sub.setIsActive(false);
-            userSubscriptionRepository.save(sub);
+        if (!Objects.equals(payment.getTargetPlan().getId(), request.getPlanId())) {
+            throw new IllegalArgumentException("Payment request does not match the requested plan");
         }
 
-        user.setPlan(targetPlan);
-        userRepository.save(user);
+        if (payment.getStatus() == PaymentStatus.PAID) {
+            log.info("Demo payment {} already processed", payment.getPaymentCode());
+            return;
+        }
 
-        LocalDateTime startDate = LocalDateTime.now();
-        LocalDateTime endDate = preservedEndDate != null
-                ? preservedEndDate
-                : startDate.plusDays(targetPlan.getDurationDays() != null ? targetPlan.getDurationDays() : 30L);
+        if (isExpired(payment)) {
+            payment.setStatus(PaymentStatus.EXPIRED);
+            subscriptionPaymentRepository.save(payment);
+            throw new IllegalStateException("Payment request has expired");
+        }
 
-        UserSubscription newSub = UserSubscription.builder()
-                .user(user)
-                .plan(targetPlan)
-                .startDate(startDate)
-                .endDate(endDate)
-                .isActive(true)
-                .build();
+        payment.setStatus(PaymentStatus.PAID);
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setProviderName(blankToDefault(payment.getProviderName(), paymentProviderName));
+        payment.setProviderTransactionRef("DEMO-" + payment.getPaymentCode());
+        subscriptionPaymentRepository.save(payment);
 
-        userSubscriptionRepository.save(newSub);
-        notificationService.createNotification(
-                user,
-                "Plan Upgraded",
-                String.format("Your %s plan is now active until %s.", targetPlan.getPlanName(), newSub.getEndDate().toLocalDate()),
-                NotificationType.SYSTEM
-        );
-        log.info("Successfully upgraded user {} to plan {}", email, targetPlan.getPlanName());
+        activatePlanForUser(payment.getUser(), payment.getTargetPlan(), payment.getPaidAt(), payment);
+    }
+
+    @Transactional
+    public PaymentStatusResponse getPaymentStatus(String paymentCode, String email) {
+        SubscriptionPayment payment = subscriptionPaymentRepository.findByPaymentCode(paymentCode)
+                .orElseThrow(() -> new IllegalArgumentException("Payment request not found"));
+
+        if (!Objects.equals(payment.getUser().getEmail(), email)) {
+            throw new IllegalArgumentException("You do not have permission to view this payment request");
+        }
+
+        if (isExpired(payment) && payment.getStatus() == PaymentStatus.PENDING) {
+            payment.setStatus(PaymentStatus.EXPIRED);
+            subscriptionPaymentRepository.save(payment);
+        }
+
+        return mapPaymentStatus(payment);
+    }
+
+    @Transactional
+    public void processPaymentWebhook(PaymentWebhookRequest request, String secretHeader) {
+        validateWebhookSecret(secretHeader);
+
+        SubscriptionPayment payment = subscriptionPaymentRepository.findByTransferContent(request.getTransferContent())
+                .orElseThrow(() -> new IllegalArgumentException("Payment request not found"));
+
+        if (payment.getStatus() == PaymentStatus.PAID) {
+            log.info("Payment {} already processed", payment.getPaymentCode());
+            return;
+        }
+
+        if (isExpired(payment)) {
+            payment.setStatus(PaymentStatus.EXPIRED);
+            subscriptionPaymentRepository.save(payment);
+            throw new IllegalStateException("Payment request has expired");
+        }
+
+        if (request.getAmount() == null || payment.getAmount().compareTo(request.getAmount()) != 0) {
+            payment.setStatus(PaymentStatus.FAILED);
+            subscriptionPaymentRepository.save(payment);
+            throw new IllegalArgumentException("Transferred amount does not match the payment request");
+        }
+
+        payment.setStatus(PaymentStatus.PAID);
+        payment.setPaidAt(request.getTransactionTime() != null ? request.getTransactionTime() : LocalDateTime.now());
+        payment.setProviderName(blankToDefault(request.getProviderName(), paymentProviderName));
+        payment.setProviderTransactionRef(request.getTransactionReference());
+        subscriptionPaymentRepository.save(payment);
+
+        activatePlanForUser(payment.getUser(), payment.getTargetPlan(), payment.getPaidAt(), payment);
+        log.info("Payment {} confirmed and plan {} activated for user {}",
+                payment.getPaymentCode(),
+                payment.getTargetPlan().getPlanName(),
+                payment.getUser().getEmail());
     }
 
     @Transactional(readOnly = true)
@@ -175,6 +231,398 @@ public class SubscriptionService {
                         .createdAt(sub.getCreatedAt())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    @Scheduled(cron = "0 */10 * * * *")
+    @Transactional
+    public void processExpiredSubscriptions() {
+        LocalDateTime now = LocalDateTime.now();
+        List<UserSubscription> expiredSubscriptions = userSubscriptionRepository.findByIsActiveTrueAndEndDateBefore(now);
+
+        if (expiredSubscriptions.isEmpty()) {
+            return;
+        }
+
+        expiredSubscriptions.forEach(this::handleExpiredSubscription);
+        log.info("Processed {} expired subscription(s)", expiredSubscriptions.size());
+    }
+
+    @Transactional
+    public void handleExpiredSubscription(UserSubscription expiredSubscription) {
+        if (expiredSubscription == null || !Boolean.TRUE.equals(expiredSubscription.getIsActive())) {
+            return;
+        }
+
+        SubscriptionPlan freePlan = getFreePlan();
+        User user = expiredSubscription.getUser();
+
+        expiredSubscription.setIsActive(false);
+        userSubscriptionRepository.save(expiredSubscription);
+
+        user.setPlan(freePlan);
+        StorageQuotaSnapshot snapshot = syncStorageStatus(user, freePlan);
+        userRepository.save(user);
+
+        if (snapshot.overQuota()) {
+            notificationService.createNotification(
+                    user,
+                    "Subscription expired",
+                    "Your paid plan expired and your account returned to FREE. Uploading is disabled until you free up storage or upgrade again.",
+                    NotificationType.SYSTEM
+            );
+        }
+    }
+
+    @Transactional
+    public StorageQuotaSnapshot syncStorageStatus(User user) {
+        return syncStorageStatus(user, user.getPlan());
+    }
+
+    @Transactional
+    public StorageQuotaSnapshot syncStorageStatus(User user, SubscriptionPlan referencePlan) {
+        SubscriptionPlan effectivePlan = referencePlan != null ? referencePlan : getFreePlan();
+        long usedStorageBytes = documentRepository.sumFileSizeByUserId(user.getId());
+        long storageLimitBytes = getStorageLimitBytes(effectivePlan);
+        boolean overQuota = storageLimitBytes > 0 && usedStorageBytes > storageLimitBytes;
+
+        user.setStorageStatus(overQuota ? StorageStatus.OVER_QUOTA : StorageStatus.NORMAL);
+        return buildStorageQuotaSnapshot(effectivePlan, usedStorageBytes, overQuota);
+    }
+
+    @Transactional(readOnly = true)
+    public StorageQuotaSnapshot getStorageQuotaSnapshot(User user) {
+        SubscriptionPlan effectivePlan = user.getPlan() != null ? user.getPlan() : getFreePlan();
+        long usedStorageBytes = documentRepository.sumFileSizeByUserId(user.getId());
+        long storageLimitBytes = getStorageLimitBytes(effectivePlan);
+        boolean overQuota = user.getStorageStatus() == StorageStatus.OVER_QUOTA;
+
+        if (storageLimitBytes > 0) {
+            overQuota = usedStorageBytes > storageLimitBytes;
+        }
+
+        return buildStorageQuotaSnapshot(effectivePlan, usedStorageBytes, overQuota);
+    }
+
+    @Transactional(readOnly = true)
+    public void validateUploadAllowed(User user, long incomingFileSizeBytes) {
+        StorageQuotaSnapshot snapshot = getStorageQuotaSnapshot(user);
+        if (snapshot.overQuota()) {
+            throw new StorageQuotaExceededException(snapshot.message());
+        }
+
+        if (snapshot.storageLimitBytes() > 0
+                && snapshot.storageUsedBytes() + incomingFileSizeBytes > snapshot.storageLimitBytes()) {
+            throw new StorageQuotaExceededException("Storage limit exceeded. Delete existing files or upgrade your plan.");
+        }
+    }
+
+    private BigDecimal validateUpgradeFlow(SubscriptionPlan currentPlan, SubscriptionPlan targetPlan) {
+        if ("FREE".equalsIgnoreCase(targetPlan.getPlanName())) {
+            throw new IllegalArgumentException("Cannot purchase or upgrade to FREE plan");
+        }
+
+        BigDecimal currentPlanPrice = currentPlan != null && currentPlan.getPrice() != null
+                ? currentPlan.getPrice()
+                : BigDecimal.ZERO;
+
+        if (currentPlan != null && targetPlan.getPlanName().equalsIgnoreCase(currentPlan.getPlanName())) {
+            throw new IllegalArgumentException("You are already using this plan.");
+        }
+
+        if (currentPlan != null && targetPlan.getPrice().compareTo(currentPlanPrice) < 0) {
+            throw new IllegalArgumentException("Downgrade is not supported in this flow.");
+        }
+
+        return currentPlanPrice;
+    }
+
+    private UpgradeQuote calculateUpgradeQuote(
+            SubscriptionPlan currentPlan,
+            SubscriptionPlan targetPlan,
+            UserSubscription currentSubscription,
+            LocalDateTime upgradeDate
+    ) {
+        BigDecimal currentPlanPrice = validateUpgradeFlow(currentPlan, targetPlan);
+        boolean hasActivePaidSubscription = currentSubscription != null
+                && currentSubscription.getPlan() != null
+                && !"FREE".equalsIgnoreCase(currentSubscription.getPlan().getPlanName())
+                && currentSubscription.getEndDate() != null
+                && currentSubscription.getEndDate().isAfter(upgradeDate);
+
+        if (!hasActivePaidSubscription) {
+            return new UpgradeQuote(
+                    targetPlan.getPrice(),
+                    currentPlanPrice,
+                    BigDecimal.ZERO,
+                    0L,
+                    0L,
+                    null
+            );
+        }
+
+        BigDecimal amountDue = calculateUpgradeAmount(
+                currentPlanPrice,
+                targetPlan.getPrice(),
+                currentSubscription.getStartDate(),
+                currentSubscription.getEndDate(),
+                upgradeDate
+        );
+
+        long billingCycleDays = ChronoUnit.DAYS.between(
+                currentSubscription.getStartDate().toLocalDate(),
+                currentSubscription.getEndDate().toLocalDate()
+        );
+        long remainingDays = Math.max(
+                0L,
+                ChronoUnit.DAYS.between(upgradeDate.toLocalDate(), currentSubscription.getEndDate().toLocalDate())
+        );
+        BigDecimal creditApplied = targetPlan.getPrice().subtract(amountDue).max(BigDecimal.ZERO);
+
+        return new UpgradeQuote(
+                amountDue,
+                currentPlanPrice,
+                creditApplied,
+                remainingDays,
+                billingCycleDays,
+                currentSubscription.getEndDate()
+        );
+    }
+
+    private BigDecimal calculateUpgradeAmount(
+            BigDecimal currentPrice,
+            BigDecimal targetPrice,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            LocalDateTime upgradeDate
+    ) {
+        if (currentPrice == null || targetPrice == null) {
+            throw new IllegalArgumentException("Plan price must not be null");
+        }
+
+        if (targetPrice.compareTo(currentPrice) <= 0) {
+            throw new IllegalArgumentException("Target plan must be higher than current plan");
+        }
+
+        if (startDate == null || endDate == null || upgradeDate == null) {
+            return targetPrice;
+        }
+
+        long billingCycleDays = ChronoUnit.DAYS.between(startDate.toLocalDate(), endDate.toLocalDate());
+        long remainingDays = ChronoUnit.DAYS.between(upgradeDate.toLocalDate(), endDate.toLocalDate());
+
+        if (billingCycleDays <= 0) {
+            throw new IllegalStateException("Invalid subscription billing cycle");
+        }
+
+        if (remainingDays <= 0) {
+            return targetPrice;
+        }
+
+        BigDecimal difference = targetPrice.subtract(currentPrice);
+        return difference
+                .multiply(BigDecimal.valueOf(remainingDays))
+                .divide(BigDecimal.valueOf(billingCycleDays), 0, RoundingMode.HALF_UP);
+    }
+
+    private SubscriptionPayment createPendingPayment(
+            User user,
+            SubscriptionPlan currentPlan,
+            SubscriptionPlan targetPlan,
+            UpgradeQuote quote
+    ) {
+        BigDecimal amountDue = quote.amountDue();
+        String paymentCode = generatePaymentCode(user.getId(), targetPlan.getId());
+        String transferContent = paymentCode;
+        String qrCodeUrl = buildVietQrUrl(
+                paymentBankName,
+                paymentAccountNumber,
+                amountDue,
+                transferContent,
+                paymentAccountName
+        );
+
+        SubscriptionPayment payment = SubscriptionPayment.builder()
+                .user(user)
+                .currentPlan(currentPlan)
+                .targetPlan(targetPlan)
+                .paymentCode(paymentCode)
+                .transferContent(transferContent)
+                .amount(amountDue)
+                .status(PaymentStatus.PENDING)
+                .bankName(paymentBankName)
+                .accountName(paymentAccountName)
+                .accountNumber(paymentAccountNumber)
+                .providerName(paymentProviderName)
+                .qrCodeUrl(qrCodeUrl)
+                .expiresAt(LocalDateTime.now().plusMinutes(paymentOrderExpiryMinutes))
+                .build();
+
+        return subscriptionPaymentRepository.save(payment);
+    }
+
+    private void activatePlanForUser(
+            User user,
+            SubscriptionPlan targetPlan,
+            LocalDateTime paymentSuccessTime,
+            SubscriptionPayment payment
+    ) {
+        List<UserSubscription> activeSubs = userSubscriptionRepository.findByUser_IdAndIsActiveTrue(user.getId());
+        UserSubscription activeSubscription = activeSubs.stream()
+                .filter(sub -> sub.getEndDate() != null && sub.getEndDate().isAfter(paymentSuccessTime))
+                .max(Comparator.comparing(UserSubscription::getEndDate))
+                .orElse(null);
+
+        boolean preserveCurrentCycle = activeSubscription != null
+                && payment.getCurrentPlan() != null
+                && !"FREE".equalsIgnoreCase(payment.getCurrentPlan().getPlanName())
+                && targetPlan.getPrice().compareTo(payment.getCurrentPlan().getPrice()) > 0;
+
+        user.setPlan(targetPlan);
+        syncStorageStatus(user, targetPlan);
+        userRepository.save(user);
+
+        if (preserveCurrentCycle) {
+            for (UserSubscription sub : activeSubs) {
+                if (!Objects.equals(sub.getId(), activeSubscription.getId())) {
+                    sub.setIsActive(false);
+                    userSubscriptionRepository.save(sub);
+                }
+            }
+
+            activeSubscription.setPlan(targetPlan);
+            activeSubscription.setIsActive(true);
+            userSubscriptionRepository.save(activeSubscription);
+            notifyPlanUpgrade(user, targetPlan, activeSubscription.getEndDate());
+            return;
+        }
+
+        for (UserSubscription sub : activeSubs) {
+            sub.setIsActive(false);
+            userSubscriptionRepository.save(sub);
+        }
+
+        LocalDateTime startDate = paymentSuccessTime;
+        LocalDateTime endDate = paymentSuccessTime.plusDays(targetPlan.getDurationDays() != null ? targetPlan.getDurationDays() : 30L);
+
+        UserSubscription newSub = UserSubscription.builder()
+                .user(user)
+                .plan(targetPlan)
+                .startDate(startDate)
+                .endDate(endDate)
+                .isActive(true)
+                .build();
+
+        userSubscriptionRepository.save(newSub);
+        notifyPlanUpgrade(user, targetPlan, newSub.getEndDate());
+    }
+
+    private void notifyPlanUpgrade(User user, SubscriptionPlan targetPlan, LocalDateTime endDate) {
+        notificationService.createNotification(
+                user,
+                "Plan Upgraded",
+                String.format("Your %s plan is now active until %s.", targetPlan.getPlanName(), endDate.toLocalDate()),
+                NotificationType.SYSTEM
+        );
+    }
+
+    private PaymentStatusResponse mapPaymentStatus(SubscriptionPayment payment) {
+        PaymentStatus status = payment.getStatus();
+        String message = switch (status) {
+            case PAID -> "Payment confirmed. Your plan is active.";
+            case EXPIRED -> "This payment request expired. Please create a new one.";
+            case FAILED -> "This payment could not be matched. Please contact support.";
+            case CANCELLED -> "This payment request was cancelled.";
+            case PENDING -> "Waiting for the bank transfer confirmation.";
+        };
+
+        return PaymentStatusResponse.builder()
+                .paymentCode(payment.getPaymentCode())
+                .planId(payment.getTargetPlan().getId())
+                .planName(payment.getTargetPlan().getPlanName())
+                .amount(payment.getAmount())
+                .status(status)
+                .transferContent(payment.getTransferContent())
+                .createdAt(payment.getCreatedAt())
+                .expiresAt(payment.getExpiresAt())
+                .paidAt(payment.getPaidAt())
+                .finalStatus(status != PaymentStatus.PENDING)
+                .message(message)
+                .build();
+    }
+
+    private void expirePendingPayment(Long userId, Long targetPlanId) {
+        subscriptionPaymentRepository
+                .findFirstByUser_IdAndTargetPlan_IdAndStatusOrderByCreatedAtDesc(userId, targetPlanId, PaymentStatus.PENDING)
+                .ifPresent(payment -> {
+                    payment.setStatus(isExpired(payment) ? PaymentStatus.EXPIRED : PaymentStatus.CANCELLED);
+                    subscriptionPaymentRepository.save(payment);
+                });
+    }
+
+    private UserSubscription findCurrentActiveSubscription(Long userId) {
+        LocalDateTime now = LocalDateTime.now();
+        return userSubscriptionRepository.findByUser_IdAndIsActiveTrue(userId).stream()
+                .filter(sub -> sub.getEndDate() == null || sub.getEndDate().isAfter(now))
+                .max(Comparator.comparing(UserSubscription::getEndDate, Comparator.nullsLast(Comparator.naturalOrder())))
+                .orElse(null);
+    }
+
+    private SubscriptionPlan getFreePlan() {
+        return subscriptionPlanRepository.findByPlanName("FREE")
+                .orElseThrow(() -> new IllegalStateException("FREE plan not found"));
+    }
+
+    private long getStorageLimitBytes(SubscriptionPlan plan) {
+        Long storageLimitMb = plan != null ? plan.getStorageLimitMb() : null;
+        if (storageLimitMb == null || storageLimitMb <= 0) {
+            return 0L;
+        }
+        return storageLimitMb * 1024L * 1024L;
+    }
+
+    private StorageQuotaSnapshot buildStorageQuotaSnapshot(SubscriptionPlan plan, long usedStorageBytes, boolean overQuota) {
+        long storageLimitBytes = getStorageLimitBytes(plan);
+        String message = null;
+        if (overQuota) {
+            String planName = plan != null && plan.getPlanName() != null ? plan.getPlanName().toUpperCase() : "FREE";
+            message = "FREE".equals(planName)
+                    ? "Your subscription has expired and your storage usage exceeds the FREE plan limit. You can still view, download, or delete existing files, but you cannot upload new files until you free up storage or upgrade your plan."
+                    : String.format("Your current storage usage exceeds the %s plan limit. Delete some files or upgrade your plan to continue uploading.", planName);
+        }
+
+        return new StorageQuotaSnapshot(
+                plan != null ? plan.getStorageLimitMb() : 0L,
+                storageLimitBytes,
+                usedStorageBytes,
+                usedStorageBytes / (1024d * 1024d),
+                overQuota ? StorageStatus.OVER_QUOTA : StorageStatus.NORMAL,
+                !overQuota,
+                message
+        );
+    }
+
+    private boolean isExpired(SubscriptionPayment payment) {
+        return payment.getExpiresAt() != null && payment.getExpiresAt().isBefore(LocalDateTime.now());
+    }
+
+    private String generatePaymentCode(Long userId, Long planId) {
+        String shortId = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        return "SHU" + userId + "P" + planId + shortId;
+    }
+
+    private void validateWebhookSecret(String secretHeader) {
+        if (webhookSecret == null || webhookSecret.isBlank()) {
+            log.warn("Payment webhook secret is not configured. Webhook requests are accepted without signature validation.");
+            return;
+        }
+
+        if (!webhookSecret.equals(secretHeader)) {
+            throw new IllegalArgumentException("Invalid webhook signature");
+        }
+    }
+
+    private String blankToDefault(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     private String buildVietQrUrl(String bank, String account, BigDecimal amount, String content, String name) {
@@ -205,5 +653,28 @@ public class SubscriptionService {
             case "MB", "MBBANK" -> "MB";
             default -> normalized;
         };
+    }
+
+    private record UpgradeQuote(
+            BigDecimal amountDue,
+            BigDecimal currentPlanPrice,
+            BigDecimal creditApplied,
+            long remainingDays,
+            long billingCycleDays,
+            LocalDateTime currentPeriodEndDate
+    ) {}
+
+    public record StorageQuotaSnapshot(
+            long storageLimitMb,
+            long storageLimitBytes,
+            long storageUsedBytes,
+            double storageUsedMb,
+            StorageStatus storageStatus,
+            boolean canUpload,
+            String message
+    ) {
+        public boolean overQuota() {
+            return storageStatus == StorageStatus.OVER_QUOTA;
+        }
     }
 }

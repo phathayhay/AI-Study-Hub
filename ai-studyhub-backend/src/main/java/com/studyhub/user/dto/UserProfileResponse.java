@@ -1,6 +1,7 @@
 package com.studyhub.user.dto;
 
 import com.studyhub.common.enums.Campus;
+import com.studyhub.common.enums.StorageStatus;
 import com.studyhub.common.enums.UserStatus;
 import com.studyhub.common.enums.VerificationStatus;
 import lombok.*;
@@ -25,7 +26,9 @@ public class UserProfileResponse {
     private String planName;
     private LocalDateTime planExpiresAt;
     private Long planStorageLimitMb;
+    private Long planStorageLimitBytes;
     private Long planStorageUsedBytes;
+    private Double planStorageUsedMb;
     private Integer planAiRequestsPerDay;
     private Long planAiRequestsUsedToday;
     private Boolean planCanUseAiSummary;
@@ -33,6 +36,10 @@ public class UserProfileResponse {
     private Boolean planCanUseQuizzes;
     private Boolean planCanPublishDocuments;
     private Boolean planCanPublishFolders;
+    private StorageStatus storageStatus;
+    private Boolean overQuota;
+    private Boolean canUpload;
+    private String storageMessage;
     private String currentSemester;
     private UserStatus status;
     private VerificationStatus verificationStatus;

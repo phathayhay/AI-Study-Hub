@@ -4,7 +4,6 @@ import com.studyhub.chat.repository.ChatMessageRepository;
 import com.studyhub.common.ApiResponse;
 import com.studyhub.common.enums.SenderType;
 import com.studyhub.security.SecurityUtils;
-import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.dto.NotificationSummaryResponse;
 import com.studyhub.user.entity.StudentVerification;
@@ -15,6 +14,7 @@ import com.studyhub.user.repository.UserRepository;
 import com.studyhub.user.repository.UserSubscriptionRepository;
 import com.studyhub.user.service.NotificationService;
 import com.studyhub.user.service.StudentVerificationService;
+import com.studyhub.user.service.SubscriptionService;
 import com.studyhub.user.dto.UserProfileResponse;
 import com.studyhub.user.dto.UpdateProfileRequest;
 import com.studyhub.course.entity.Major;
@@ -52,8 +52,8 @@ public class UserController {
     private final StudentVerificationRepository studentVerificationRepository;
     private final MajorRepository majorRepository;
     private final NotificationService notificationService;
-    private final DocumentRepository documentRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final SubscriptionService subscriptionService;
 
     // API tải lên ảnh đại diện của người dùng
     @PostMapping(value = "/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -193,7 +193,7 @@ public class UserController {
                 .orElse(null);
 
         SubscriptionPlan activePlan = user.getPlan();
-        long usedStorageBytes = documentRepository.sumFileSizeByUserId(user.getId());
+        SubscriptionService.StorageQuotaSnapshot quotaSnapshot = subscriptionService.getStorageQuotaSnapshot(user);
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = startOfDay.plusDays(1);
@@ -217,7 +217,9 @@ public class UserController {
                 .planName(activePlan != null ? activePlan.getPlanName() : "FREE")
                 .planExpiresAt(planExpiresAt)
                 .planStorageLimitMb(activePlan != null ? activePlan.getStorageLimitMb() : null)
-                .planStorageUsedBytes(usedStorageBytes)
+                .planStorageLimitBytes(quotaSnapshot.storageLimitBytes())
+                .planStorageUsedBytes(quotaSnapshot.storageUsedBytes())
+                .planStorageUsedMb(quotaSnapshot.storageUsedMb())
                 .planAiRequestsPerDay(activePlan != null ? activePlan.getAiRequestsPerDay() : null)
                 .planAiRequestsUsedToday(aiRequestsUsedToday)
                 .planCanUseAiSummary(activePlan != null ? activePlan.getCanUseAiSummary() : null)
@@ -225,6 +227,10 @@ public class UserController {
                 .planCanUseQuizzes(activePlan != null ? activePlan.getCanUseQuizzes() : null)
                 .planCanPublishDocuments(activePlan != null ? activePlan.getCanPublishDocuments() : null)
                 .planCanPublishFolders(activePlan != null ? activePlan.getCanPublishFolders() : null)
+                .storageStatus(quotaSnapshot.storageStatus())
+                .overQuota(quotaSnapshot.overQuota())
+                .canUpload(quotaSnapshot.canUpload())
+                .storageMessage(quotaSnapshot.message())
                 .currentSemester(user.getCurrentSemester())
                 .status(user.getStatus())
                 .verificationStatus(effectiveVerificationStatus)

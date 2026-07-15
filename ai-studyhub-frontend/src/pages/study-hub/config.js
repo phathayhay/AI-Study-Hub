@@ -19,7 +19,7 @@ export const pricingPlans = [
   {
     id: 'pro',
     name: 'Pro',
-    price: '99,000 VND',
+    price: '29,000 VND',
     subtitle: 'Balanced storage and study tools',
     tone: 'blue',
     popular: true,
@@ -29,7 +29,7 @@ export const pricingPlans = [
   {
     id: 'premium',
     name: 'Premium',
-    price: '199,000 VND',
+    price: '69,000 VND',
     subtitle: 'Highest capacity for heavy workflows',
     tone: 'purple',
     features: ['2,048 MB storage', '1,000 AI requests per day', 'AI Summary', 'AI Flashcards', 'AI Quizzes', 'Public document publishing', 'Public folder publishing'],

@@ -1,10 +1,14 @@
 package com.studyhub.user.service;
 
+import com.studyhub.common.enums.StorageStatus;
+import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.user.dto.*;
 import com.studyhub.user.entity.SubscriptionPlan;
+import com.studyhub.user.entity.SubscriptionPayment;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.entity.UserSubscription;
 import com.studyhub.user.repository.SubscriptionPlanRepository;
+import com.studyhub.user.repository.SubscriptionPaymentRepository;
 import com.studyhub.user.repository.UserRepository;
 import com.studyhub.user.repository.UserSubscriptionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -36,7 +41,13 @@ class SubscriptionServiceTest {
     private UserSubscriptionRepository userSubscriptionRepository;
 
     @Mock
+    private SubscriptionPaymentRepository subscriptionPaymentRepository;
+
+    @Mock
     private NotificationService notificationService;
+
+    @Mock
+    private DocumentRepository documentRepository;
 
     @InjectMocks
     private SubscriptionService subscriptionService;
@@ -44,6 +55,7 @@ class SubscriptionServiceTest {
     private User mockUser;
     private SubscriptionPlan freePlan;
     private SubscriptionPlan proPlan;
+    private SubscriptionPlan premiumPlan;
 
     @BeforeEach
     void setUp() {
@@ -61,9 +73,20 @@ class SubscriptionServiceTest {
                 .id(2L)
                 .planName("PRO")
                 .description("Pro plan")
-                .price(BigDecimal.valueOf(99000))
+                .price(BigDecimal.valueOf(29000))
                 .storageLimitMb(5120L)
                 .aiRequestsPerDay(100)
+                .isActive(true)
+                .build();
+
+        premiumPlan = SubscriptionPlan.builder()
+                .id(3L)
+                .planName("PREMIUM")
+                .description("Premium plan")
+                .price(BigDecimal.valueOf(69000))
+                .storageLimitMb(2048L)
+                .aiRequestsPerDay(1000)
+                .durationDays(30)
                 .isActive(true)
                 .build();
 
@@ -74,6 +97,12 @@ class SubscriptionServiceTest {
                 .lastName("FPT")
                 .plan(freePlan)
                 .build();
+
+        ReflectionTestUtils.setField(subscriptionService, "paymentBankName", "TPBank");
+        ReflectionTestUtils.setField(subscriptionService, "paymentAccountName", "CONG TY AI STUDYHUB FPT");
+        ReflectionTestUtils.setField(subscriptionService, "paymentAccountNumber", "00004103937");
+        ReflectionTestUtils.setField(subscriptionService, "paymentProviderName", "BANK_TRANSFER");
+        ReflectionTestUtils.setField(subscriptionService, "paymentOrderExpiryMinutes", 30L);
     }
 
     @Test
@@ -92,23 +121,57 @@ class SubscriptionServiceTest {
     void testGetUpgradePaymentInfo_Success() {
         when(userRepository.findByEmail("student@fpt.edu.vn")).thenReturn(Optional.of(mockUser));
         when(subscriptionPlanRepository.findById(2L)).thenReturn(Optional.of(proPlan));
+        when(userSubscriptionRepository.findByUser_IdAndIsActiveTrue(10L)).thenReturn(List.of());
+        when(subscriptionPaymentRepository.findFirstByUser_IdAndTargetPlan_IdAndStatusOrderByCreatedAtDesc(eq(10L), eq(2L), any()))
+                .thenReturn(Optional.empty());
+        when(subscriptionPaymentRepository.save(any(SubscriptionPayment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         UpgradePaymentResponse response = subscriptionService.getUpgradePaymentInfo(2L, "student@fpt.edu.vn");
 
         assertNotNull(response);
         assertEquals(2L, response.getPlanId());
         assertEquals("PRO", response.getPlanName());
-        assertEquals(BigDecimal.valueOf(99000), response.getAmount());
+        assertEquals(BigDecimal.valueOf(29000), response.getAmount());
         assertEquals("TPBank", response.getBankName());
         assertEquals("00004103937", response.getAccountNumber());
-        assertTrue(response.getTransferContent().contains("SHUPGRADE"));
+        assertEquals(0L, response.getRemainingDays());
         assertTrue(response.getQrCodeUrl().contains("https://img.vietqr.io/image/TPB-00004103937-compact2.png"));
+    }
+
+    @Test
+    void testGetUpgradePaymentInfo_ProToPremiumProratedAmount() {
+        mockUser.setPlan(proPlan);
+        UserSubscription activeProSubscription = UserSubscription.builder()
+                .id(501L)
+                .user(mockUser)
+                .plan(proPlan)
+                .startDate(LocalDateTime.now().minusDays(25))
+                .endDate(LocalDateTime.now().plusDays(5))
+                .isActive(true)
+                .build();
+
+        when(userRepository.findByEmail("student@fpt.edu.vn")).thenReturn(Optional.of(mockUser));
+        when(subscriptionPlanRepository.findById(3L)).thenReturn(Optional.of(premiumPlan));
+        when(userSubscriptionRepository.findByUser_IdAndIsActiveTrue(10L)).thenReturn(List.of(activeProSubscription));
+        when(subscriptionPaymentRepository.findFirstByUser_IdAndTargetPlan_IdAndStatusOrderByCreatedAtDesc(eq(10L), eq(3L), eq(com.studyhub.common.enums.PaymentStatus.PENDING)))
+                .thenReturn(Optional.empty());
+        when(subscriptionPaymentRepository.save(any(SubscriptionPayment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpgradePaymentResponse response = subscriptionService.getUpgradePaymentInfo(3L, "student@fpt.edu.vn");
+
+        assertEquals(BigDecimal.valueOf(6667), response.getAmount());
+        assertEquals(5L, response.getRemainingDays());
+        assertEquals(30L, response.getBillingCycleDays());
+        assertNotNull(response.getCurrentPeriodEndDate());
     }
 
     @Test
     void testGetUpgradePaymentInfo_UpgradeToFreeThrowsException() {
         when(userRepository.findByEmail("student@fpt.edu.vn")).thenReturn(Optional.of(mockUser));
         when(subscriptionPlanRepository.findById(1L)).thenReturn(Optional.of(freePlan));
+        when(userSubscriptionRepository.findByUser_IdAndIsActiveTrue(10L)).thenReturn(List.of());
 
         assertThrows(IllegalArgumentException.class, () -> {
             subscriptionService.getUpgradePaymentInfo(1L, "student@fpt.edu.vn");
@@ -119,34 +182,35 @@ class SubscriptionServiceTest {
     void testSimulatePaymentSuccess() {
         SimulatePaymentRequest request = SimulatePaymentRequest.builder()
                 .planId(2L)
-                .transferContent("SHUPGRADE 10 2 1234")
+                .transferContent("SHU10P2DEMO")
                 .build();
 
-        when(userRepository.findByEmail("student@fpt.edu.vn")).thenReturn(Optional.of(mockUser));
-        when(subscriptionPlanRepository.findById(2L)).thenReturn(Optional.of(proPlan));
-
-        UserSubscription oldSub = UserSubscription.builder()
-                .id(100L)
+        SubscriptionPayment pendingPayment = SubscriptionPayment.builder()
+                .id(900L)
                 .user(mockUser)
-                .plan(freePlan)
-                .isActive(true)
+                .currentPlan(freePlan)
+                .targetPlan(proPlan)
+                .transferContent("SHU10P2DEMO")
+                .paymentCode("SHU10P2DEMO")
+                .amount(BigDecimal.valueOf(29000))
+                .status(com.studyhub.common.enums.PaymentStatus.PENDING)
+                .expiresAt(LocalDateTime.now().plusMinutes(30))
                 .build();
 
         when(userSubscriptionRepository.findByUser_IdAndIsActiveTrue(10L))
-                .thenReturn(List.of(oldSub));
+                .thenReturn(List.of());
+        when(subscriptionPaymentRepository.findByTransferContent("SHU10P2DEMO"))
+                .thenReturn(Optional.of(pendingPayment));
+        when(subscriptionPaymentRepository.save(any(SubscriptionPayment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         subscriptionService.simulatePaymentSuccess(request, "student@fpt.edu.vn");
 
-        // Verify old subscription is deactivated
-        assertFalse(oldSub.getIsActive());
-        verify(userSubscriptionRepository, times(1)).save(oldSub);
-
-        // Verify user plan is updated to PRO
         assertEquals(proPlan, mockUser.getPlan());
+        assertEquals(com.studyhub.common.enums.PaymentStatus.PAID, pendingPayment.getStatus());
         verify(userRepository, times(1)).save(mockUser);
-
-        // Verify new subscription is saved
-        verify(userSubscriptionRepository, times(1)).save(argThat(sub -> 
+        verify(subscriptionPaymentRepository, atLeastOnce()).save(pendingPayment);
+        verify(userSubscriptionRepository, times(1)).save(argThat(sub ->
             sub.getPlan().equals(proPlan) && sub.getUser().equals(mockUser) && sub.getIsActive()
         ));
     }
@@ -171,5 +235,47 @@ class SubscriptionServiceTest {
         assertEquals(1, response.size());
         assertEquals("PRO", response.get(0).getPlanName());
         assertTrue(response.get(0).getIsActive());
+    }
+
+    @Test
+    void testHandleExpiredSubscription_MarksUserOverQuotaWithoutDeletingData() {
+        mockUser.setPlan(proPlan);
+        mockUser.setStorageStatus(StorageStatus.NORMAL);
+        freePlan.setStorageLimitMb(50L);
+        UserSubscription expiredSubscription = UserSubscription.builder()
+                .id(301L)
+                .user(mockUser)
+                .plan(proPlan)
+                .startDate(LocalDateTime.now().minusDays(30))
+                .endDate(LocalDateTime.now().minusMinutes(5))
+                .isActive(true)
+                .build();
+
+        when(subscriptionPlanRepository.findByPlanName("FREE")).thenReturn(Optional.of(freePlan));
+        when(documentRepository.sumFileSizeByUserId(10L)).thenReturn(800L * 1024L * 1024L);
+
+        subscriptionService.handleExpiredSubscription(expiredSubscription);
+
+        assertEquals(freePlan, mockUser.getPlan());
+        assertEquals(StorageStatus.OVER_QUOTA, mockUser.getStorageStatus());
+        assertFalse(expiredSubscription.getIsActive());
+        verify(userSubscriptionRepository).save(expiredSubscription);
+        verify(userRepository).save(mockUser);
+        verify(notificationService).createNotification(eq(mockUser), eq("Subscription expired"), contains("returned to FREE"), any());
+    }
+
+    @Test
+    void testSyncStorageStatus_ReturnsNormalWhenUsageFallsWithinLimit() {
+        mockUser.setPlan(freePlan);
+        mockUser.setStorageStatus(StorageStatus.OVER_QUOTA);
+        freePlan.setStorageLimitMb(50L);
+        when(documentRepository.sumFileSizeByUserId(10L)).thenReturn(40L * 1024L * 1024L);
+
+        SubscriptionService.StorageQuotaSnapshot snapshot = subscriptionService.syncStorageStatus(mockUser, freePlan);
+
+        assertEquals(StorageStatus.NORMAL, mockUser.getStorageStatus());
+        assertFalse(snapshot.overQuota());
+        assertTrue(snapshot.canUpload());
+        assertNull(snapshot.message());
     }
 }
