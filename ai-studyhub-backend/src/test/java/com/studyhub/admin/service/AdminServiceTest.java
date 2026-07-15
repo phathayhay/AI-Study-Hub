@@ -12,6 +12,7 @@ import com.studyhub.document.entity.Report;
 import com.studyhub.document.repository.DocumentCategoryRepository;
 import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.document.repository.ReportRepository;
+import com.studyhub.document.service.DocumentService;
 import com.studyhub.user.entity.Role;
 import com.studyhub.user.entity.StudentVerification;
 import com.studyhub.user.entity.SubscriptionPlan;
@@ -22,6 +23,7 @@ import com.studyhub.user.repository.UserRepository;
 import com.studyhub.course.dto.CourseListResponse;
 import com.studyhub.course.service.CourseService;
 import com.studyhub.user.service.NotificationService;
+import com.studyhub.user.service.SubscriptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,6 +63,14 @@ class AdminServiceTest {
     private CourseService courseService;
     @Mock
     private NotificationService notificationService;
+    @Mock
+    private SubscriptionService subscriptionService;
+    @Mock
+    private DocumentService documentService;
+    @Mock
+    private AdminVerificationService adminVerificationService;
+    @Mock
+    private AdminAnalyticsService adminAnalyticsService;
 
     @InjectMocks
     private AdminService adminService;
@@ -165,20 +175,17 @@ class AdminServiceTest {
 
     @Test
     void testGetPendingVerifications() {
-        StudentVerification pending = StudentVerification.builder()
+        AdminVerificationResponse pending = AdminVerificationResponse.builder()
                 .id(100L)
-                .user(mockUser)
                 .imageUrl("https://cloud.com/card.png")
-                .status(VerificationStatus.PENDING)
                 .build();
-
-        when(studentVerificationRepository.findByStatus(VerificationStatus.PENDING))
-                .thenReturn(List.of(pending));
+        when(adminVerificationService.getPendingVerifications()).thenReturn(List.of(pending));
 
         List<AdminVerificationResponse> response = adminService.getPendingVerifications();
         assertNotNull(response);
         assertEquals(1, response.size());
         assertEquals("https://cloud.com/card.png", response.get(0).getImageUrl());
+        verify(adminVerificationService).getPendingVerifications();
     }
 
     @Test
@@ -190,9 +197,6 @@ class AdminServiceTest {
                 .status(VerificationStatus.PENDING)
                 .build();
 
-        when(studentVerificationRepository.findById(100L)).thenReturn(Optional.of(requestVerification));
-        when(userRepository.findByEmail("admin@fpt.edu.vn")).thenReturn(Optional.of(mockAdmin));
-
         VerificationReviewRequest reviewDto = VerificationReviewRequest.builder()
                 .status("APPROVED")
                 .reviewNote("Identity confirmed")
@@ -200,11 +204,7 @@ class AdminServiceTest {
 
         adminService.reviewVerification(100L, reviewDto, "admin@fpt.edu.vn");
 
-        assertEquals(VerificationStatus.APPROVED, requestVerification.getStatus());
-        assertEquals(VerificationStatus.APPROVED, mockUser.getVerificationStatus());
-        assertEquals(UserStatus.ACTIVE, mockUser.getStatus());
-        verify(studentVerificationRepository, times(1)).save(requestVerification);
-        verify(userRepository, times(1)).save(mockUser);
+        verify(adminVerificationService).reviewVerification(100L, reviewDto, "admin@fpt.edu.vn");
     }
 
     @Test
@@ -216,9 +216,6 @@ class AdminServiceTest {
                 .status(VerificationStatus.PENDING)
                 .build();
 
-        when(studentVerificationRepository.findById(100L)).thenReturn(Optional.of(requestVerification));
-        when(userRepository.findByEmail("admin@fpt.edu.vn")).thenReturn(Optional.of(mockAdmin));
-
         VerificationReviewRequest reviewDto = VerificationReviewRequest.builder()
                 .status("REJECTED")
                 .reviewNote("Blurry photo")
@@ -226,11 +223,7 @@ class AdminServiceTest {
 
         adminService.reviewVerification(100L, reviewDto, "admin@fpt.edu.vn");
 
-        assertEquals(VerificationStatus.REJECTED, requestVerification.getStatus());
-        assertEquals(VerificationStatus.REJECTED, mockUser.getVerificationStatus());
-        assertEquals(UserStatus.INACTIVE, mockUser.getStatus());
-        verify(studentVerificationRepository, times(1)).save(requestVerification);
-        verify(userRepository, times(1)).save(mockUser);
+        verify(adminVerificationService).reviewVerification(100L, reviewDto, "admin@fpt.edu.vn");
     }
 
     // ── 3. Document Moderation & Reports Tests
@@ -305,58 +298,38 @@ class AdminServiceTest {
 
     @Test
     void testCRUDMajors() {
-        // Create
-        when(majorRepository.findByMajorCode("SE")).thenReturn(Optional.empty());
         MajorRequest req = MajorRequest.builder().majorCode("se").majorName("Software Engineering").build();
-        adminService.createMajor(req);
-        verify(majorRepository, times(1)).save(any(Major.class));
+        when(courseService.createMajor(req)).thenReturn(mockMajor);
+        assertSame(mockMajor, adminService.createMajor(req));
 
-        // Read
-        when(majorRepository.findAll()).thenReturn(List.of(mockMajor));
+        when(courseService.getAllMajors()).thenReturn(List.of(mockMajor));
         List<Major> list = adminService.getAllMajors();
         assertEquals(1, list.size());
 
-        // Update
-        when(majorRepository.findById(10L)).thenReturn(Optional.of(mockMajor));
         MajorRequest updateReq = MajorRequest.builder().majorName("New Software Engineering").build();
-        adminService.updateMajor(10L, updateReq);
-        assertEquals("New Software Engineering", mockMajor.getMajorName());
-        verify(majorRepository, times(1)).save(mockMajor);
+        when(courseService.updateMajor(10L, updateReq)).thenReturn(mockMajor);
+        assertSame(mockMajor, adminService.updateMajor(10L, updateReq));
 
-        // Delete
-        when(majorRepository.existsById(10L)).thenReturn(true);
         adminService.deleteMajor(10L);
-        verify(majorRepository, times(1)).deleteById(10L);
+        verify(courseService).deleteMajor(10L);
     }
 
     @Test
     void testCRUDCourses() {
-        // Create
-        when(majorRepository.findById(10L)).thenReturn(Optional.of(mockMajor));
-        when(courseRepository.save(any(Course.class))).thenReturn(mockCourse);
-        when(courseService.toCourseListResponse(any(Course.class))).thenReturn(new CourseListResponse());
+        CourseListResponse courseResponse = new CourseListResponse();
         CourseRequest req = CourseRequest.builder().courseCode("PRJ301").courseName("Java Web").majorId(10L).isActive(true).build();
-        adminService.createCourse(req);
-        verify(courseRepository, times(1)).save(any(Course.class));
+        when(courseService.createCourse(req)).thenReturn(courseResponse);
+        assertSame(courseResponse, adminService.createCourse(req));
 
-        // Read
-        when(courseRepository.findAll()).thenReturn(List.of(mockCourse));
-        when(courseService.toCourseListResponse(mockCourse)).thenReturn(new CourseListResponse());
+        when(courseService.getAllCourses()).thenReturn(List.of(courseResponse));
         List<CourseListResponse> list = adminService.getAllCourses();
         assertEquals(1, list.size());
 
-        // Update
-        when(courseRepository.findById(20L)).thenReturn(Optional.of(mockCourse));
-        when(courseRepository.save(mockCourse)).thenReturn(mockCourse);
         CourseRequest updateReq = CourseRequest.builder().courseName("New Java Web").majorId(10L).isActive(false).build();
-        adminService.updateCourse(20L, updateReq);
-        assertEquals("New Java Web", mockCourse.getCourseName());
-        assertFalse(mockCourse.getIsActive());
-        verify(courseRepository, times(1)).save(mockCourse);
+        when(courseService.updateCourse(20L, updateReq)).thenReturn(courseResponse);
+        assertSame(courseResponse, adminService.updateCourse(20L, updateReq));
 
-        // Delete
-        when(courseRepository.existsById(20L)).thenReturn(true);
         adminService.deleteCourse(20L);
-        verify(courseRepository, times(1)).deleteById(20L);
+        verify(courseService).deleteCourse(20L);
     }
 }

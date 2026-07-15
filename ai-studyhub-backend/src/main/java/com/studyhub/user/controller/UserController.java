@@ -1,24 +1,13 @@
 package com.studyhub.user.controller;
 
-import com.studyhub.chat.repository.ChatMessageRepository;
 import com.studyhub.common.ApiResponse;
-import com.studyhub.common.enums.SenderType;
 import com.studyhub.security.SecurityUtils;
-import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.dto.NotificationSummaryResponse;
-import com.studyhub.user.entity.StudentVerification;
-import com.studyhub.user.entity.SubscriptionPlan;
-import com.studyhub.user.entity.User;
-import com.studyhub.user.repository.StudentVerificationRepository;
-import com.studyhub.user.repository.UserRepository;
-import com.studyhub.user.repository.UserSubscriptionRepository;
+import com.studyhub.user.dto.UpdateProfileRequest;
+import com.studyhub.user.dto.UserProfileResponse;
 import com.studyhub.user.service.NotificationService;
 import com.studyhub.user.service.StudentVerificationService;
-import com.studyhub.user.service.SubscriptionService;
-import com.studyhub.user.dto.UserProfileResponse;
-import com.studyhub.user.dto.UpdateProfileRequest;
-import com.studyhub.course.entity.Major;
-import com.studyhub.course.repository.MajorRepository;
+import com.studyhub.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -31,12 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Comparator;
 
 @Slf4j
 @RestController
@@ -45,15 +30,9 @@ import java.util.Comparator;
 @Tag(name = "User Profile", description = "User profile management APIs")
 public class UserController {
 
-    private final UserRepository userRepository;
-    private final UserSubscriptionRepository userSubscriptionRepository;
-    private final CloudinaryStorageService cloudinaryStorageService;
+    private final UserService userService;
     private final StudentVerificationService studentVerificationService;
-    private final StudentVerificationRepository studentVerificationRepository;
-    private final MajorRepository majorRepository;
     private final NotificationService notificationService;
-    private final ChatMessageRepository chatMessageRepository;
-    private final SubscriptionService subscriptionService;
 
     // API tải lên ảnh đại diện của người dùng
     @PostMapping(value = "/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -72,23 +51,8 @@ public class UserController {
             throw new IllegalArgumentException("Uploaded file cannot be empty");
         }
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
         try {
-            // Xóa ảnh đại diện cũ trên Cloudinary nếu có
-            String oldAvatarUrl = user.getAvatarUrl();
-            if (oldAvatarUrl != null && !oldAvatarUrl.isEmpty()) {
-                cloudinaryStorageService.deleteFile(oldAvatarUrl);
-            }
-
-            // Tải ảnh đại diện mới lên Cloudinary
-            String newAvatarUrl = cloudinaryStorageService.uploadFile(file, "avatars");
-
-            // Cập nhật đường dẫn ảnh mới vào Database
-            user.setAvatarUrl(newAvatarUrl);
-            userRepository.save(user);
-
+            String newAvatarUrl = userService.uploadAvatar(email, file);
             return ResponseEntity.ok(ApiResponse.ok("Avatar uploaded successfully", newAvatarUrl));
         } catch (IOException e) {
             log.error("Failed to upload avatar for user {}: {}", email, e.getMessage());
@@ -126,118 +90,21 @@ public class UserController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Profile retrieved successfully", content = @Content(schema = @Schema(implementation = com.studyhub.user.dto.UserProfileResponse.class))),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "User is not logged in / Invalid access token", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class)))
     })
-    @Transactional(readOnly = true)
     public ResponseEntity<ApiResponse<UserProfileResponse>> getProfile() {
         String email = SecurityUtils.getCurrentUserEmail();
         log.info("API: Retrieving profile for user {}", email);
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        UserProfileResponse profileResponse = buildUserProfileResponse(user);
-
+        UserProfileResponse profileResponse = userService.getProfile(email);
         return ResponseEntity.ok(ApiResponse.ok("Profile retrieved successfully", profileResponse));
     }
 
     // API cập nhật thông tin cá nhân
     @PutMapping("/profile")
     @Operation(summary = "Update current user profile", description = "Updates details of the currently authenticated user.")
-    @Transactional
     public ResponseEntity<ApiResponse<UserProfileResponse>> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         String email = SecurityUtils.getCurrentUserEmail();
         log.info("API: Updating profile for user {}", email);
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
-
-        user.setFirstName(request.getFirstName().trim());
-        user.setLastName(request.getLastName().trim());
-
-        if (request.getCampus() != null && !request.getCampus().isBlank()) {
-            try {
-                user.setCampus(com.studyhub.common.enums.Campus.valueOf(request.getCampus().toUpperCase()));
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid campus code: " + request.getCampus());
-            }
-        }
-
-        if (request.getMajorId() != null) {
-            Major major = majorRepository.findById(request.getMajorId())
-                    .orElseThrow(() -> new IllegalArgumentException("Major not found"));
-            user.setMajor(major);
-        } else {
-            user.setMajor(null);
-        }
-
-        user.setCurrentSemester(request.getCurrentSemester());
-
-        User savedUser = userRepository.save(user);
-
-        UserProfileResponse profileResponse = buildUserProfileResponse(savedUser);
-
+        UserProfileResponse profileResponse = userService.updateProfile(email, request);
         return ResponseEntity.ok(ApiResponse.ok("Profile updated successfully", profileResponse));
-    }
-
-    private UserProfileResponse buildUserProfileResponse(User user) {
-        StudentVerification verification = studentVerificationRepository.findByUserId(user.getId()).orElse(null);
-        boolean verificationRequestSubmitted = verification != null && verification.getImageUrl() != null && !verification.getImageUrl().isBlank();
-        com.studyhub.common.enums.VerificationStatus effectiveVerificationStatus = user.getVerificationStatus();
-        if (effectiveVerificationStatus == com.studyhub.common.enums.VerificationStatus.PENDING && !verificationRequestSubmitted) {
-            effectiveVerificationStatus = com.studyhub.common.enums.VerificationStatus.UNVERIFIED;
-        }
-
-        LocalDateTime planExpiresAt = userSubscriptionRepository.findByUser_IdAndIsActiveTrue(user.getId()).stream()
-                .map(subscription -> subscription.getEndDate())
-                .filter(endDate -> endDate != null)
-                .max(Comparator.naturalOrder())
-                .orElse(null);
-
-        SubscriptionPlan activePlan = user.getPlan();
-        SubscriptionService.StorageQuotaSnapshot quotaSnapshot = subscriptionService.getStorageQuotaSnapshot(user);
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = startOfDay.plusDays(1);
-        long aiRequestsUsedToday = chatMessageRepository.countByUserIdAndSenderTypeBetween(
-                user.getId(),
-                SenderType.AI,
-                startOfDay,
-                endOfDay
-        );
-
-        return UserProfileResponse.builder()
-                .id(user.getId())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .fullName(user.getFullName())
-                .email(user.getEmail())
-                .avatarUrl(user.getAvatarUrl())
-                .campus(user.getCampus())
-                .majorName(user.getMajor() != null ? user.getMajor().getMajorName() : null)
-                .majorId(user.getMajor() != null ? user.getMajor().getId() : null)
-                .planName(activePlan != null ? activePlan.getPlanName() : "FREE")
-                .planExpiresAt(planExpiresAt)
-                .planStorageLimitMb(activePlan != null ? activePlan.getStorageLimitMb() : null)
-                .planStorageLimitBytes(quotaSnapshot.storageLimitBytes())
-                .planStorageUsedBytes(quotaSnapshot.storageUsedBytes())
-                .planStorageUsedMb(quotaSnapshot.storageUsedMb())
-                .planAiRequestsPerDay(activePlan != null ? activePlan.getAiRequestsPerDay() : null)
-                .planAiRequestsUsedToday(aiRequestsUsedToday)
-                .planCanUseAiSummary(activePlan != null ? activePlan.getCanUseAiSummary() : null)
-                .planCanUseFlashcards(activePlan != null ? activePlan.getCanUseFlashcards() : null)
-                .planCanUseQuizzes(activePlan != null ? activePlan.getCanUseQuizzes() : null)
-                .planCanPublishDocuments(activePlan != null ? activePlan.getCanPublishDocuments() : null)
-                .planCanPublishFolders(activePlan != null ? activePlan.getCanPublishFolders() : null)
-                .storageStatus(quotaSnapshot.storageStatus())
-                .overQuota(quotaSnapshot.overQuota())
-                .canUpload(quotaSnapshot.canUpload())
-                .storageMessage(quotaSnapshot.message())
-                .currentSemester(user.getCurrentSemester())
-                .status(user.getStatus())
-                .verificationStatus(effectiveVerificationStatus)
-                .verificationRequestSubmitted(verificationRequestSubmitted)
-                .verificationReviewNote(verification != null ? verification.getReviewNote() : null)
-                .role(user.getRole() != null ? user.getRole().getRoleName() : "USER")
-                .build();
     }
 
     @GetMapping("/notifications")
@@ -267,5 +134,3 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok("All notifications marked as read"));
     }
 }
-
-

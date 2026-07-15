@@ -24,7 +24,7 @@ import com.studyhub.user.repository.UserSubscriptionRepository;
 import com.studyhub.user.dto.ForgotPasswordRequest;
 import com.studyhub.user.dto.ResetPasswordRequest;
 import com.studyhub.user.dto.ChangePasswordRequest;
-import com.studyhub.common.service.EmailService;
+import com.studyhub.infra.mail.EmailService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;

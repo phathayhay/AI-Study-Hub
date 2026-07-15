@@ -1,5 +1,6 @@
 package com.studyhub.document.service;
 
+import com.studyhub.admin.dto.CategoryRequest;
 import com.studyhub.common.enums.FileType;
 import com.studyhub.common.enums.ModerationStatus;
 import com.studyhub.common.enums.Visibility;
@@ -382,5 +383,36 @@ public class DocumentService {
                 .tags(doc.getTags().stream().map(Tag::getTagName).collect(Collectors.toSet()))
                 .uploader(doc.getUser().getFullName())
                 .build();
+    }
+
+    // ── Document Category CRUD ──────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<DocumentCategory> getAllCategories() {
+        return categoryRepository.findAll();
+    }
+
+    @Transactional
+    public DocumentCategory createCategory(CategoryRequest request) {
+        DocumentCategory category = DocumentCategory.builder()
+                .categoryName(request.getCategoryName())
+                .build();
+        return categoryRepository.save(category);
+    }
+
+    @Transactional
+    public DocumentCategory updateCategory(Long id, CategoryRequest request) {
+        DocumentCategory category = categoryRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Category not found"));
+        category.setCategoryName(request.getCategoryName());
+        return categoryRepository.save(category);
+    }
+
+    @Transactional
+    public void deleteCategory(Long id) {
+        if (!categoryRepository.existsById(id)) {
+            throw new IllegalArgumentException("Category not found");
+        }
+        categoryRepository.deleteById(id);
     }
 }

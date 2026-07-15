@@ -49,6 +49,9 @@ class SubscriptionServiceTest {
     @Mock
     private DocumentRepository documentRepository;
 
+    @Mock
+    private UserQuotaService userQuotaService;
+
     @InjectMocks
     private SubscriptionService subscriptionService;
 
@@ -217,16 +220,22 @@ class SubscriptionServiceTest {
 
     @Test
     void testGetBillingHistory() {
-        UserSubscription historyRecord = UserSubscription.builder()
+        SubscriptionPayment historyRecord = SubscriptionPayment.builder()
                 .id(101L)
                 .user(mockUser)
-                .plan(proPlan)
-                .startDate(LocalDateTime.now())
-                .endDate(LocalDateTime.now().plusDays(30))
-                .isActive(true)
+                .targetPlan(proPlan)
+                .amount(BigDecimal.valueOf(29000))
+                .status(com.studyhub.common.enums.PaymentStatus.PAID)
+                .paymentCode("PAID-101")
+                .transferContent("SHU10P2PAID")
+                .bankName("TPBank")
+                .accountName("AI Study Hub")
+                .accountNumber("00004103937")
+                .paidAt(LocalDateTime.now())
                 .build();
 
-        when(userSubscriptionRepository.findByUser_EmailOrderByCreatedAtDesc("student@fpt.edu.vn"))
+        when(userRepository.findByEmail("student@fpt.edu.vn")).thenReturn(Optional.of(mockUser));
+        when(subscriptionPaymentRepository.findByUser_IdOrderByCreatedAtDesc(10L))
                 .thenReturn(List.of(historyRecord));
 
         List<BillingHistoryResponse> response = subscriptionService.getBillingHistory("student@fpt.edu.vn");
@@ -252,9 +261,21 @@ class SubscriptionServiceTest {
                 .build();
 
         when(subscriptionPlanRepository.findByPlanName("FREE")).thenReturn(Optional.of(freePlan));
-        when(documentRepository.sumFileSizeByUserId(10L)).thenReturn(800L * 1024L * 1024L);
+        when(userSubscriptionRepository.findByIsActiveTrueAndEndDateBefore(any(LocalDateTime.class)))
+                .thenReturn(List.of(expiredSubscription));
+        when(userQuotaService.getStorageQuotaSnapshot(mockUser)).thenReturn(
+                new UserQuotaService.StorageQuotaSnapshot(
+                        50L,
+                        50L * 1024L * 1024L,
+                        800L * 1024L * 1024L,
+                        800d,
+                        StorageStatus.OVER_QUOTA,
+                        false,
+                        "Storage limit exceeded"
+                )
+        );
 
-        subscriptionService.handleExpiredSubscription(expiredSubscription);
+        subscriptionService.checkExpiredSubscriptions();
 
         assertEquals(freePlan, mockUser.getPlan());
         assertEquals(StorageStatus.OVER_QUOTA, mockUser.getStorageStatus());

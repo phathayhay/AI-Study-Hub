@@ -1,6 +1,7 @@
 package com.studyhub.user.dto;
 
 import lombok.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -14,4 +15,8 @@ public class BillingHistoryResponse {
     private LocalDateTime endDate;
     private Boolean isActive;
     private LocalDateTime createdAt;
+    private BigDecimal amount;
+    private LocalDateTime paidAt;
+    private String paymentStatus;
+    private String transactionRef;
 }

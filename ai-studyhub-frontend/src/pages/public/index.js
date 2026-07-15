@@ -1,0 +1,7 @@
+export { HomeScreen } from './Home'
+export { ExplorePage } from './Explore'
+export { UploadPage } from './Upload'
+export { ProfilePage } from './Profile'
+export { FolderDetailPage } from './FolderDetail'
+export { DocumentDetailPage } from './DocumentDetail'
+export { PricingPage } from './Pricing'
