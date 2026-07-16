@@ -3,6 +3,7 @@ package com.studyhub.document.dto;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Data
 @NoArgsConstructor
@@ -20,6 +21,9 @@ public class FolderResponse {
     private LocalDateTime updatedAt;
     private Integer publicDocumentCount;
     private Integer totalDownloads;
+    private Set<Long> courseIds;
+    private Set<Long> categoryIds;
+    private Set<String> semesters;
     private Boolean publishReady;
     private String publishBlockedReason;
     private List<FolderResponse> subfolders;

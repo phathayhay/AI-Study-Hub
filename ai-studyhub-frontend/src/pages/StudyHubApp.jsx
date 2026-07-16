@@ -14,7 +14,6 @@ import { StudySessionPage as StudyDocumentApi } from './study'
 import useAuth from '../hooks/useAuth'
 import { getFolder } from '../features/folders/folderService'
 import { getDocument, searchDocuments } from '../features/documents/documentService'
-import { register as apiRegister } from '../features/auth/authService'
 import { ROUTES, ROUTE_PATHS, fillRoute } from '../constants/routes'
 import { getNotifications as getUserNotifications, getUserProfile, markAllNotificationsAsRead, markNotificationAsRead } from '../services/userService'
 import { getToken } from '../services/api'
@@ -36,7 +35,7 @@ const getUserRole = (user) => {
 export default function StudyHubApp() {
   const location = useLocation()
   const routerNavigate = useNavigate()
-  const { user, loading, login: authLogin, register: authRegister, logout: authLogout, setUser } = useAuth()
+  const { user, loading, login: authLogin, logout: authLogout, setUser } = useAuth()
   const [route, setRoute] = useState('explore')
   const [previousRoute, setPreviousRoute] = useState('explore')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -666,22 +665,15 @@ export default function StudyHubApp() {
     navigate(r === 'admin' ? 'admin-overview' : 'explore')
   }
 
-  const handleRegister = async (formData) => {
-    const session = await apiRegister(formData)
-    const u = await authRegister(session)
-    if (u) {
-      migrateGuestHistoryToUser(u.id || u.email || 'user')
-      window.showToast?.('Registration successful! Welcome to AI Study Hub 🎉', 'success')
-      navigate('explore')
-    } else {
-      throw new Error('Failed to save login session. Please try again.')
-    }
-  }
-
   const handleLogout = async () => {
     await authLogout()
     try { localStorage.removeItem('recentItems_guest') } catch (e) {}
     navigate('explore')
+  }
+
+  const handleSwitchToLogin = async () => {
+    await authLogout()
+    navigate('login')
   }
 
   const openStudyFile = (file) => {
@@ -729,10 +721,12 @@ export default function StudyHubApp() {
   if (loading) return null
 
   if (route === 'login') return <LoginPage onLogin={handleLogin} onNavigate={navigate} />
-  if (route === 'register') return <RegisterPage onRegister={handleRegister} onNavigate={navigate} />
+  if (route === 'register') return <RegisterPage onNavigate={navigate} />
   if (route === 'forgot-password') return <ForgotPasswordPage onNavigate={navigate} />
   if (route === 'reset-password') return <ResetPasswordPage onNavigate={navigate} />
-  if (route === 'verify-email') return <VerifyEmailPage onNavigate={navigate} />
+  if (route === 'verify-email') {
+    return <VerifyEmailPage onNavigate={navigate} onSignIn={handleSwitchToLogin} />
+  }
   if (route.startsWith('admin-')) {
     if (role !== 'admin') return null
     return <AdminApp route={route} onNavigate={navigate} onLogout={handleLogout} />

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import StudyHubIcon from '../icons/StudyHubIcons'
 
 export function NotificationPanel({
@@ -11,6 +11,27 @@ export function NotificationPanel({
   onOpenNotification
 }) {
   const [activeTab, setActiveTab] = useState('All')
+  const panelRef = useRef(null)
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (panelRef.current?.contains(event.target)) return
+      if (event.target.closest?.('[data-notification-trigger]')) return
+      onClose?.()
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose?.()
+    }
+
+    window.document.addEventListener('pointerdown', handlePointerDown)
+    window.document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.document.removeEventListener('pointerdown', handlePointerDown)
+      window.document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onClose])
 
   const getNoticeVisual = (item) => {
     switch (item.notificationType) {
@@ -64,7 +85,7 @@ export function NotificationPanel({
   })
 
   return (
-    <aside className="notification-panel">
+    <aside className="notification-panel" ref={panelRef}>
       <header>
         <h2><StudyHubIcon name="bell" size={22} /> Notifications <span>{unreadCount}</span></h2>
         <button disabled={!unreadCount} onClick={onMarkAllRead} type="button">Mark all read</button>

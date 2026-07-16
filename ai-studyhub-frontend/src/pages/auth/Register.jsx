@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Mail, Lock, User as UserIcon, Loader2 } from 'lucide-react'
 import { register as apiRegister } from '../../services/authService'
 import { AuthLayout, InputField } from './AuthLayout'
+import { VerifyEmailView } from './VerifyEmail'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -12,9 +13,28 @@ function getEmailError(value) {
   return ''
 }
 
-export function RegisterPage({ onNavigate, onRegister }) {
+export function RegisterPage({ onNavigate }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [registeredEmail, setRegisteredEmail] = useState('')
+
+  if (registeredEmail) {
+    return (
+      <AuthLayout
+        modeTitle="Verify your email"
+        modeSubtitle="One last step before entering your study workspace."
+        error={error}
+        onNavigate={onNavigate}
+      >
+        <VerifyEmailView
+          email={registeredEmail}
+          onBack={() => onNavigate('login')}
+          onError={setError}
+          onSuccess={(message) => window.showToast?.(message, 'success')}
+        />
+      </AuthLayout>
+    )
+  }
 
   return (
     <AuthLayout
@@ -25,12 +45,14 @@ export function RegisterPage({ onNavigate, onRegister }) {
     >
       <SignUpForm
         onRegisterSuccess={(email) => {
-          // Redirect page to verify email notification route, or notify parent
-          if (onRegister) {
-            onRegister(email)
-          } else {
-            onNavigate('verify-email', { email })
+          const normalizedEmail = email.toLowerCase()
+          const isFptEmail = normalizedEmail.endsWith('@fpt.edu.vn') || normalizedEmail.endsWith('@fe.edu.vn')
+          if (isFptEmail) {
+            window.showToast?.('Registration successful. You can sign in now.', 'success')
+            onNavigate('login')
+            return
           }
+          setRegisteredEmail(email)
         }}
         onLoading={setLoading}
         onError={setError}

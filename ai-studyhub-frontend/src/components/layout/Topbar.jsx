@@ -175,6 +175,7 @@ export default function Topbar({
           )}
 
           <button
+            data-notification-trigger
             onClick={onNotifications}
             className="bg-white dark:bg-slate-700 border border-[#e2e8f0] dark:border-slate-600 transition-colors duration-300 ease-in-out"
             style={{ width: '36px', height: '36px', borderRadius: '50%', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative' }}

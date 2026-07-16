@@ -113,8 +113,13 @@ function ExploreSearchFilter({
   setSelectedMajor,
   selectedCourse,
   setSelectedCourse,
+  selectedSemester,
+  setSelectedSemester,
+  selectedCategory,
+  setSelectedCategory,
   popularCourses,
   majors,
+  categories,
   guest
 }) {
   return (
@@ -192,6 +197,35 @@ function ExploreSearchFilter({
               </button>
             );
           })}
+        </div>
+
+        <div className="filter-row flex flex-wrap gap-3 items-center justify-center text-xs md:text-sm text-slate-500 dark:text-slate-400">
+          <label className="font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">
+            Semester
+            <select
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
+              onChange={(event) => setSelectedSemester(event.target.value)}
+              value={selectedSemester}
+            >
+              <option value="">All semesters</option>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((number) => (
+                <option key={number} value={`Semester ${number}`}>Semester {number}</option>
+              ))}
+            </select>
+          </label>
+          <label className="font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">
+            Type
+            <select
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
+              onChange={(event) => setSelectedCategory(event.target.value)}
+              value={selectedCategory}
+            >
+              <option value="">All document types</option>
+              {categories.map((category) => (
+                <option key={category.id} value={String(category.id)}>{category.categoryName}</option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
     </section>
@@ -315,7 +349,7 @@ function matchesDocumentMajor(doc, selectedMajor, coursesList = [], majorsList =
 }
 
 function getFolderCode(folderName = '') {
-  const codeMatch = folderName.match(/^([A-Z]{3}\d{3})/i)
+  const codeMatch = folderName.trim().match(/^([A-Z]{2,4}\d{0,3})\b/i)
   return codeMatch ? codeMatch[1].toUpperCase() : 'FPTU'
 }
 
@@ -324,13 +358,25 @@ function formatFolderMetric(value, singularLabel) {
 }
 
 function mapFolderToCard(folder) {
+  const folderCode = getFolderCode(folder?.folderName || '')
+  const documentCourseCodes = Array.isArray(folder?.documents)
+    ? folder.documents.map(getDocCourseCode).filter((code) => code && code !== 'DOC')
+    : []
+  const courseCodes = [...new Set([
+    ...(folderCode !== 'FPTU' ? [folderCode] : []),
+    ...documentCourseCodes
+  ])]
   const fileCount = Number(folder?.publicDocumentCount ?? folder?.documents?.length ?? 0)
   const downloadCount = Number(folder?.totalDownloads ?? 0)
   const ownerName = folder?.ownerName || 'FPTU community'
 
   return {
     id: folder?.id,
-    code: getFolderCode(folder?.folderName || ''),
+    code: folderCode,
+    courseCodes,
+    courseIds: (folder?.courseIds || []).map(Number),
+    categoryIds: (folder?.categoryIds || []).map(Number),
+    semesters: folder?.semesters || [],
     title: folder?.folderName || 'Untitled Folder',
     description: `Public study collection by ${ownerName}`,
     files: formatFolderMetric(fileCount, 'file'),
@@ -351,6 +397,8 @@ export function ExplorePage({
 }) {
   const [selectedMajor, setSelectedMajor] = useState(initialMajor)
   const [selectedCourse, setSelectedCourse] = useState(initialCourse)
+  const [selectedSemester, setSelectedSemester] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [searchQuery, setSearchQuery] = useState(initialKeyword)
 
   useEffect(() => {
@@ -450,7 +498,15 @@ export function ExplorePage({
     const courseObj = coursesList.find(c => c.courseCode === selectedCourse)
     const courseId = courseObj ? courseObj.id : null
 
-    getDocuments({ keyword: searchQuery || null, majorId, courseId, page: 0, size: 100 })
+    getDocuments({
+      keyword: searchQuery || null,
+      majorId,
+      courseId,
+      categoryId: selectedCategory || null,
+      semester: selectedSemester || null,
+      page: 0,
+      size: 100
+    })
       .then((res) => {
         if (!active) return
         const docs = res?.content || res?.data?.content || res || []
@@ -467,12 +523,33 @@ export function ExplorePage({
     return () => {
       active = false
     }
-  }, [searchQuery, selectedMajor, selectedCourse, majorsList, coursesList])
+  }, [searchQuery, selectedMajor, selectedCourse, selectedSemester, selectedCategory, majorsList, coursesList])
 
-  const filteredFolders = realFolders.filter(f =>
-    (selectedMajor === 'ALL' || (f.code && f.code.startsWith(selectedMajor))) &&
-    (!searchQuery || f.title.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  const filteredFolders = realFolders.filter((folder) => {
+    const folderCourseCodes = folder.courseCodes || []
+    const normalizedCourse = String(selectedCourse || '').toUpperCase()
+    const matchesCourse = !normalizedCourse || folderCourseCodes.some((code) =>
+      code === normalizedCourse || code.startsWith(normalizedCourse) || normalizedCourse.startsWith(code)
+    )
+    const matchesSemester = !selectedSemester || folder.semesters.includes(selectedSemester)
+    const matchesCategory = !selectedCategory || folder.categoryIds.includes(Number(selectedCategory))
+
+    const candidateCourses = coursesList.filter((course) => {
+      const courseCode = String(course?.courseCode || '').toUpperCase()
+      return folderCourseCodes.some((code) =>
+        code === courseCode || code.startsWith(courseCode) || courseCode.startsWith(code)
+      )
+    })
+    const matchesMajor = selectedMajor === 'ALL' || candidateCourses.some((course) =>
+      isCourseEligibleForMajor(course, selectedMajor, majorsList)
+    )
+
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+    const matchesKeyword = !normalizedQuery || [folder.title, folder.description, folder.code]
+      .some((value) => String(value || '').toLowerCase().includes(normalizedQuery))
+
+    return matchesCourse && matchesSemester && matchesCategory && matchesMajor && matchesKeyword
+  })
 
   const trendingDocs = [...documents]
     .sort((a, b) => (b.totalDownloads || b.downloads || 0) - (a.totalDownloads || a.downloads || 0))
@@ -495,7 +572,7 @@ export function ExplorePage({
     })
     .slice(0, 3)
 
-  const isFiltered = searchQuery || selectedCourse || selectedMajor !== 'ALL'
+  const isFiltered = searchQuery || selectedCourse || selectedSemester || selectedCategory || selectedMajor !== 'ALL'
 
   return (
     <main className="home-main dark:bg-[#0f172a] dark:bg-none" style={{ overflowY: 'auto', flex: 1, padding: '0 24px' }}>
@@ -509,12 +586,17 @@ export function ExplorePage({
           setSelectedMajor={setSelectedMajor}
           selectedCourse={selectedCourse}
           setSelectedCourse={setSelectedCourse}
+          selectedSemester={selectedSemester}
+          setSelectedSemester={setSelectedSemester}
+          selectedCategory={selectedCategory}
+          setSelectedCategory={setSelectedCategory}
           popularCourses={
             selectedMajor === 'ALL'
               ? coursesList.slice(0, 10).map(c => c.courseCode)
               : coursesList.filter(c => isCourseEligibleForMajor(c, selectedMajor, majorsList)).slice(0, 10).map(c => c.courseCode)
           }
           majors={majorsList.map(m => m.majorCode)}
+          categories={categoriesList}
           guest={guest}
         />
 

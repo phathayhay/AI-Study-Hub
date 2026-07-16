@@ -126,6 +126,7 @@ public class DocumentService {
                 .folder(folder)
                 .title(request.getTitle())
                 .description(request.getDescription())
+                .semester(request.getSemester())
                 .fileName(originalFilename)
                 .fileUrl(fileUrl)
                 .fileSize(file.getSize())
@@ -198,12 +199,13 @@ public class DocumentService {
     }
 
     @Transactional(readOnly = true)
-    public Page<DocumentResponse> searchDocuments(String keyword, Long majorId, Long courseId, Long categoryId, Pageable pageable) {
+    public Page<DocumentResponse> searchDocuments(String keyword, Long majorId, Long courseId, Long categoryId, String semester, Pageable pageable) {
         Specification<Document> spec = Specification.where(DocumentSpecifications.isPublicAndApproved())
                 .and(DocumentSpecifications.hasKeyword(keyword))
                 .and(DocumentSpecifications.hasMajorId(majorId))
                 .and(DocumentSpecifications.hasCourseId(courseId))
-                .and(DocumentSpecifications.hasCategoryId(categoryId));
+                .and(DocumentSpecifications.hasCategoryId(categoryId))
+                .and(DocumentSpecifications.hasSemester(semester));
 
         Page<Document> docs = documentRepository.findAll(spec, pageable);
         return docs.map(this::mapToResponse);
@@ -365,6 +367,7 @@ public class DocumentService {
                 .userId(doc.getUser().getId())
                 .title(doc.getTitle())
                 .description(doc.getDescription())
+                .semester(doc.getSemester())
                 .fileName(doc.getFileName())
                 .fileUrl(doc.getFileUrl())
                 .thumbnailUrl(doc.getThumbnailUrl())

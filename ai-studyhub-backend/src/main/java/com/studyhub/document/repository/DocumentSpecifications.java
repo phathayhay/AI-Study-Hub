@@ -6,6 +6,7 @@ import com.studyhub.document.entity.Document;
 import com.studyhub.document.entity.Folder;
 import com.studyhub.course.entity.Course;
 import com.studyhub.document.entity.DocumentCategory;
+import com.studyhub.document.entity.Tag;
 import com.studyhub.user.entity.User;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
@@ -24,13 +25,16 @@ public class DocumentSpecifications {
             Join<Document, Course> courseJoin = root.join("course", JoinType.LEFT);
             Join<Document, DocumentCategory> categoryJoin = root.join("category", JoinType.LEFT);
             Join<Document, User> userJoin = root.join("user", JoinType.LEFT);
-            
+            Join<Document, Tag> tagJoin = root.join("tags", JoinType.LEFT);
+            query.distinct(true);
+
             return cb.or(
                     cb.like(cb.lower(root.get("title")), pattern),
                     cb.like(cb.lower(root.get("description")), pattern),
                     cb.like(cb.lower(courseJoin.get("courseCode")), pattern),
                     cb.like(cb.lower(courseJoin.get("courseName")), pattern),
                     cb.like(cb.lower(categoryJoin.get("categoryName")), pattern),
+                    cb.like(cb.lower(tagJoin.get("tagName")), pattern),
                     cb.like(cb.lower(userJoin.get("firstName")), pattern),
                     cb.like(cb.lower(userJoin.get("lastName")), pattern)
             );
@@ -80,6 +84,15 @@ public class DocumentSpecifications {
                             cb.notEqual(folderJoin.get("visibility"), Visibility.PUBLIC)
                     )
             );
+        };
+    }
+
+    public static Specification<Document> hasSemester(String semester) {
+        return (root, query, cb) -> {
+            if (semester == null || semester.isBlank()) {
+                return null;
+            }
+            return cb.equal(cb.lower(root.get("semester")), semester.trim().toLowerCase());
         };
     }
 }

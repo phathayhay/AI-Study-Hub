@@ -86,7 +86,7 @@ export function VerifyEmailView({ email, onBack, onError, onSuccess }) {
   )
 }
 
-export function VerifyEmailPage({ onNavigate }) {
+export function VerifyEmailPage({ onNavigate, onSignIn }) {
   const [status, setStatus] = useState('loading') // 'loading', 'success', 'error'
   const [message, setMessage] = useState('')
   const effectRan = useRef(false)
@@ -181,7 +181,7 @@ export function VerifyEmailPage({ onNavigate }) {
                 {message || 'Your account has been successfully verified.'}
               </p>
               <button
-                onClick={() => onNavigate('login')}
+                onClick={() => onSignIn ? onSignIn() : onNavigate('login')}
                 className="w-full mt-4 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-4 rounded-xl font-semibold text-sm transition-all shadow-md cursor-pointer"
               >
                 Sign In Now →

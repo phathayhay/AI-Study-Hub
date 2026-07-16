@@ -60,6 +60,15 @@ public class DocumentController {
         if (request == null || request.getTitle() == null || request.getTitle().trim().isEmpty()) {
             throw new IllegalArgumentException("Title is required");
         }
+        if (request.getSemester() == null || !request.getSemester().matches("Semester [1-9]")) {
+            throw new IllegalArgumentException("A valid semester is required");
+        }
+        if (request.getCourseId() == null) {
+            throw new IllegalArgumentException("Course is required");
+        }
+        if (request.getCategoryId() == null) {
+            throw new IllegalArgumentException("Document type is required");
+        }
         
         String email = SecurityUtils.getCurrentUserEmail();
         return ResponseEntity.ok(documentService.uploadDocument(file, request, email));
@@ -107,6 +116,7 @@ public class DocumentController {
             @RequestParam(value = "majorId", required = false) Long majorId,
             @RequestParam(value = "courseId", required = false) Long courseId,
             @RequestParam(value = "categoryId", required = false) Long categoryId,
+            @RequestParam(value = "semester", required = false) String semester,
             @RequestParam(value = "page", defaultValue = "0") int page,
             @RequestParam(value = "size", defaultValue = "10") int size,
             @RequestParam(value = "sortBy", defaultValue = "createdAt") String sortBy,
@@ -114,7 +124,7 @@ public class DocumentController {
 
         Sort sort = sortDir.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        return ResponseEntity.ok(documentService.searchDocuments(keyword, majorId, courseId, categoryId, pageable));
+        return ResponseEntity.ok(documentService.searchDocuments(keyword, majorId, courseId, categoryId, semester, pageable));
     }
 
     // API lấy lịch sử xem tài liệu của người dùng

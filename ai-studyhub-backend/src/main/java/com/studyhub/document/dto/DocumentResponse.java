@@ -14,6 +14,7 @@ public class DocumentResponse {
     private Long userId;
     private String title;
     private String description;
+    private String semester;
     private String fileName;
     private String fileUrl;
     private String thumbnailUrl;

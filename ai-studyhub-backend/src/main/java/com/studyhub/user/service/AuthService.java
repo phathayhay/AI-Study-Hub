@@ -70,7 +70,8 @@ public class AuthService {
         log.info("Registering user with email: {}", request.getEmail());
 
         String email = request.getEmail().trim().toLowerCase();
-        VerificationStatus initialVerificationStatus = isFptEmail(email)
+        boolean fptEmail = isFptEmail(email);
+        VerificationStatus initialVerificationStatus = fptEmail
                 ? VerificationStatus.APPROVED
                 : VerificationStatus.UNVERIFIED;
 
@@ -107,19 +108,20 @@ public class AuthService {
                 .plan(freePlan)
                 .role(userRole)
                 .currentSemester(null)
-                .status(UserStatus.INACTIVE) // Requires email verification
+                .status(fptEmail ? UserStatus.ACTIVE : UserStatus.INACTIVE)
                 .verificationStatus(initialVerificationStatus)
                 .build();
  
          userRepository.save(user);
  
-         // Generate email verification token and send verification email
-         try {
-             String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
-             String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
-             emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
-         } catch (Exception e) {
-             log.warn("Failed to send verification email to {}: {}. Registration will proceed, but user must be verified manually in the database.", user.getEmail(), e.getMessage());
+         if (!fptEmail) {
+             try {
+                 String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
+                 String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
+                 emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
+             } catch (Exception e) {
+                 log.warn("Failed to send verification email to {}: {}. Registration will proceed, but user must be verified manually in the database.", user.getEmail(), e.getMessage());
+             }
          }
      }
 

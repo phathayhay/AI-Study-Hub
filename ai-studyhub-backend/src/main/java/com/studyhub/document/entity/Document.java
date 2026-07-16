@@ -45,6 +45,9 @@ public class Document {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(length = 30)
+    private String semester;
+
     @Column(name = "file_name", nullable = false, length = 255)
     private String fileName;
 

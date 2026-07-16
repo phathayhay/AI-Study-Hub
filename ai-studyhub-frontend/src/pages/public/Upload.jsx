@@ -208,6 +208,7 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
       const res = await uploadDocument(selectedUploadFile, {
         title,
         description,
+        semester: selectedSemester,
         visibility,
         tags,
         courseId,
