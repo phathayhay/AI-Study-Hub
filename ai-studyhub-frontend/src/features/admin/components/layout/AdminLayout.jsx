@@ -1,6 +1,8 @@
 import StudyHubIcon from '../../../../components/icons/StudyHubIcons'
 import Badge from '../../../../components/ui/Badge'
+import compactLogo from '../../../../assets/logo-compact.png'
 import { adminNavigation as adminNavItems } from '../../constants/adminNavigation'
+import { ADMIN_ROUTES } from '../../constants/adminRoutes'
 
 export function AdminLayout({ active, children, onNavigate, onLogout }) {
   return (
@@ -17,10 +19,15 @@ export function AdminLayout({ active, children, onNavigate, onLogout }) {
 export function AdminSidebar({ active, onNavigate, onLogout }) {
   return (
     <aside className="admin-sidebar">
-      <div className="admin-brand">
-        <img alt="StudyHub Admin" src="/images/Thiáº¿t káº¿ chÆ°a cĂ³ tĂªn.png" />
+      <button
+        aria-label="Go to Admin Overview"
+        className="admin-brand"
+        onClick={() => onNavigate(ADMIN_ROUTES.overview)}
+        type="button"
+      >
+        <img alt="" aria-hidden="true" src={compactLogo} />
         <span><strong>StudyHub Admin</strong><small>Control Panel</small></span>
-      </div>
+      </button>
       <nav>
         {adminNavItems.map((item) => (
           <button

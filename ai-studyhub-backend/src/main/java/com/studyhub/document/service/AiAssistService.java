@@ -8,7 +8,10 @@ import com.studyhub.document.dto.*;
 import com.studyhub.document.entity.*;
 import com.studyhub.document.repository.*;
 import com.studyhub.user.entity.User;
+import com.studyhub.user.entity.ActivityLog;
+import com.studyhub.user.repository.ActivityLogRepository;
 import com.studyhub.user.repository.UserRepository;
+import com.studyhub.user.service.UserQuotaService;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +36,8 @@ public class AiAssistService {
     private final AiFlashcardSetRepository flashcardSetRepository;
     private final AiFlashcardRepository flashcardRepository;
     private final UserRepository userRepository;
+    private final ActivityLogRepository activityLogRepository;
+    private final UserQuotaService userQuotaService;
     private final TextExtractionService textExtractionService;
     private final AiModelService aiModelService;
     private final ObjectMapper objectMapper;
@@ -41,30 +46,29 @@ public class AiAssistService {
     public DocumentSummary generateSummary(Long documentId, String userEmail) throws IOException {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        userQuotaService.validateAiRequestAllowed(user);
 
-        // Check if summary already exists
         var existing = summaryRepository.findByDocument_Id(documentId);
-        if (existing.isPresent()) {
-            log.info("Summary already exists for document: {}", documentId);
-            return existing.get();
-        }
 
         // Extract Text
         String text = textExtractionService.extractTextFromUrl(doc.getFileUrl());
         // Limit context size to avoid token limit errors (e.g. approx 15k characters)
         String contentToProcess = text.substring(0, Math.min(text.length(), 15000));
 
-        String prompt = "BẮT BUỘC: Bạn phải tạo ra một đối tượng JSON khớp chính xác với cấu trúc dưới đây. Không tự ý thay đổi tên trường (keys):\n" +
+        String prompt = "REQUIRED: Write all user-facing content in English, regardless of the source document language. " +
+                "Return a JSON object that exactly matches this structure. Do not rename any keys:\n" +
                 "{\n" +
-                "  \"shortSummary\": \"Tóm tắt ngắn gọn (dưới 1000 ký tự)\",\n" +
-                "  \"longSummary\": \"Tóm tắt chi tiết các phần quan trọng\",\n" +
-                "  \"keyTakeaways\": [\"Ý chính 1\", \"Ý chính 2\", ...]\n" +
+                "  \"shortSummary\": \"A concise summary under 1000 characters\",\n" +
+                "  \"longSummary\": \"A detailed summary of the important sections\",\n" +
+                "  \"keyTakeaways\": [\"Key takeaway 1\", \"Key takeaway 2\"]\n" +
                 "}\n" +
-                "Tài liệu học tập để bạn dựa vào:\n\n" + contentToProcess;
+                "Source study document:\n\n" + contentToProcess;
 
         log.info("Requesting AI to generate summary for document: {}", documentId);
         AiModelService.AiResponse response = aiModelService.chat(
-                "Bạn là trợ lý học tập AI chuyên tóm tắt tài liệu học thuật.",
+                "You are an AI study assistant specializing in academic summaries. Always respond in English.",
                 Collections.emptyList(),
                 prompt
         );
@@ -78,15 +82,15 @@ public class AiAssistService {
             throw new IllegalArgumentException("Không thể trích xuất tóm tắt hợp lệ từ AI. Vui lòng thử lại.");
         }
 
-        DocumentSummary summary = DocumentSummary.builder()
-                .document(doc)
-                .shortSummary(summaryDto.getShortSummary())
-                .longSummary(summaryDto.getLongSummary())
-                .keyTakeaways(summaryDto.getKeyTakeaways())
-                .tokensUsed(response.tokensUsed())
-                .build();
+        DocumentSummary summary = existing.orElseGet(() -> DocumentSummary.builder().document(doc).build());
+        summary.setShortSummary(summaryDto.getShortSummary());
+        summary.setLongSummary(summaryDto.getLongSummary());
+        summary.setKeyTakeaways(summaryDto.getKeyTakeaways());
+        summary.setTokensUsed(response.tokensUsed());
 
-        return summaryRepository.save(summary);
+        DocumentSummary savedSummary = summaryRepository.save(summary);
+        recordAiUsage(user, "AI_SUMMARY", "DOCUMENT", documentId);
+        return savedSummary;
     }
 
     @Transactional(readOnly = true)
@@ -101,36 +105,38 @@ public class AiAssistService {
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        userQuotaService.validateAiRequestAllowed(user);
 
         // Extract Text
         String text = textExtractionService.extractTextFromUrl(doc.getFileUrl());
         String contentToProcess = text.substring(0, Math.min(text.length(), 15000));
 
         String prompt = String.format(
-                "BẮT BUỘC: Hãy tạo một bộ câu hỏi trắc nghiệm ôn tập (gồm 5 đến 10 câu hỏi) mức độ %s dựa trên tài liệu sau đây bằng Tiếng Việt.\n" +
-                        "Bạn phải trả về một đối tượng JSON khớp chính xác với cấu trúc dưới đây, không tự ý thay đổi tên trường (keys):\n" +
+                "REQUIRED: Create 5 to 10 %s-level multiple-choice review questions from the document. " +
+                        "Write the title, questions, options, and explanations in English, regardless of the source language.\n" +
+                        "Return a JSON object that exactly matches this structure. Do not rename any keys:\n" +
                         "{\n" +
-                        "  \"quizTitle\": \"Tiêu đề bộ đề trắc nghiệm\",\n" +
+                        "  \"quizTitle\": \"Quiz title\",\n" +
                         "  \"questions\": [\n" +
                         "    {\n" +
-                        "      \"questionText\": \"Câu hỏi?\",\n" +
-                        "      \"optionA\": \"Lựa chọn A\",\n" +
-                        "      \"optionB\": \"Lựa chọn B\",\n" +
-                        "      \"optionC\": \"Lựa chọn C\",\n" +
-                        "      \"optionD\": \"Lựa chọn D\",\n" +
+                        "      \"questionText\": \"Question?\",\n" +
+                        "      \"optionA\": \"Option A\",\n" +
+                        "      \"optionB\": \"Option B\",\n" +
+                        "      \"optionC\": \"Option C\",\n" +
+                        "      \"optionD\": \"Option D\",\n" +
                         "      \"correctOption\": \"A\",\n" +
-                        "      \"explanation\": \"Giải thích tại sao lựa chọn đó đúng\"\n" +
+                        "      \"explanation\": \"Why this option is correct\"\n" +
                         "    }\n" +
                         "  ]\n" +
                         "}\n" +
-                        "Chú ý: correctOption chỉ nhận một trong bốn giá trị: A, B, C, D.\n" +
-                        "Tài liệu học tập để bạn dựa vào:\n\n%s",
+                        "correctOption must be one of: A, B, C, D.\n" +
+                        "Source study document:\n\n%s",
                 difficulty.name(), contentToProcess
         );
 
         log.info("Requesting AI to generate quiz for document: {}", documentId);
         AiModelService.AiResponse response = aiModelService.chat(
-                "Bạn là trợ lý học tập AI chuyên tạo câu hỏi trắc nghiệm ôn tập.",
+                "You are an AI study assistant specializing in multiple-choice quizzes. Always respond in English.",
                 Collections.emptyList(),
                 prompt
         );
@@ -178,6 +184,7 @@ public class AiAssistService {
             questions.add(quizQuestionRepository.save(question));
         }
 
+        recordAiUsage(user, "AI_QUIZ", "QUIZ", savedQuiz.getId());
         return mapQuizToResponse(savedQuiz, questions);
     }
 
@@ -205,28 +212,30 @@ public class AiAssistService {
                 .orElseThrow(() -> new IllegalArgumentException("Document not found"));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        userQuotaService.validateAiRequestAllowed(user);
 
         // Extract Text
         String text = textExtractionService.extractTextFromUrl(doc.getFileUrl());
         String contentToProcess = text.substring(0, Math.min(text.length(), 15000));
 
-        String prompt = "BẮT BUỘC: Hãy tạo một bộ thẻ ghi nhớ học tập (flashcards) gồm 8 đến 15 thẻ dựa trên tài liệu sau bằng Tiếng Việt.\n" +
-                "Bạn phải trả về một đối tượng JSON khớp chính xác với cấu trúc dưới đây, không tự ý thay đổi tên trường (keys):\n" +
+        String prompt = "REQUIRED: Create 8 to 15 study flashcards from the document. " +
+                "Write the set name, description, questions, and answers in English, regardless of the source language.\n" +
+                "Return a JSON object that exactly matches this structure. Do not rename any keys:\n" +
                 "{\n" +
-                "  \"setName\": \"Tên bộ flashcards\",\n" +
-                "  \"description\": \"Mô tả ngắn gọn\",\n" +
+                "  \"setName\": \"Flashcard set name\",\n" +
+                "  \"description\": \"Brief description\",\n" +
                 "  \"cards\": [\n" +
                 "    {\n" +
-                "      \"frontContent\": \"Khái niệm / Câu hỏi (Mặt trước)\",\n" +
-                "      \"backContent\": \"Định nghĩa / Giải thích (Mặt sau)\"\n" +
+                "      \"frontContent\": \"Concept or question\",\n" +
+                "      \"backContent\": \"Definition or explanation\"\n" +
                 "    }\n" +
                 "  ]\n" +
                 "}\n" +
-                "Tài liệu học tập để bạn dựa vào:\n\n" + contentToProcess;
+                "Source study document:\n\n" + contentToProcess;
 
         log.info("Requesting AI to generate flashcards for document: {}", documentId);
         AiModelService.AiResponse response = aiModelService.chat(
-                "Bạn là trợ lý học tập AI chuyên tạo flashcards giúp ghi nhớ kiến thức.",
+                "You are an AI study assistant specializing in effective study flashcards. Always respond in English.",
                 Collections.emptyList(),
                 prompt
         );
@@ -262,6 +271,7 @@ public class AiAssistService {
             cards.add(flashcardRepository.save(card));
         }
 
+        recordAiUsage(user, "AI_FLASHCARDS", "FLASHCARD_SET", savedSet.getId());
         return mapFlashcardSetToResponse(savedSet, cards);
     }
 
@@ -319,6 +329,16 @@ public class AiAssistService {
             text = text.substring(0, text.length() - 3);
         }
         return text.trim();
+    }
+
+    private void recordAiUsage(User user, String actionType, String entityType, Long entityId) {
+        activityLogRepository.save(ActivityLog.builder()
+                .user(user)
+                .actionType(actionType)
+                .entityType(entityType)
+                .entityId(entityId)
+                .description("Successful AI request")
+                .build());
     }
 
     private QuizResponse mapQuizToResponse(AiQuiz quiz, List<AiQuizQuestion> questions) {

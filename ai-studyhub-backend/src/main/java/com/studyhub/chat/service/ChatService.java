@@ -11,6 +11,7 @@ import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.document.service.TextExtractionService;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.UserRepository;
+import com.studyhub.user.service.UserQuotaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class ChatService {
     private final DocumentRepository documentRepository;
     private final TextExtractionService textExtractionService;
     private final AiModelService aiModelService;
+    private final UserQuotaService userQuotaService;
 
     /**
      * Tạo một phiên trò chuyện mới.
@@ -101,6 +103,7 @@ public class ChatService {
         log.info("User {} sending message to session: {}", email, sessionId);
         ChatSession session = chatSessionRepository.findByIdAndUser_Email(sessionId, email)
                 .orElseThrow(() -> new IllegalArgumentException("Chat session not found or access denied"));
+        userQuotaService.validateAiRequestAllowed(session.getUser());
 
         // 1. Lưu tin nhắn của User
         ChatMessage userMessage = ChatMessage.builder()
@@ -124,14 +127,17 @@ public class ChatService {
                 .collect(Collectors.toList());
 
         // 3. Xây dựng System Prompt (Ngữ cảnh tài liệu hoặc Trợ lý mặc định)
-        String systemPrompt = "Bạn là trợ lý học tập AI của hệ thống AI Study Hub FPT. Hãy trả lời các câu hỏi học thuật của sinh viên bằng Tiếng Việt một cách khoa học, rõ ràng và chi tiết.";
+        String systemPrompt = "You are the AI study assistant for AI Study Hub FPT. " +
+                "Always answer in clear, accurate English, even when the user writes in another language.";
         if (session.getDocument() != null) {
             try {
                 String fileUrl = session.getDocument().getFileUrl();
                 String documentText = textExtractionService.extractTextFromUrl(fileUrl);
                 if (documentText != null && !documentText.isBlank()) {
                     String truncatedText = documentText.substring(0, Math.min(documentText.length(), 15000));
-                    systemPrompt = "Bạn là trợ lý học tập AI. Hãy trả lời các câu hỏi dựa trên nội dung tài liệu sau đây:\n\n" + truncatedText;
+                    systemPrompt = "You are an AI study assistant. Answer in clear, accurate English, " +
+                            "even when the user or source document uses another language. " +
+                            "Base your answer on the following document content:\n\n" + truncatedText;
                 }
             } catch (Exception e) {
                 log.warn("Failed to extract context from document id: {}. Error: {}", session.getDocument().getId(), e.getMessage());

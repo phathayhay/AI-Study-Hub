@@ -15,6 +15,7 @@ import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.StudentVerificationRepository;
 import com.studyhub.user.repository.UserRepository;
 import com.studyhub.user.repository.UserSubscriptionRepository;
+import com.studyhub.user.repository.ActivityLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class UserServiceImpl implements UserService {
     private final StudentVerificationRepository studentVerificationRepository;
     private final MajorRepository majorRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ActivityLogRepository activityLogRepository;
     private final SubscriptionService subscriptionService;
 
     @Override
@@ -140,6 +142,8 @@ public class UserServiceImpl implements UserService {
                 startOfDay,
                 endOfDay
         );
+        aiRequestsUsedToday += activityLogRepository.countByUser_IdAndActionTypeStartingWithAndCreatedAtBetween(
+                user.getId(), "AI_", startOfDay, endOfDay);
 
         return UserProfileResponse.builder()
                 .id(user.getId())

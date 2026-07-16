@@ -79,6 +79,7 @@ export default function Sidebar({
   const storagePercent = storageLimitMb > 0 ? Math.min((storageUsedMb / storageLimitMb) * 100, 100) : 0
   const aiDailyLimit = Number(user?.planAiRequestsPerDay || 0)
   const aiUsedToday = Number(user?.planAiRequestsUsedToday || 0)
+  const aiDisplayedToday = aiDailyLimit > 0 ? Math.min(aiUsedToday, aiDailyLimit) : aiUsedToday
   const aiPercent = aiDailyLimit > 0 ? Math.min((aiUsedToday / aiDailyLimit) * 100, 100) : 0
   const isOverQuota = Boolean(user?.overQuota)
   const storageFooterMessage = isOverQuota
@@ -529,7 +530,7 @@ export default function Sidebar({
                 <div className="sidebar-plan-card__row">
                   <div className="sidebar-plan-card__labels">
                     <strong>AI today</strong>
-                    <span>{aiUsedToday} / {aiDailyLimit || 0}</span>
+                    <span>{aiDisplayedToday} / {aiDailyLimit || 0}</span>
                   </div>
                   <div className="sidebar-plan-card__progress">
                     <div className="sidebar-plan-card__progress-fill sidebar-plan-card__progress-fill--ai" style={{ width: `${aiPercent}%` }} />

@@ -534,14 +534,14 @@ function QuizViewer({ onBack, quiz }) {
   )
 }
 
-export function QuizTab({ documentId, quiz, quizzes, loading, onCreateQuiz, onOpenQuiz, setQuiz }) {
+export function QuizTab({ documentId, quiz, quizzes, loading, onCreateQuiz, onOpenQuiz, setQuiz, quotaReached = false }) {
   if (quiz) {
     return <QuizViewer quiz={quiz} onBack={() => setQuiz(null)} />
   }
 
   return (
     <QuizPanel 
-      disabled={!documentId || loading} 
+      disabled={!documentId || loading}
       loading={loading} 
       onCreate={onCreateQuiz} 
       onOpen={onOpenQuiz} 

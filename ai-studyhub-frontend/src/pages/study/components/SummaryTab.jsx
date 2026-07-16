@@ -3,7 +3,7 @@ import StudyHubIcon from '../../../components/icons/StudyHubIcons'
 
 const FONT_STEPS = [12, 13, 14, 15, 16, 18, 20, 22, 24]
 
-function SummaryView({ summary }) {
+function SummaryView({ summary, onRegenerate, loading, quotaReached }) {
   const [fontStep, setFontStep] = useState(4) // default index → 16px
   const fontSize = FONT_STEPS[fontStep]
 
@@ -40,6 +40,17 @@ function SummaryView({ summary }) {
 
         {/* Controls: A — slider — A  +  download */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            onClick={onRegenerate}
+            disabled={loading}
+            type="button"
+            title="Regenerate summary in English"
+            className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors duration-150"
+            style={{ background: 'none', border: 'none', cursor: loading ? 'wait' : 'pointer', opacity: quotaReached ? 0.65 : 1, padding: '4px', display: 'flex', alignItems: 'center', borderRadius: '6px' }}
+          >
+            <StudyHubIcon name="refresh" size={20} />
+          </button>
+
           {/* Small A */}
           <span
             onClick={() => setFontStep((s) => Math.max(0, s - 1))}
@@ -112,9 +123,9 @@ function SummaryView({ summary }) {
   )
 }
 
-export function SummaryTab({ documentId, summary, onGenerateSummary, loading, initialAiLoading }) {
+export function SummaryTab({ documentId, summary, onGenerateSummary, loading, initialAiLoading, quotaReached = false }) {
   if (summary) {
-    return <SummaryView summary={summary} />
+    return <SummaryView summary={summary} onRegenerate={onGenerateSummary} loading={loading} quotaReached={quotaReached} />
   }
 
   return (
@@ -129,7 +140,7 @@ export function SummaryTab({ documentId, summary, onGenerateSummary, loading, in
         <button
           onClick={onGenerateSummary}
           disabled={!documentId || loading || initialAiLoading}
-          style={{ marginTop: '24px', backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', padding: '12px 32px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 600, cursor: 'pointer', border: 'none' }}
+          style={{ marginTop: '24px', backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', padding: '12px 32px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 600, cursor: 'pointer', opacity: quotaReached ? 0.65 : 1, border: 'none' }}
         >
           {loading ? (
             <>

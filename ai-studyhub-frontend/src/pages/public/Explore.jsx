@@ -208,9 +208,12 @@ function ExploreSearchFilter({
               value={selectedSemester}
             >
               <option value="">All semesters</option>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((number) => (
-                <option key={number} value={`Semester ${number}`}>Semester {number}</option>
-              ))}
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((number) => {
+                const semester = `Semester ${number}`
+                return (
+                  <option key={semester} value={semester}>{semester}</option>
+                )
+              })}
             </select>
           </label>
           <label className="font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">

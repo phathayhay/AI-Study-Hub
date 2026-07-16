@@ -2,12 +2,14 @@ package com.studyhub.user.service;
 
 import com.studyhub.chat.repository.ChatMessageRepository;
 import com.studyhub.common.StorageQuotaExceededException;
+import com.studyhub.common.AiQuotaExceededException;
 import com.studyhub.common.enums.SenderType;
 import com.studyhub.common.enums.StorageStatus;
 import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.SubscriptionPlanRepository;
+import com.studyhub.user.repository.ActivityLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ public class UserQuotaServiceImpl implements UserQuotaService {
 
     private final DocumentRepository documentRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ActivityLogRepository activityLogRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
 
     @Override
@@ -72,8 +75,20 @@ public class UserQuotaServiceImpl implements UserQuotaService {
                 startOfDay,
                 endOfDay
         );
+        aiRequestsUsedToday += activityLogRepository.countByUser_IdAndActionTypeStartingWithAndCreatedAtBetween(
+                user.getId(), "AI_", startOfDay, endOfDay);
 
         return aiRequestsUsedToday < limit;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void validateAiRequestAllowed(User user) {
+        if (!hasRemainingAiRequests(user)) {
+            throw new AiQuotaExceededException(
+                    "You have reached today's AI request limit. Please try again tomorrow or upgrade your plan."
+            );
+        }
     }
 
     private SubscriptionPlan getFreePlan() {

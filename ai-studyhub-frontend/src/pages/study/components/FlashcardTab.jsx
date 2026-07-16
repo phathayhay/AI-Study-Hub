@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import StudyHubIcon from '../../../components/icons/StudyHubIcons'
 
-function FlashcardViewer({ set, onRegenerate, loading }) {
+function FlashcardViewer({ set, onRegenerate, loading, quotaReached }) {
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [slideDirection, setSlideDirection] = useState('')
@@ -112,9 +112,9 @@ function FlashcardViewer({ set, onRegenerate, loading }) {
   )
 }
 
-export function FlashcardTab({ documentId, flashcardSet, onGenerateFlashcards, loading, initialAiLoading }) {
+export function FlashcardTab({ documentId, flashcardSet, onGenerateFlashcards, loading, initialAiLoading, quotaReached = false }) {
   if (flashcardSet) {
-    return <FlashcardViewer set={flashcardSet} onRegenerate={onGenerateFlashcards} loading={loading} />
+    return <FlashcardViewer set={flashcardSet} onRegenerate={onGenerateFlashcards} loading={loading} quotaReached={quotaReached} />
   }
 
   return (
@@ -129,7 +129,7 @@ export function FlashcardTab({ documentId, flashcardSet, onGenerateFlashcards, l
         <button
           onClick={onGenerateFlashcards}
           disabled={!documentId || loading || initialAiLoading}
-          style={{ marginTop: '24px', backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', padding: '12px 32px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 600, cursor: 'pointer', border: 'none' }}
+          style={{ marginTop: '24px', backgroundColor: '#6366f1', color: '#fff', borderRadius: '8px', padding: '12px 32px', fontSize: '15px', display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: 600, cursor: 'pointer', opacity: quotaReached ? 0.65 : 1, border: 'none' }}
         >
           {loading ? (
             <>

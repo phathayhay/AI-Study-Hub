@@ -11,7 +11,12 @@ export function AdminSearch({ onChange, placeholder, value }) {
   const inputProps = {}
   if (value !== undefined) inputProps.value = value
   if (onChange) inputProps.onChange = (event) => onChange(event.target.value)
-  return <label className="admin-search"><StudyHubIcon name="search" size={18} /><input placeholder={placeholder} {...inputProps} /></label>
+  return (
+    <label className="admin-search" role="search">
+      <StudyHubIcon name="search" size={18} />
+      <input aria-label={placeholder || 'Search'} placeholder={placeholder} type="search" {...inputProps} />
+    </label>
+  )
 }
 
 export function AdminStatusFilter({ onChange, options, value }) {

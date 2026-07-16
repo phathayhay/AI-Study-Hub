@@ -18,6 +18,12 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(AiQuotaExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAiQuotaExceeded(AiQuotaExceededException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
     @ExceptionHandler(StorageQuotaExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleStorageQuotaExceeded(StorageQuotaExceededException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)

@@ -11,6 +11,7 @@ import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.document.service.TextExtractionService;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.UserRepository;
+import com.studyhub.user.service.UserQuotaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +45,9 @@ class ChatServiceTest {
 
     @Mock
     private AiModelService aiModelService;
+
+    @Mock
+    private UserQuotaService userQuotaService;
 
     @InjectMocks
     private ChatService chatService;
@@ -305,9 +309,9 @@ class ChatServiceTest {
                 "gemini-2.5-flash-lite",
                 50
         );
-        // Should fallback to default Vietnamese academic tutoring prompt
+        // Should fall back to the default English academic tutoring prompt.
         when(aiModelService.chat(
-                contains("Bạn là trợ lý học tập AI của hệ thống AI Study Hub FPT"),
+                contains("Always answer in clear, accurate English"),
                 anyList(),
                 eq("Summarize this document")
         )).thenReturn(mockGeminiResp);

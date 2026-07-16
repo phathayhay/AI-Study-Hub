@@ -70,6 +70,7 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
   const storagePercent = storageLimitMb > 0 ? Math.min((storageUsedMb / storageLimitMb) * 100, 100) : 0
   const aiDailyLimit = Number(user?.planAiRequestsPerDay || 0)
   const aiUsedToday = Number(user?.planAiRequestsUsedToday || 0)
+  const aiDisplayedToday = aiDailyLimit > 0 ? Math.min(aiUsedToday, aiDailyLimit) : aiUsedToday
   const aiPercent = aiDailyLimit > 0 ? Math.min((aiUsedToday / aiDailyLimit) * 100, 100) : 0
   const isOverQuota = Boolean(user?.overQuota)
   const planRights = [
@@ -360,7 +361,7 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
                 <div className="settings-plan-usage-card">
                   <div className="settings-plan-usage-head">
                     <strong>AI usage today</strong>
-                    <span>{aiUsedToday} / {aiDailyLimit || 0} requests</span>
+                    <span>{aiDisplayedToday} / {aiDailyLimit || 0} requests</span>
                   </div>
                   <div className="settings-plan-progress">
                     <div className="settings-plan-progress__fill settings-plan-progress__fill--ai" style={{ width: `${aiPercent}%` }} />

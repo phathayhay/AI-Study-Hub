@@ -3,9 +3,15 @@ import { ADMIN_STATUS_LABELS } from '../constants/adminStatus'
 
 export function AdminSearch({ onChange, placeholder, value }) {
   return (
-    <label className="admin-search">
+    <label className="admin-search" role="search">
       <StudyHubIcon name="search" size={18} />
-      <input onChange={(event) => onChange?.(event.target.value)} placeholder={placeholder} value={value ?? ''} />
+      <input
+        aria-label={placeholder || 'Search'}
+        onChange={(event) => onChange?.(event.target.value)}
+        placeholder={placeholder}
+        type="search"
+        value={value ?? ''}
+      />
     </label>
   )
 }

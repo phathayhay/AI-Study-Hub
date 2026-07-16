@@ -7,7 +7,7 @@ import {
   sendChatMessage,
 } from '../../../features/ai/aiService'
 
-export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setIsResizing }) {
+export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setIsResizing, onAiUsageUpdated, aiQuotaReached = false }) {
   const [chatSessions, setChatSessions] = useState([])
   const [currentSessionId, setCurrentSessionId] = useState(null)
   const [chatMessages, setChatMessages] = useState([])
@@ -72,6 +72,10 @@ export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setI
   const handleSendChatMessage = async (overrideContent = null) => {
     const textToSend = (overrideContent || chatInput).trim()
     if (!textToSend || chatSendLoading) return
+    if (aiQuotaReached) {
+      window.showToast?.("You have reached today's AI request limit. Please try again tomorrow or upgrade your plan.", 'error')
+      return
+    }
 
     setChatSendLoading(true)
     if (!overrideContent) setChatInput('')
@@ -107,6 +111,7 @@ export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setI
       const aiReply = sendRes?.data || sendRes
       if (aiReply) {
         setChatMessages(prev => [...prev, aiReply])
+        onAiUsageUpdated?.()
       }
     } catch (err) {
       console.error('Failed to send message:', err)
@@ -375,7 +380,7 @@ export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setI
                 
                 <button 
                   onClick={() => handleSendChatMessage()}
-                  disabled={chatSendLoading}
+                  disabled={chatSendLoading || aiQuotaReached}
                   className="bg-indigo-600 dark:bg-indigo-500 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white transition-all duration-200 shadow-sm cursor-pointer"
                   style={{ 
                     width: '38px', 
@@ -385,7 +390,8 @@ export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setI
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'center', 
-                    opacity: chatSendLoading ? 0.6 : 1,
+                    opacity: chatSendLoading || aiQuotaReached ? 0.6 : 1,
+                    cursor: aiQuotaReached ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <StudyHubIcon name="arrow-up" size={16} />

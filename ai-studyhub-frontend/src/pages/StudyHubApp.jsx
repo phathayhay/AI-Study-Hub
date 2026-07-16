@@ -910,6 +910,11 @@ export default function StudyHubApp() {
           activeTab={studyTab} file={studyFile}
           onBack={() => navigate(previousRoute || 'library')}
           onTabChange={(tab) => { setStudyTab(tab); setStudyMode('default') }}
+          onAiUsageUpdated={refreshCurrentUserProfile}
+          aiQuotaReached={
+            user?.planAiRequestsPerDay != null
+            && Number(user?.planAiRequestsUsedToday || 0) >= Number(user.planAiRequestsPerDay)
+          }
         />
       )}
 

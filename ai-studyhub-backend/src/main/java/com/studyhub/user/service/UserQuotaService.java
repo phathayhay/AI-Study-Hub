@@ -34,4 +34,9 @@ public interface UserQuotaService {
      * Check if the user has remaining AI request limits for the day.
      */
     boolean hasRemainingAiRequests(User user);
+
+    /**
+     * Reject an AI request when the user's daily allowance is exhausted.
+     */
+    void validateAiRequestAllowed(User user);
 }

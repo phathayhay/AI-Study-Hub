@@ -1,6 +1,7 @@
 package com.studyhub.user.service;
 
 import com.studyhub.chat.repository.ChatMessageRepository;
+import com.studyhub.user.repository.ActivityLogRepository;
 import com.studyhub.common.enums.Campus;
 import com.studyhub.common.enums.StorageStatus;
 import com.studyhub.common.enums.VerificationStatus;
@@ -52,6 +53,9 @@ class UserServiceImplTest {
 
     @Mock
     private ChatMessageRepository chatMessageRepository;
+
+    @Mock
+    private ActivityLogRepository activityLogRepository;
 
     @Mock
     private SubscriptionService subscriptionService;

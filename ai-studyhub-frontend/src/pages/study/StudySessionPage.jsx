@@ -18,7 +18,7 @@ import { FlashcardTab } from './components/FlashcardTab'
 import { QuizTab } from './components/QuizTab'
 import { ChatbotTab } from './components/ChatbotTab'
 
-export default function StudySessionPage({ activeTab: propActiveTab, file, onBack, onTabChange }) {
+export default function StudySessionPage({ activeTab: propActiveTab, file, onBack, onTabChange, onAiUsageUpdated, aiQuotaReached = false }) {
   const documentId = file?.documentId ?? file?.id
   const [activeTab, setActiveTab] = useState(propActiveTab || 'original')
   
@@ -152,7 +152,12 @@ export default function StudySessionPage({ activeTab: propActiveTab, file, onBac
     return () => { active = false }
   }, [documentId])
 
-  const runRequest = async (request) => {
+  const runRequest = async (request, usesAiQuota = false) => {
+    if (usesAiQuota && aiQuotaReached) {
+      window.showToast?.("You have reached today's AI request limit. Please try again tomorrow or upgrade your plan.", 'error')
+      return null
+    }
+
     setLoading(true)
     setError('')
     try {
@@ -166,26 +171,29 @@ export default function StudySessionPage({ activeTab: propActiveTab, file, onBac
   }
 
   const handleSummary = async () => {
-    const result = await runRequest(() => generateSummary(documentId))
+    const result = await runRequest(() => generateSummary(documentId), true)
     if (result) {
       setSummary(result)
+      onAiUsageUpdated?.()
       window.showToast?.('AI Summary generated successfully', 'success')
     }
   }
 
   const regenerateFlashcards = async () => {
-    const result = await runRequest(() => generateFlashcards(documentId))
+    const result = await runRequest(() => generateFlashcards(documentId), true)
     if (result) {
       setFlashcardSet(result)
+      onAiUsageUpdated?.()
       window.showToast?.('AI Flashcards generated successfully', 'success')
     }
   }
 
   const handleQuiz = async (difficulty) => {
-    const result = await runRequest(() => generateQuiz(documentId, difficulty))
+    const result = await runRequest(() => generateQuiz(documentId, difficulty), true)
     if (!result) return
     setQuiz(result)
     setQuizzes((current) => [result, ...current.filter((item) => item.id !== result.id)])
+    onAiUsageUpdated?.()
     window.showToast?.('AI Quiz generated successfully', 'success')
   }
 
@@ -225,7 +233,7 @@ export default function StudySessionPage({ activeTab: propActiveTab, file, onBac
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-300 ease-in-out" style={{ flex: 1, borderRadius: '16px', overflowY: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
               {/* CONTENT AREA */}
-              <div style={{ flex: 1, padding: activeTab === 'original' ? '0' : '24px', overflowY: activeTab === 'original' ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ flex: 1, padding: activeTab === 'original' ? '0' : '24px', overflowX: 'hidden', overflowY: activeTab === 'original' ? 'hidden' : 'auto', display: 'flex', flexDirection: 'column' }}>
                 {!documentId && <p className="api-status api-status--error">Tài liệu này chưa có documentId từ backend.</p>}
                 {error && <p className="api-status api-status--error">{error}</p>}
                 
@@ -250,6 +258,7 @@ export default function StudySessionPage({ activeTab: propActiveTab, file, onBac
                     onGenerateSummary={handleSummary} 
                     loading={loading} 
                     initialAiLoading={initialAiLoading} 
+                    quotaReached={aiQuotaReached}
                   />
                 )}
                 
@@ -260,10 +269,11 @@ export default function StudySessionPage({ activeTab: propActiveTab, file, onBac
                     onGenerateFlashcards={regenerateFlashcards} 
                     loading={loading} 
                     initialAiLoading={initialAiLoading} 
+                    quotaReached={aiQuotaReached}
                   />
                 )}
 
-                {activeTab === 'quizzes' && (
+                <div style={{ display: activeTab === 'quizzes' ? 'contents' : 'none' }}>
                   <QuizTab 
                     documentId={documentId} 
                     quiz={quiz} 
@@ -272,8 +282,9 @@ export default function StudySessionPage({ activeTab: propActiveTab, file, onBac
                     onCreateQuiz={handleQuiz} 
                     onOpenQuiz={openQuiz} 
                     setQuiz={setQuiz} 
+                    quotaReached={aiQuotaReached}
                   />
-                )}
+                </div>
               </div>
             </div>
           </div>
@@ -306,6 +317,8 @@ export default function StudySessionPage({ activeTab: propActiveTab, file, onBac
             rightPanelWidth={rightPanelWidth} 
             isResizing={isResizing} 
             setIsResizing={setIsResizing} 
+            aiQuotaReached={aiQuotaReached}
+            onAiUsageUpdated={onAiUsageUpdated}
           />
         </div>
       </main>

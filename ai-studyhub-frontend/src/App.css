@@ -4834,6 +4834,7 @@ body.dark-theme .rating-star.is-active {
 
 .admin-brand {
   min-height: 72px;
+  width: 100%;
   gap: 12px;
   margin-bottom: 28px;
   padding: 12px;
@@ -4841,6 +4842,21 @@ body.dark-theme .rating-star.is-active {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.admin-brand:hover,
+.admin-brand:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(147, 197, 253, 0.4);
+}
+
+.admin-brand:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
 }
 
 .admin-brand svg {
@@ -4924,7 +4940,7 @@ body.dark-theme .rating-star.is-active {
   position: sticky;
   top: 0;
   z-index: 20;
-  height: 68px;
+  height: 96px;
   justify-content: space-between;
   padding: 0 36px;
   background: rgba(255, 255, 255, 0.92);
@@ -5480,6 +5496,157 @@ body.dark-theme .rating-star.is-active {
 
 .admin-date-range .admin-filter-input {
   min-width: 190px;
+}
+
+/* Consistent, breathable controls across admin management pages. */
+.admin-section-header {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  column-gap: 28px;
+  row-gap: 16px;
+}
+
+.admin-section-header h1 {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.admin-section-header > div {
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.admin-search,
+.admin-filter-input {
+  box-sizing: border-box;
+  min-height: 46px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.admin-search {
+  width: clamp(240px, 24vw, 320px);
+  flex: 1 1 260px;
+  padding: 0 15px;
+  background: #ffffff;
+}
+
+.admin-search svg {
+  flex: 0 0 auto;
+}
+
+.admin-search input {
+  width: 100%;
+  min-width: 0;
+  color: #0f172a;
+  line-height: 1.4;
+}
+
+.admin-search input::placeholder {
+  color: #94a3b8;
+}
+
+.admin-search input::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+.admin-filter-input {
+  width: auto;
+  min-width: 180px;
+  height: 46px;
+  padding: 0 42px 0 14px;
+  color: #334155;
+  line-height: 1.4;
+}
+
+input.admin-filter-input {
+  padding-right: 14px;
+}
+
+.admin-toolbar-group {
+  width: 100%;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-date-range {
+  gap: 10px;
+  padding: 0;
+}
+
+.admin-date-range .admin-filter-input {
+  min-width: 160px;
+}
+
+.admin-search-row {
+  grid-template-columns: minmax(280px, 1fr) minmax(190px, 240px);
+  gap: 16px;
+  align-items: center;
+}
+
+.logs-card .admin-section-header {
+  grid-template-columns: 1fr;
+}
+
+.logs-card .admin-section-header > div {
+  justify-content: flex-start;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.logs-card .admin-toolbar-group .admin-search {
+  flex: 1 1 260px;
+}
+
+@media (max-width: 1100px) {
+  .admin-section-header {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .admin-section-header > div {
+    justify-content: flex-start;
+  }
+
+  .admin-search {
+    width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .admin-section-header h1 {
+    white-space: normal;
+  }
+
+  .admin-section-header > div,
+  .admin-toolbar-group,
+  .admin-date-range {
+    width: 100%;
+  }
+
+  .admin-search,
+  .admin-filter-input,
+  .admin-date-range,
+  .admin-date-range__field,
+  .admin-date-range .admin-filter-input {
+    width: 100%;
+  }
+
+  .admin-date-range {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-date-range__separator {
+    display: none;
+  }
+
+  .admin-search-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-table {

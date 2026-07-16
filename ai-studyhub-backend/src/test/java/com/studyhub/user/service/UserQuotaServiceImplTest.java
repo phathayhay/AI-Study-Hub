@@ -1,6 +1,7 @@
 package com.studyhub.user.service;
 
 import com.studyhub.chat.repository.ChatMessageRepository;
+import com.studyhub.common.AiQuotaExceededException;
 import com.studyhub.common.StorageQuotaExceededException;
 import com.studyhub.common.enums.SenderType;
 import com.studyhub.common.enums.StorageStatus;
@@ -8,6 +9,7 @@ import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.repository.SubscriptionPlanRepository;
+import com.studyhub.user.repository.ActivityLogRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +31,9 @@ class UserQuotaServiceImplTest {
 
     @Mock
     private ChatMessageRepository chatMessageRepository;
+
+    @Mock
+    private ActivityLogRepository activityLogRepository;
 
     @Mock
     private SubscriptionPlanRepository subscriptionPlanRepository;
@@ -117,5 +122,16 @@ class UserQuotaServiceImplTest {
 
         // Assert
         assertFalse(hasRemaining);
+    }
+
+    @Test
+    void validateAiRequestAllowed_WhenCombinedUsageReachesLimit_ShouldThrowException() {
+        when(chatMessageRepository.countByUserIdAndSenderTypeBetween(any(), eq(SenderType.AI), any(), any()))
+                .thenReturn(3L);
+        when(activityLogRepository.countByUser_IdAndActionTypeStartingWithAndCreatedAtBetween(
+                eq(user.getId()), eq("AI_"), any(), any()))
+                .thenReturn(2L);
+
+        assertThrows(AiQuotaExceededException.class, () -> userQuotaService.validateAiRequestAllowed(user));
     }
 }
