@@ -18,6 +18,12 @@ node_modules/
 
 # json
 ai-studyhub-backend/src/main/resources/firebase-service-account.json
+/ai-studyhub-frontend/folder_api_details.json
+
+# Local tools and generated audit output
+/OllamaSetup.exe
+/mon_hoc_swp391.txt
+/ai-studyhub-frontend/eslint-errors*.txt
 
 # OS
 .DS_Store

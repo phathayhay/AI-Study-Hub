@@ -39,7 +39,7 @@ public class DocumentController {
 
     // API tải lên tài liệu học tập mới
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Upload a new academic document", description = "Uploads a document file (PDF, DOCX, etc.) to Firebase Storage, parses text context, and saves metadata in the database.")
+    @Operation(summary = "Upload a new academic document", description = "Uploads a document file (PDF, DOCX, etc.) to Cloudinary, parses text context, and saves metadata in the database.")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Document uploaded successfully"),
         @ApiResponse(responseCode = "400", description = "Invalid file or upload details provided", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Invalid file or upload details provided\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),
@@ -174,7 +174,7 @@ public class DocumentController {
 
     // API xóa tài liệu
     @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a document", description = "Deletes a document from the database and removes its file from Firebase Storage.")
+    @Operation(summary = "Delete a document", description = "Deletes a document from the database and removes its file from Cloudinary.")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "204", description = "Document deleted successfully"),
         @ApiResponse(responseCode = "404", description = "Document not found", content = @Content(schema = @Schema(implementation = com.studyhub.common.ApiErrorResponse.class), examples = @ExampleObject(value = "{\"success\": false, \"message\": \"Document not found\", \"timestamp\": \"2026-06-14T16:40:00\"}"))),

@@ -37,22 +37,6 @@ export const pricingPlans = [
   },
 ]
 
-export const adminUsers = [
-  { initial: 'N', name: 'Nguyen Van A', email: 'studenta@fpt.edu.vn', joined: '20/5/2024', docs: 12, status: 'active' },
-  { initial: 'T', name: 'Tran Thi B', email: 'studentb@fpt.edu.vn', joined: '19/5/2024', docs: 8, status: 'active' },
-  { initial: 'L', name: 'Le Van C', email: 'studentc@fpt.edu.vn', joined: '18/5/2024', docs: 15, status: 'blocked' },
-  { initial: 'P', name: 'Pham Van D', email: 'studentd@fpt.edu.vn', joined: '17/5/2024', docs: 5, status: 'active' },
-  { initial: 'H', name: 'Hoang Thi E', email: 'studente@fpt.edu.vn', joined: '16/5/2024', docs: 20, status: 'active' },
-]
-
-export const adminDocuments = [
-  ['CEA201 - Chapter 5: Cache Memory', 'Nguyen Van A', '20/5/2024', 0, 'pending'],
-  ['PRF192 - Assignment Solution', 'Tran Thi B', '19/5/2024', 0, 'pending'],
-  ['DBI202 - SQL Practice', 'Le Van C', '18/5/2024', 145, 'approved'],
-  ['SWP391 - Project Template', 'Pham Van D', '17/5/2024', 230, 'approved'],
-  ['PRO192 - OOP Design Patterns', 'Hoang Thi E', '16/5/2024', 0, 'rejected'],
-]
-
 export const adminCourses = [
   ['CEA201', 'Computer Architecture', 'Semester 3', 'SE', 234],
   ['PRF192', 'Programming Fundamentals', 'Semester 1', 'SE', 198],

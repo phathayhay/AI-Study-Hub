@@ -53,6 +53,25 @@ The strongest cleanup opportunities are old frontend service clients, unused uti
 
 The payment fallback and VNPAY reconciliation components are not redundant at the current baseline and must not be deleted during general cleanup.
 
+### Cleanup execution result
+
+The reviewed cleanup was implemented on 2026-07-17 with the following safeguards and results:
+
+| Area | Result |
+| --- | --- |
+| Repository artifacts | Tracked endpoint/lint dumps removed; local obsolete runner and temporary course note removed; Ollama installer retained locally but ignored |
+| Frontend dead code | FE-01 through FE-12 removed; dead card/mock symbols removed |
+| Frontend dependencies | `jszip`, `mammoth`, and `pdfjs-dist` removed with npm; lockfile synchronized |
+| Backend obsolete integration | Firebase bootstrap/configuration and SDK removed; unused Vertex AI SDK removed |
+| Storage implementation | Cloudinary services retained and unchanged |
+| Payment/auth/upload behavior | Active implementations retained; no cleanup refactor applied |
+| Frontend production build | Passed before and after cleanup |
+| Frontend lint baseline | Improved from 82 findings (74 errors, 8 warnings) to 79 findings (71 errors, 8 warnings); remaining findings predate this cleanup |
+| Backend test baseline | 62 tests passed before cleanup and 62 tests passed after cleanup |
+| Backend startup smoke test | Passed on an isolated random port; smoke-test process stopped afterward |
+
+No behavior regression was detected by the available automated checks and startup smoke test. Manual browser smoke testing remains recommended after pulling the cleanup commit.
+
 ## 4. Decision Matrix
 
 ### 4.1 Delete-ready frontend files
@@ -273,4 +292,4 @@ The cleanup is complete only when:
 
 ## 10. Final Recommendation
 
-Proceed with PR 1 through PR 3 only after the current payment and subscription work is stabilized. Keep all payment fallback and reconciliation components for now. Treat this document as the decision baseline, then update the baseline commit and candidate status after each cleanup PR.
+The reviewed PR 1 through PR 3 cleanup scope has been implemented and verified against the recorded baseline. Keep all payment fallback and reconciliation components. Perform authentication consolidation, admin component standardization, and `SubscriptionService` decomposition only as separate future refactors with their own tests and rollback points.

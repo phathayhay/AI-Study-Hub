@@ -47,12 +47,6 @@ jwt:
   expiration-ms: 86400000      # 24 hours
   reset-token-expiry-ms: 900000 # 15 minutes
 
-# ── Firebase ─────────────────────────────────────────────────
-firebase:
-  service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:src/main/resources/firebase-service-account.json}
-  storage-bucket: ${FIREBASE_STORAGE_BUCKET:your-project-id.appspot.com}
-  project-id: ${FIREBASE_PROJECT_ID:your-project-id}
-
 # ── Cloudinary ───────────────────────────────────────────────
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME}
