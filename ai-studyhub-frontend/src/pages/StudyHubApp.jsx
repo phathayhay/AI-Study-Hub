@@ -8,7 +8,7 @@ import { LibraryPage } from './library'
 import { NotificationPanel, ReportModal, SettingsModal, FeatureRequestModal, SupportModal, ChromeExtensionModal, UpgradePaymentModal } from '../components/modals'
 import {
   DocumentDetailPage, ExplorePage, FolderDetailPage, HomeScreen,
-  PricingPage, ProfilePage, UploadPage,
+  PaymentResultPage, PricingPage, ProfilePage, SandboxPaymentPage, UploadPage,
 } from './public'
 import { StudySessionPage as StudyDocumentApi } from './study'
 import useAuth from '../hooks/useAuth'
@@ -509,7 +509,7 @@ export default function StudyHubApp() {
   useEffect(() => {
     const isAdminRoute = route.startsWith('admin-')
     if (guest) {
-      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']
+      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'sandbox-payment', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']
       if (!publicRoutes.includes(route)) {
         setRoute('login')
         pushPath('login', {}, true)
@@ -545,7 +545,7 @@ export default function StudyHubApp() {
     // Enforce route guards
     const hasToken = !!getToken()
     const isGuest = !user && !hasToken
-    const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']
+    const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'sandbox-payment', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']
     let targetBaseRoute = nextRoute
     if (nextRoute === 'new-study-session') {
       targetBaseRoute = 'upload'
@@ -726,6 +726,10 @@ export default function StudyHubApp() {
   if (route === 'reset-password') return <ResetPasswordPage onNavigate={navigate} />
   if (route === 'verify-email') {
     return <VerifyEmailPage onNavigate={navigate} onSignIn={handleSwitchToLogin} />
+  }
+  if (route === 'sandbox-payment') return <SandboxPaymentPage onNavigate={navigate} />
+  if (route === 'payment-result') {
+    return <PaymentResultPage onNavigate={navigate} onPaymentConfirmed={refreshCurrentUserProfile} />
   }
   if (route.startsWith('admin-')) {
     if (role !== 'admin') return null
@@ -1023,6 +1027,8 @@ const routeMatchers = [
   { pattern: ROUTES.NEW_STUDY_SESSION, route: 'upload', uploadMode: 'study' },
   { pattern: ROUTES.PROFILE, route: 'profile' },
   { pattern: ROUTES.PRICING, route: 'pricing' },
+  { pattern: ROUTES.SANDBOX_PAYMENT, route: 'sandbox-payment' },
+  { pattern: ROUTES.PAYMENT_RESULT, route: 'payment-result' },
   { pattern: ROUTES.FOLDER_DETAIL, route: 'folder-detail' },
   { pattern: ROUTES.DOCUMENT_DETAIL, route: 'doc-detail' },
   { pattern: ROUTES.STUDY_DOCUMENT, route: 'study' },

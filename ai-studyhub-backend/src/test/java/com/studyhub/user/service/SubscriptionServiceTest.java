@@ -7,6 +7,10 @@ import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.SubscriptionPayment;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.entity.UserSubscription;
+import com.studyhub.user.entity.SubscriptionPlanVersion;
+import com.studyhub.payment.PaymentGateway;
+import com.studyhub.user.repository.ActivityLogRepository;
+import com.studyhub.user.repository.SubscriptionPlanVersionRepository;
 import com.studyhub.user.repository.SubscriptionPlanRepository;
 import com.studyhub.user.repository.SubscriptionPaymentRepository;
 import com.studyhub.user.repository.UserRepository;
@@ -52,6 +56,18 @@ class SubscriptionServiceTest {
     @Mock
     private UserQuotaService userQuotaService;
 
+    @Mock
+    private SubscriptionPlanVersionRepository planVersionRepository;
+
+    @Mock
+    private ActivityLogRepository activityLogRepository;
+
+    @Mock
+    private SubscriptionEntitlementService entitlementService;
+
+    @Mock
+    private PaymentGateway paymentGateway;
+
     @InjectMocks
     private SubscriptionService subscriptionService;
 
@@ -59,6 +75,9 @@ class SubscriptionServiceTest {
     private SubscriptionPlan freePlan;
     private SubscriptionPlan proPlan;
     private SubscriptionPlan premiumPlan;
+    private SubscriptionPlanVersion freeVersion;
+    private SubscriptionPlanVersion proVersion;
+    private SubscriptionPlanVersion premiumVersion;
 
     @BeforeEach
     void setUp() {
@@ -101,11 +120,31 @@ class SubscriptionServiceTest {
                 .plan(freePlan)
                 .build();
 
+        freeVersion = version(11L, freePlan, 1);
+        proVersion = version(12L, proPlan, 1);
+        premiumVersion = version(13L, premiumPlan, 1);
+        lenient().when(planVersionRepository.findFirstByPlan_IdOrderByVersionNumberDesc(1L)).thenReturn(Optional.of(freeVersion));
+        lenient().when(planVersionRepository.findFirstByPlan_IdOrderByVersionNumberDesc(2L)).thenReturn(Optional.of(proVersion));
+        lenient().when(planVersionRepository.findFirstByPlan_IdOrderByVersionNumberDesc(3L)).thenReturn(Optional.of(premiumVersion));
+        lenient().when(paymentGateway.createCheckout(any())).thenReturn(
+                new PaymentGateway.CheckoutSession("http://localhost:5173/sandbox-payment", "signed-token", "STUDYHUB_SANDBOX"));
+        lenient().when(paymentGateway.isSandbox()).thenReturn(true);
+
         ReflectionTestUtils.setField(subscriptionService, "paymentBankName", "TPBank");
         ReflectionTestUtils.setField(subscriptionService, "paymentAccountName", "CONG TY AI STUDYHUB FPT");
         ReflectionTestUtils.setField(subscriptionService, "paymentAccountNumber", "00004103937");
         ReflectionTestUtils.setField(subscriptionService, "paymentProviderName", "BANK_TRANSFER");
         ReflectionTestUtils.setField(subscriptionService, "paymentOrderExpiryMinutes", 30L);
+        ReflectionTestUtils.setField(subscriptionService, "webhookSecret", "verified-webhook-secret");
+    }
+
+    private SubscriptionPlanVersion version(Long id, SubscriptionPlan plan, int number) {
+        return SubscriptionPlanVersion.builder()
+                .id(id).plan(plan).versionNumber(number).planName(plan.getPlanName()).description(plan.getDescription()).price(plan.getPrice())
+                .storageLimitMb(plan.getStorageLimitMb()).aiRequestsPerDay(plan.getAiRequestsPerDay())
+                .downloadLimit(0).bookmarkLimit(0).durationDays(plan.getDurationDays() != null ? plan.getDurationDays() : 30)
+                .canUseAiSummary(true).canUseFlashcards(true).canUseQuizzes(true)
+                .canPublishDocuments(true).canPublishFolders(true).build();
     }
 
     @Test
@@ -149,6 +188,7 @@ class SubscriptionServiceTest {
                 .id(501L)
                 .user(mockUser)
                 .plan(proPlan)
+                .planVersion(proVersion)
                 .startDate(LocalDateTime.now().minusDays(25))
                 .endDate(LocalDateTime.now().plusDays(5))
                 .isActive(true)
@@ -164,7 +204,7 @@ class SubscriptionServiceTest {
 
         UpgradePaymentResponse response = subscriptionService.getUpgradePaymentInfo(3L, "student@fpt.edu.vn");
 
-        assertEquals(BigDecimal.valueOf(6667), response.getAmount());
+        assertEquals(BigDecimal.valueOf(64167), response.getAmount());
         assertEquals(5L, response.getRemainingDays());
         assertEquals(30L, response.getBillingCycleDays());
         assertNotNull(response.getCurrentPeriodEndDate());
@@ -193,6 +233,7 @@ class SubscriptionServiceTest {
                 .user(mockUser)
                 .currentPlan(freePlan)
                 .targetPlan(proPlan)
+                .targetPlanVersion(proVersion)
                 .transferContent("SHU10P2DEMO")
                 .paymentCode("SHU10P2DEMO")
                 .amount(BigDecimal.valueOf(29000))
@@ -202,20 +243,99 @@ class SubscriptionServiceTest {
 
         when(userSubscriptionRepository.findByUser_IdAndIsActiveTrue(10L))
                 .thenReturn(List.of());
-        when(subscriptionPaymentRepository.findByTransferContent("SHU10P2DEMO"))
+        when(subscriptionPaymentRepository.findWithLockByTransferContent("SHU10P2DEMO"))
                 .thenReturn(Optional.of(pendingPayment));
         when(subscriptionPaymentRepository.save(any(SubscriptionPayment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userQuotaService.getStorageQuotaSnapshot(mockUser)).thenReturn(
+                new UserQuotaService.StorageQuotaSnapshot(5120L, 5120L * 1024L * 1024L, 0L, 0d, StorageStatus.NORMAL, true, null));
 
         subscriptionService.simulatePaymentSuccess(request, "student@fpt.edu.vn");
 
         assertEquals(proPlan, mockUser.getPlan());
         assertEquals(com.studyhub.common.enums.PaymentStatus.PAID, pendingPayment.getStatus());
-        verify(userRepository, times(1)).save(mockUser);
+        verify(userRepository, atLeastOnce()).save(mockUser);
         verify(subscriptionPaymentRepository, atLeastOnce()).save(pendingPayment);
         verify(userSubscriptionRepository, times(1)).save(argThat(sub ->
             sub.getPlan().equals(proPlan) && sub.getUser().equals(mockUser) && sub.getIsActive()
         ));
+    }
+
+    @Test
+    void sandboxFailedPayment_DoesNotActivatePlan() {
+        SubscriptionPayment payment = pendingPayment();
+        when(subscriptionPaymentRepository.findWithLockByPaymentCode(payment.getPaymentCode()))
+                .thenReturn(Optional.of(payment));
+        when(subscriptionPaymentRepository.save(any(SubscriptionPayment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        PaymentStatusResponse response = subscriptionService.processSandboxPayment(
+                payment.getPaymentCode(), "signed-token", "FAILED");
+
+        assertEquals(com.studyhub.common.enums.PaymentStatus.FAILED, response.getStatus());
+        assertEquals(freePlan, mockUser.getPlan());
+        verify(paymentGateway).verifyCheckoutToken(payment.getPaymentCode(), "signed-token");
+        verify(userSubscriptionRepository).existsByPayment_Id(payment.getId());
+        verify(userSubscriptionRepository, never()).save(any(UserSubscription.class));
+    }
+
+    @Test
+    void duplicateSandboxSuccess_ActivatesSubscriptionOnlyOnce() {
+        SubscriptionPayment payment = pendingPayment();
+        when(subscriptionPaymentRepository.findWithLockByPaymentCode(payment.getPaymentCode()))
+                .thenReturn(Optional.of(payment));
+        when(subscriptionPaymentRepository.save(any(SubscriptionPayment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userSubscriptionRepository.findByUser_IdAndIsActiveTrue(mockUser.getId())).thenReturn(List.of());
+        when(userQuotaService.getStorageQuotaSnapshot(mockUser)).thenReturn(
+                new UserQuotaService.StorageQuotaSnapshot(5120L, 5120L * 1024L * 1024L, 0L, 0d, StorageStatus.NORMAL, true, null));
+
+        PaymentStatusResponse first = subscriptionService.processSandboxPayment(
+                payment.getPaymentCode(), "signed-token", "SUCCESS");
+        PaymentStatusResponse duplicate = subscriptionService.processSandboxPayment(
+                payment.getPaymentCode(), "signed-token", "SUCCESS");
+
+        assertEquals(com.studyhub.common.enums.PaymentStatus.PAID, first.getStatus());
+        assertEquals(com.studyhub.common.enums.PaymentStatus.PAID, duplicate.getStatus());
+        verify(userSubscriptionRepository, times(1)).save(any(UserSubscription.class));
+    }
+
+    @Test
+    void webhookWithInvalidSignature_IsRejectedBeforePaymentLookup() {
+        PaymentWebhookRequest request = PaymentWebhookRequest.builder()
+                .transferContent("SHU10P2SIGNED").amount(BigDecimal.valueOf(29000))
+                .transactionReference("TX-100").build();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subscriptionService.processPaymentWebhook(request, "wrong-secret"));
+        verify(subscriptionPaymentRepository, never()).findWithLockByTransferContent(anyString());
+    }
+
+    @Test
+    void webhookWithIncorrectAmount_IsRejectedWithoutActivation() {
+        SubscriptionPayment payment = pendingPayment();
+        PaymentWebhookRequest request = PaymentWebhookRequest.builder()
+                .transferContent(payment.getTransferContent()).amount(BigDecimal.ONE)
+                .transactionReference("TX-101").build();
+        when(subscriptionPaymentRepository.findWithLockByTransferContent(payment.getTransferContent()))
+                .thenReturn(Optional.of(payment));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> subscriptionService.processPaymentWebhook(request, "verified-webhook-secret"));
+        assertEquals(com.studyhub.common.enums.PaymentStatus.FAILED, payment.getStatus());
+        verifyNoInteractions(userSubscriptionRepository);
+    }
+
+    private SubscriptionPayment pendingPayment() {
+        return SubscriptionPayment.builder()
+                .id(901L).user(mockUser).currentPlan(freePlan).targetPlan(proPlan)
+                .currentPlanVersion(freeVersion).targetPlanVersion(proVersion)
+                .paymentCode("SHU10P2SIGNED").transferContent("SHU10P2SIGNED")
+                .amount(BigDecimal.valueOf(29000)).originalAmount(BigDecimal.valueOf(29000))
+                .idempotencyKey("SHU10P2SIGNED")
+                .bankName("TPBank").accountName("AI Study Hub").accountNumber("00004103937")
+                .status(com.studyhub.common.enums.PaymentStatus.PENDING)
+                .expiresAt(LocalDateTime.now().plusMinutes(30)).build();
     }
 
     @Test

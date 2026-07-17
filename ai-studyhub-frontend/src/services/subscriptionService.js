@@ -38,7 +38,19 @@ export function getUpgradePaymentInfo(body) {
  * Path: /api/subscriptions/payments/{paymentCode}
  */
 export function getPaymentStatus(paymentCode) {
-  return apiGet(`/subscriptions/payments/${paymentCode}`);
+  return apiGet(`/payments/${encodeURIComponent(paymentCode)}/status`);
+}
+
+export function createVnpayCheckout(planId) {
+  return apiPost('/payments/vnpay/checkout', { planId });
+}
+
+export function getCurrentSubscription() {
+  return apiGet('/subscriptions/current');
+}
+
+export function completeSandboxPayment(paymentCode, body) {
+  return apiPost(`/subscriptions/sandbox/payments/${encodeURIComponent(paymentCode)}/complete`, body);
 }
 
 /**

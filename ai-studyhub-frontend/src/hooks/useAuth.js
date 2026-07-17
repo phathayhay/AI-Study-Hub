@@ -82,7 +82,7 @@ export default function useAuth() {
           })
           .catch(err => {
             console.error('Failed to sync user profile:', err)
-            if (err?.status === 401 || err?.status === 403) {
+            if (err?.status === 401) {
               clearAuthSession()
               setUser(null)
             }

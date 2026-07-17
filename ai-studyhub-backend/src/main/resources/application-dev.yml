@@ -20,11 +20,3 @@ logging:
 
 app:
   frontend-url: http://localhost:5173
-  demo-account:
-    enabled: true
-    email: ${DEMO_ACCOUNT_EMAIL:demo@studyhub.local}
-    password: ${DEMO_ACCOUNT_PASSWORD:StudyHub@123}
-  demo-admin:
-    enabled: true
-    email: ${DEMO_ADMIN_EMAIL:admin@studyhub.local}
-    password: ${DEMO_ADMIN_PASSWORD:Admin@123}

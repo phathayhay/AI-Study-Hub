@@ -35,7 +35,8 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/logout", "/api/auth/verify-email", "/api/auth/send-verify-email", "/api/subscriptions/plans", "/api/subscriptions/webhook/**").permitAll()
+                .requestMatchers("/", "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/logout", "/api/auth/verify-email", "/api/auth/send-verify-email", "/api/subscriptions/plans", "/api/subscriptions/webhook/**", "/api/subscriptions/sandbox/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/return", "/api/payments/vnpay/ipn").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/documents/my", "/api/documents/history", "/api/documents/favorites", "/api/documents/shared", "/api/documents/*/download").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/documents/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/folders/public", "/api/folders/public/**").permitAll()

@@ -31,6 +31,16 @@ public class SubscriptionController {
         return ResponseEntity.ok(ApiResponse.ok("Plans retrieved successfully", response));
     }
 
+    @GetMapping({"/current", "/current/benefits"})
+    @Operation(summary = "Get current subscription and snapshot benefits")
+    public ResponseEntity<ApiResponse<CurrentSubscriptionResponse>> getCurrentSubscription() {
+        String email = SecurityUtils.getCurrentUserEmail();
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Current subscription retrieved successfully",
+                subscriptionService.getCurrentSubscription(email)
+        ));
+    }
+
     @PostMapping("/upgrade")
     @Operation(summary = "Get plan upgrade payment info", description = "Requests checkout information for upgrading a plan. Returns dynamic VietQR transfer bank details and dynamic code image URL.")
     public ResponseEntity<ApiResponse<UpgradePaymentResponse>> getUpgradePaymentInfo(
@@ -57,6 +67,17 @@ public class SubscriptionController {
         log.info("API: Simulating payment success callback for plan ID {} by user {}", request.getPlanId(), email);
         subscriptionService.simulatePaymentSuccess(request, email);
         return ResponseEntity.ok(ApiResponse.ok("Subscription plan upgraded successfully"));
+    }
+
+    @PostMapping("/sandbox/payments/{paymentCode}/complete")
+    @Operation(summary = "Complete a sandbox payment with a signed checkout token")
+    public ResponseEntity<ApiResponse<PaymentStatusResponse>> completeSandboxPayment(
+            @PathVariable String paymentCode,
+            @Valid @RequestBody SandboxPaymentRequest request
+    ) {
+        PaymentStatusResponse response = subscriptionService.processSandboxPayment(
+                paymentCode, request.getToken(), request.getOutcome());
+        return ResponseEntity.ok(ApiResponse.ok("Sandbox payment processed", response));
     }
 
     @PostMapping("/webhook/bank-transfer")

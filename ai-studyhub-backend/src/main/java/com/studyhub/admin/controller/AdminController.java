@@ -270,4 +270,15 @@ public class AdminController {
         adminService.deletePlan(id);
         return ResponseEntity.ok(ApiResponse.ok("Subscription plan deleted successfully"));
     }
+
+    @GetMapping("/plans/{id}/versions")
+    @Operation(summary = "List immutable versions of a subscription plan")
+    public ResponseEntity<ApiResponse<List<com.studyhub.user.dto.SubscriptionPlanVersionResponse>>> getPlanVersions(
+            @PathVariable Long id
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "Subscription plan versions retrieved successfully",
+                adminService.getPlanVersions(id)
+        ));
+    }
 }

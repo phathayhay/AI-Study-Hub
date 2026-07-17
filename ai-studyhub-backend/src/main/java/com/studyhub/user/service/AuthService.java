@@ -14,11 +14,13 @@ import com.studyhub.user.dto.TokenResponse;
 import com.studyhub.user.entity.RefreshToken;
 import com.studyhub.user.entity.Role;
 import com.studyhub.user.entity.SubscriptionPlan;
+import com.studyhub.user.entity.SubscriptionPlanVersion;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.entity.UserSubscription;
 import com.studyhub.user.repository.RefreshTokenRepository;
 import com.studyhub.user.repository.RoleRepository;
 import com.studyhub.user.repository.SubscriptionPlanRepository;
+import com.studyhub.user.repository.SubscriptionPlanVersionRepository;
 import com.studyhub.user.repository.UserRepository;
 import com.studyhub.user.repository.UserSubscriptionRepository;
 import com.studyhub.user.dto.ForgotPasswordRequest;
@@ -52,6 +54,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final MajorRepository majorRepository;
     private final UserSubscriptionRepository userSubscriptionRepository;
+    private final SubscriptionPlanVersionRepository subscriptionPlanVersionRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
@@ -113,6 +116,23 @@ public class AuthService {
                 .build();
  
          userRepository.save(user);
+
+         SubscriptionPlanVersion freeVersion = subscriptionPlanVersionRepository
+                 .findFirstByPlan_IdOrderByVersionNumberDesc(freePlan.getId())
+                 .orElseGet(() -> subscriptionPlanVersionRepository.save(SubscriptionPlanVersion.builder()
+                         .plan(freePlan).versionNumber(1).planName(freePlan.getPlanName()).description(freePlan.getDescription())
+                         .price(freePlan.getPrice()).storageLimitMb(freePlan.getStorageLimitMb())
+                         .aiRequestsPerDay(freePlan.getAiRequestsPerDay()).downloadLimit(freePlan.getDownloadLimit())
+                         .bookmarkLimit(freePlan.getBookmarkLimit()).durationDays(freePlan.getDurationDays() != null ? freePlan.getDurationDays() : 30)
+                         .canUseAiSummary(Boolean.TRUE.equals(freePlan.getCanUseAiSummary()))
+                         .canUseFlashcards(Boolean.TRUE.equals(freePlan.getCanUseFlashcards()))
+                         .canUseQuizzes(Boolean.TRUE.equals(freePlan.getCanUseQuizzes()))
+                         .canPublishDocuments(Boolean.TRUE.equals(freePlan.getCanPublishDocuments()))
+                         .canPublishFolders(Boolean.TRUE.equals(freePlan.getCanPublishFolders()))
+                         .effectiveFrom(LocalDateTime.now()).build()));
+         userSubscriptionRepository.save(UserSubscription.builder()
+                 .user(user).plan(freePlan).planVersion(freeVersion).pricePaid(BigDecimal.ZERO)
+                 .startDate(LocalDateTime.now()).endDate(null).isActive(true).autoRenew(false).build());
  
          if (!fptEmail) {
              try {

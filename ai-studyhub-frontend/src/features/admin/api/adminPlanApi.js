@@ -5,6 +5,7 @@ export const adminPlanApi = {
   create: (body) => apiPost('/admin/plans', body),
   update: (id, body) => apiPut(`/admin/plans/${id}`, body),
   remove: (id) => apiDelete(`/admin/plans/${id}`),
+  versions: (id) => apiGet(`/admin/plans/${id}/versions`),
 }
 
 export const adminMajorApi = {

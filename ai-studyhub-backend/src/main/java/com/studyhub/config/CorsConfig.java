@@ -15,10 +15,14 @@ public class CorsConfig {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
+    @Value("${app.allowed-origins:${app.frontend-url}}")
+    private String allowedOrigins;
+
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedOrigins(java.util.Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim).filter(value -> !value.isBlank()).toList());
         config.setAllowedMethods(List.of("GET","POST","PUT","DELETE","PATCH","OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

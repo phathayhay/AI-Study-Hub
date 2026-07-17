@@ -154,7 +154,7 @@ async function request(method, path, body, opts = {}) {
   }
 
   if (
-    (res.status === 401 || res.status === 403)
+    res.status === 401
     && !opts._retriedAfterRefresh
     && !path.startsWith('/auth/')
     && getRefreshToken()
@@ -193,7 +193,7 @@ export async function apiDownload(path, opts = {}) {
   }
 
   if (
-    (res.status === 401 || res.status === 403)
+    res.status === 401
     && !opts._retriedAfterRefresh
     && !path.startsWith('/auth/')
     && getRefreshToken()

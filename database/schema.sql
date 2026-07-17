@@ -23,6 +23,8 @@ CREATE TABLE subscription_plans (
     price DECIMAL(10,2) NOT NULL DEFAULT 0,
     storage_limit_mb BIGINT NOT NULL,
     ai_requests_per_day INT NOT NULL,
+    download_limit INT NOT NULL DEFAULT 0,
+    bookmark_limit INT NOT NULL DEFAULT 0,
     duration_days INT NOT NULL DEFAULT 30,
     can_use_ai_summary BOOLEAN NOT NULL DEFAULT TRUE,
     can_use_flashcards BOOLEAN NOT NULL DEFAULT TRUE,
@@ -30,7 +32,31 @@ CREATE TABLE subscription_plans (
     can_publish_documents BOOLEAN NOT NULL DEFAULT FALSE,
     can_publish_folders BOOLEAN NOT NULL DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE subscription_plan_versions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    subscription_plan_id BIGINT NOT NULL,
+    version_number INT NOT NULL,
+    plan_name VARCHAR(50) NOT NULL,
+    description VARCHAR(255),
+    price DECIMAL(12,2) NOT NULL,
+    storage_limit_mb BIGINT NOT NULL,
+    ai_requests_per_day INT NOT NULL,
+    download_limit INT NOT NULL DEFAULT 0,
+    bookmark_limit INT NOT NULL DEFAULT 0,
+    duration_days INT NOT NULL,
+    can_use_ai_summary BOOLEAN NOT NULL,
+    can_use_flashcards BOOLEAN NOT NULL,
+    can_use_quizzes BOOLEAN NOT NULL,
+    can_publish_documents BOOLEAN NOT NULL,
+    can_publish_folders BOOLEAN NOT NULL,
+    effective_from TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_plan_version UNIQUE (subscription_plan_id, version_number),
+    CONSTRAINT fk_plan_versions_plan FOREIGN KEY (subscription_plan_id) REFERENCES subscription_plans(id)
 );
 
 -- =====================================================
@@ -764,17 +790,24 @@ CREATE TABLE user_subscriptions (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT NOT NULL,
     plan_id BIGINT NOT NULL,
+    plan_version_id BIGINT NOT NULL,
+    payment_id BIGINT NULL UNIQUE,
     start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     end_date TIMESTAMP NULL,
     is_active BOOLEAN DEFAULT TRUE,
+    auto_renew BOOLEAN NOT NULL DEFAULT FALSE,
+    price_paid DECIMAL(12,2) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_user_subscriptions_user
         FOREIGN KEY(user_id)
         REFERENCES users(id)
         ON DELETE CASCADE,
     CONSTRAINT fk_user_subscriptions_plan
         FOREIGN KEY(plan_id)
-        REFERENCES subscription_plans(id)
+        REFERENCES subscription_plans(id),
+    CONSTRAINT fk_user_subscriptions_plan_version FOREIGN KEY(plan_version_id)
+        REFERENCES subscription_plan_versions(id)
 );
 
 -- =====================================================
@@ -787,9 +820,16 @@ CREATE TABLE subscription_payments (
     user_id BIGINT NOT NULL,
     current_plan_id BIGINT NULL,
     target_plan_id BIGINT NOT NULL,
+    current_plan_version_id BIGINT NULL,
+    target_plan_version_id BIGINT NOT NULL,
     payment_code VARCHAR(64) NOT NULL UNIQUE,
     transfer_content VARCHAR(128) NOT NULL UNIQUE,
     amount DECIMAL(10,2) NOT NULL,
+    original_amount DECIMAL(12,2) NOT NULL,
+    remaining_value DECIMAL(12,2) NOT NULL DEFAULT 0,
+    discount_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    currency CHAR(3) NOT NULL DEFAULT 'VND',
+    idempotency_key VARCHAR(100) NOT NULL UNIQUE,
     status ENUM(
         'PENDING',
         'PAID',
@@ -804,7 +844,17 @@ CREATE TABLE subscription_payments (
     expires_at TIMESTAMP NULL,
     paid_at TIMESTAMP NULL,
     provider_name VARCHAR(100),
-    provider_transaction_ref VARCHAR(255),
+    payment_mode VARCHAR(20),
+    vnp_txn_ref VARCHAR(100) UNIQUE,
+    vnp_transaction_no VARCHAR(100) UNIQUE,
+    vnp_bank_tran_no VARCHAR(100),
+    vnp_bank_code VARCHAR(30),
+    vnp_card_type VARCHAR(30),
+    vnp_response_code VARCHAR(10),
+    vnp_transaction_status VARCHAR(10),
+    vnp_pay_date VARCHAR(20),
+    provider_transaction_ref VARCHAR(255) UNIQUE,
+    failure_reason VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_subscription_payments_user
@@ -817,8 +867,18 @@ CREATE TABLE subscription_payments (
         ON DELETE SET NULL,
     CONSTRAINT fk_subscription_payments_target_plan
         FOREIGN KEY(target_plan_id)
-        REFERENCES subscription_plans(id)
+        REFERENCES subscription_plans(id),
+    CONSTRAINT fk_subscription_payments_current_version
+        FOREIGN KEY(current_plan_version_id)
+        REFERENCES subscription_plan_versions(id),
+    CONSTRAINT fk_subscription_payments_target_version
+        FOREIGN KEY(target_plan_version_id)
+        REFERENCES subscription_plan_versions(id)
 );
+
+ALTER TABLE user_subscriptions
+    ADD CONSTRAINT fk_user_subscriptions_payment
+    FOREIGN KEY(payment_id) REFERENCES subscription_payments(id);
 
 
 

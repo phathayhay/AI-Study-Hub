@@ -124,11 +124,11 @@ export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setI
   const handleSuggestionClick = (type) => {
     let prompt = ''
     if (type === 'summary') {
-      prompt = 'Tóm tắt nội dung chính của tài liệu này một cách ngắn gọn.'
+      prompt = 'Write a concise paragraph summarizing the main content of this document. Respond in English.'
     } else if (type === 'concept') {
-      prompt = 'Giải thích các khái niệm quan trọng nhất xuất hiện trong tài liệu.'
+      prompt = 'Explain the most important concepts presented in this document. Respond in English.'
     } else if (type === 'compare') {
-      prompt = 'So sánh các luận điểm chính trong tài liệu này và rút ra kết luận.'
+      prompt = 'Compare the main arguments in this document and provide a clear conclusion. Respond in English.'
     }
     handleSendChatMessage(prompt)
   }

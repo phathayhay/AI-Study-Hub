@@ -15,6 +15,10 @@ public class SubscriptionPlanResponse {
     private BigDecimal price;
     private Long storageLimitMb;
     private Integer aiRequestsPerDay;
+    private Integer downloadLimit;
+    private Integer bookmarkLimit;
+    private Long latestVersionId;
+    private Integer latestVersionNumber;
     private Integer durationDays;
     private Boolean canUseAiSummary;
     private Boolean canUseFlashcards;

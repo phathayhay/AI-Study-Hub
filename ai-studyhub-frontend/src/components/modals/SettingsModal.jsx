@@ -3,6 +3,7 @@ import StudyHubIcon from '../icons/StudyHubIcons'
 import { changePassword } from '../../features/auth/authService'
 import { uploadAvatar, verifyStudent, updateUserProfile } from '../../services/userService'
 import { getMajors } from '../../services/courseService'
+import { getCurrentSubscription } from '../../services/subscriptionService'
 
 export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initialTab = 'profile' }) {
   const [activeTab, setActiveTab] = useState(initialTab)
@@ -20,6 +21,7 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
   const [currentSemester, setCurrentSemester] = useState(user?.currentSemester || '')
   const [majorsList, setMajorsList] = useState([])
   const [verificationFile, setVerificationFile] = useState(null)
+  const [currentSubscription, setCurrentSubscription] = useState(null)
   const verificationRequestSubmitted = Boolean(user?.verificationRequestSubmitted)
   const [verificationStatus, setVerificationStatus] = useState(() => {
     const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
@@ -58,6 +60,13 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
       .catch((err) => console.error('Failed to load majors:', err))
   }, [])
 
+  useEffect(() => {
+    if (activeTab !== 'plan') return
+    getCurrentSubscription()
+      .then((res) => setCurrentSubscription(res?.data || null))
+      .catch((err) => console.error('Failed to load current subscription:', err))
+  }, [activeTab, user?.planName])
+
   const normalizedPlan = String(user?.planName || 'FREE').toUpperCase()
   const planExpiresAt = user?.planExpiresAt ? new Date(user.planExpiresAt) : null
   const hasValidExpiry = planExpiresAt && !Number.isNaN(planExpiresAt.getTime())
@@ -88,6 +97,26 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
     }
     return `${valueMb.toFixed(valueMb >= 100 ? 0 : 1)} MB`
   }
+
+  const upcomingPlanChanges = currentSubscription?.upcomingVersion
+    ? [
+        currentSubscription.upcomingVersion.storageLimitMb !== currentSubscription.storageLimitMb
+          ? `${formatStorageText(Number(currentSubscription.upcomingVersion.storageLimitMb))} storage`
+          : null,
+        currentSubscription.upcomingVersion.aiRequestsPerDay !== currentSubscription.aiRequestsPerDay
+          ? `${currentSubscription.upcomingVersion.aiRequestsPerDay} AI requests per day`
+          : null,
+        currentSubscription.upcomingVersion.downloadLimit !== currentSubscription.downloadLimit
+          ? `${currentSubscription.upcomingVersion.downloadLimit} downloads`
+          : null,
+        currentSubscription.upcomingVersion.bookmarkLimit !== currentSubscription.bookmarkLimit
+          ? `${currentSubscription.upcomingVersion.bookmarkLimit} bookmarks`
+          : null,
+        Number(currentSubscription.upcomingVersion.price) !== Number(currentSubscription.price)
+          ? `${Number(currentSubscription.upcomingVersion.price || 0).toLocaleString('vi-VN')} VND per billing cycle`
+          : null,
+      ].filter(Boolean)
+    : []
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault()
@@ -329,6 +358,22 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
                   Compare plans
                 </button>
               </div>
+
+              {currentSubscription?.upcomingVersion && (
+                <div style={{ padding: '14px 16px', marginBottom: 16, borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e40af', fontSize: 13, lineHeight: 1.5 }}>
+                  <strong>Changes coming at renewal</strong>
+                  <div style={{ marginTop: 3 }}>Your current benefits remain unchanged until the end of this billing period.</div>
+                  {upcomingPlanChanges.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                      {upcomingPlanChanges.map((change) => (
+                        <span key={change} style={{ padding: '4px 8px', borderRadius: 999, background: '#dbeafe', fontWeight: 600 }}>
+                          {change}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="settings-plan-usage-grid">
                 {isOverQuota && (

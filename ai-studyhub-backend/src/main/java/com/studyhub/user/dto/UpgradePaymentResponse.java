@@ -29,4 +29,8 @@ public class UpgradePaymentResponse {
     private String qrCodeUrl;
     private String paymentStatus;
     private LocalDateTime expiresAt;
+    private String checkoutUrl;
+    private String paymentMode;
+    private Long targetPlanVersionId;
+    private Integer targetPlanVersionNumber;
 }

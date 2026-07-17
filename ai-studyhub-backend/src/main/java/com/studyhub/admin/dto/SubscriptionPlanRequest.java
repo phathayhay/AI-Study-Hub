@@ -25,6 +25,12 @@ public class SubscriptionPlanRequest {
     @NotNull(message = "AI requests limit cannot be null")
     private Integer aiRequestsPerDay;
 
+    @Builder.Default
+    private Integer downloadLimit = 0;
+
+    @Builder.Default
+    private Integer bookmarkLimit = 0;
+
     @NotNull(message = "Plan duration cannot be null")
     @Builder.Default
     private Integer durationDays = 30;

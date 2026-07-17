@@ -8,7 +8,6 @@ import com.studyhub.common.enums.StorageStatus;
 import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.User;
-import com.studyhub.user.repository.SubscriptionPlanRepository;
 import com.studyhub.user.repository.ActivityLogRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +35,7 @@ class UserQuotaServiceImplTest {
     private ActivityLogRepository activityLogRepository;
 
     @Mock
-    private SubscriptionPlanRepository subscriptionPlanRepository;
+    private SubscriptionEntitlementService entitlementService;
 
     @InjectMocks
     private UserQuotaServiceImpl userQuotaService;
@@ -59,6 +58,10 @@ class UserQuotaServiceImplTest {
                 .plan(freePlan)
                 .storageStatus(StorageStatus.NORMAL)
                 .build();
+
+        SubscriptionEntitlementService.PlanBenefits benefits = SubscriptionEntitlementService.PlanBenefits.fromPlan(freePlan);
+        lenient().when(entitlementService.getActiveEntitlements(user))
+                .thenReturn(new SubscriptionEntitlementService.ActiveEntitlements(null, benefits, null));
     }
 
     @Test

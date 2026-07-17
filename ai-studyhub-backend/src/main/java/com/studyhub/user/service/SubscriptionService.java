@@ -6,21 +6,28 @@ import com.studyhub.common.enums.StorageStatus;
 import com.studyhub.common.StorageQuotaExceededException;
 import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.payment.helper.VietQrHelper;
+import com.studyhub.payment.PaymentGateway;
 import com.studyhub.user.dto.BillingHistoryResponse;
+import com.studyhub.user.dto.CurrentSubscriptionResponse;
 import com.studyhub.user.dto.PaymentStatusResponse;
 import com.studyhub.user.dto.PaymentWebhookRequest;
 import com.studyhub.user.dto.SimulatePaymentRequest;
 import com.studyhub.user.dto.SubscriptionPlanResponse;
+import com.studyhub.user.dto.SubscriptionPlanVersionResponse;
 import com.studyhub.user.dto.UpgradePaymentResponse;
 import com.studyhub.admin.dto.SubscriptionPlanRequest;
 import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.SubscriptionPayment;
 import com.studyhub.user.entity.User;
 import com.studyhub.user.entity.UserSubscription;
+import com.studyhub.user.entity.SubscriptionPlanVersion;
+import com.studyhub.user.entity.ActivityLog;
 import com.studyhub.user.repository.SubscriptionPlanRepository;
 import com.studyhub.user.repository.SubscriptionPaymentRepository;
 import com.studyhub.user.repository.UserRepository;
 import com.studyhub.user.repository.UserSubscriptionRepository;
+import com.studyhub.user.repository.SubscriptionPlanVersionRepository;
+import com.studyhub.user.repository.ActivityLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.temporal.ChronoUnit;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -49,6 +58,10 @@ public class SubscriptionService {
     private final SubscriptionPaymentRepository subscriptionPaymentRepository;
     private final NotificationService notificationService;
     private final DocumentRepository documentRepository;
+    private final SubscriptionPlanVersionRepository planVersionRepository;
+    private final ActivityLogRepository activityLogRepository;
+    private final SubscriptionEntitlementService entitlementService;
+    private final PaymentGateway paymentGateway;
 
     // Injected Quota service
     private final UserQuotaService userQuotaService;
@@ -76,20 +89,27 @@ public class SubscriptionService {
         log.info("Fetching active subscription plans");
         return subscriptionPlanRepository.findAll().stream()
                 .filter(SubscriptionPlan::getIsActive)
-                .map(plan -> SubscriptionPlanResponse.builder()
+                .map(plan -> {
+                    SubscriptionPlanVersion latest = getLatestPlanVersion(plan);
+                    return SubscriptionPlanResponse.builder()
                         .id(plan.getId())
                         .planName(plan.getPlanName())
                         .description(plan.getDescription())
-                        .price(plan.getPrice())
-                        .storageLimitMb(plan.getStorageLimitMb())
-                        .aiRequestsPerDay(plan.getAiRequestsPerDay())
-                        .durationDays(plan.getDurationDays())
-                        .canUseAiSummary(plan.getCanUseAiSummary())
-                        .canUseFlashcards(plan.getCanUseFlashcards())
-                        .canUseQuizzes(plan.getCanUseQuizzes())
-                        .canPublishDocuments(plan.getCanPublishDocuments())
-                        .canPublishFolders(plan.getCanPublishFolders())
-                        .build())
+                        .price(latest.getPrice())
+                        .storageLimitMb(latest.getStorageLimitMb())
+                        .aiRequestsPerDay(latest.getAiRequestsPerDay())
+                        .downloadLimit(latest.getDownloadLimit())
+                        .bookmarkLimit(latest.getBookmarkLimit())
+                        .latestVersionId(latest.getId())
+                        .latestVersionNumber(latest.getVersionNumber())
+                        .durationDays(latest.getDurationDays())
+                        .canUseAiSummary(latest.getCanUseAiSummary())
+                        .canUseFlashcards(latest.getCanUseFlashcards())
+                        .canUseQuizzes(latest.getCanUseQuizzes())
+                        .canPublishDocuments(latest.getCanPublishDocuments())
+                        .canPublishFolders(latest.getCanPublishFolders())
+                        .build();
+                })
                 .collect(Collectors.toList());
     }
 
@@ -103,12 +123,20 @@ public class SubscriptionService {
         SubscriptionPlan targetPlan = subscriptionPlanRepository.findById(planId)
                 .orElseThrow(() -> new IllegalArgumentException("Subscription plan not found"));
 
+        if (!Boolean.TRUE.equals(targetPlan.getIsActive())) {
+            throw new IllegalArgumentException("This subscription plan is not available for purchase");
+        }
+
+        SubscriptionPlanVersion targetVersion = getLatestPlanVersion(targetPlan);
+
         SubscriptionPlan currentPlan = user.getPlan();
         UserSubscription currentSubscription = findCurrentActiveSubscription(user.getId());
-        UpgradeQuote quote = calculateUpgradeQuote(currentPlan, targetPlan, currentSubscription, LocalDateTime.now());
+        SubscriptionPlanVersion currentVersion = currentSubscription != null ? currentSubscription.getPlanVersion() : null;
+        UpgradeQuote quote = calculateUpgradeQuote(currentPlan, currentVersion, targetPlan, targetVersion, currentSubscription, LocalDateTime.now());
         expirePendingPayment(user.getId(), targetPlan.getId());
 
-        SubscriptionPayment payment = createPendingPayment(user, currentPlan, targetPlan, quote);
+        SubscriptionPayment payment = createPendingPayment(user, currentPlan, currentVersion, targetPlan, targetVersion, quote);
+        PaymentGateway.CheckoutSession checkout = paymentGateway.createCheckout(payment);
 
         return UpgradePaymentResponse.builder()
                 .planId(targetPlan.getId())
@@ -116,12 +144,12 @@ public class SubscriptionService {
                 .currentPlanName(currentPlan != null ? currentPlan.getPlanName() : "FREE")
                 .amount(payment.getAmount())
                 .currentPlanPrice(quote.currentPlanPrice())
-                .targetPlanPrice(targetPlan.getPrice())
+                .targetPlanPrice(targetVersion.getPrice())
                 .creditApplied(quote.creditApplied())
                 .remainingDays(quote.remainingDays())
                 .billingCycleDays(quote.billingCycleDays())
                 .currentPeriodEndDate(quote.currentPeriodEndDate())
-                .durationDays(targetPlan.getDurationDays())
+                .durationDays(targetVersion.getDurationDays())
                 .accountName(payment.getAccountName())
                 .bankName(payment.getBankName())
                 .accountNumber(payment.getAccountNumber())
@@ -130,14 +158,61 @@ public class SubscriptionService {
                 .qrCodeUrl(payment.getQrCodeUrl())
                 .paymentStatus(payment.getStatus().name())
                 .expiresAt(payment.getExpiresAt())
+                .checkoutUrl(checkout.checkoutUrl())
+                .paymentMode(paymentGateway.isSandbox() ? "SANDBOX" : "PRODUCTION")
+                .targetPlanVersionId(targetVersion.getId())
+                .targetPlanVersionNumber(targetVersion.getVersionNumber())
                 .build();
     }
 
     @Transactional
+    public SubscriptionPayment createVnpayPendingPayment(Long planId, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        SubscriptionPlan targetPlan = subscriptionPlanRepository.findById(planId)
+                .orElseThrow(() -> new IllegalArgumentException("Subscription plan not found"));
+        if (!Boolean.TRUE.equals(targetPlan.getIsActive())) {
+            throw new IllegalArgumentException("This subscription plan is not available for purchase");
+        }
+
+        SubscriptionPlanVersion targetVersion = getLatestPlanVersion(targetPlan);
+        SubscriptionPlan currentPlan = user.getPlan();
+        UserSubscription currentSubscription = findCurrentActiveSubscription(user.getId());
+        SubscriptionPlanVersion currentVersion = currentSubscription != null ? currentSubscription.getPlanVersion() : null;
+        UpgradeQuote quote = calculateUpgradeQuote(
+                currentPlan, currentVersion, targetPlan, targetVersion, currentSubscription, LocalDateTime.now());
+        expirePendingPayment(user.getId(), targetPlan.getId());
+
+        SubscriptionPayment payment = createPendingPayment(
+                user, currentPlan, currentVersion, targetPlan, targetVersion, quote);
+        payment.setProviderName("VNPAY");
+        payment.setPaymentMode("SANDBOX");
+        return subscriptionPaymentRepository.save(payment);
+    }
+
+    @Transactional
+    public void activateVerifiedProviderPayment(SubscriptionPayment payment, String providerTransactionRef,
+                                                 LocalDateTime paidAt) {
+        if (payment.getStatus() == PaymentStatus.PAID) return;
+        if (payment.getStatus() != PaymentStatus.PENDING) {
+            throw new IllegalStateException("Payment is no longer eligible for activation");
+        }
+        payment.setStatus(PaymentStatus.PAID);
+        payment.setPaidAt(paidAt != null ? paidAt : LocalDateTime.now());
+        payment.setProviderTransactionRef(providerTransactionRef);
+        subscriptionPaymentRepository.save(payment);
+        activatePlanForUser(payment.getUser(), payment.getTargetPlan(), payment.getTargetPlanVersion(),
+                payment.getPaidAt(), payment);
+    }
+
+    @Transactional
     public void simulatePaymentSuccess(SimulatePaymentRequest request, String email) {
+        if (!paymentGateway.isSandbox()) {
+            throw new IllegalStateException("Payment simulation is disabled outside sandbox mode");
+        }
         log.info("Simulating payment success for user {} and plan {}", email, request.getPlanId());
 
-        SubscriptionPayment payment = subscriptionPaymentRepository.findByTransferContent(request.getTransferContent())
+        SubscriptionPayment payment = subscriptionPaymentRepository.findWithLockByTransferContent(request.getTransferContent())
                 .orElseThrow(() -> new IllegalArgumentException("Payment request not found"));
 
         if (!Objects.equals(payment.getUser().getEmail(), email)) {
@@ -165,7 +240,7 @@ public class SubscriptionService {
         payment.setProviderTransactionRef("DEMO-" + payment.getPaymentCode());
         subscriptionPaymentRepository.save(payment);
 
-        activatePlanForUser(payment.getUser(), payment.getTargetPlan(), payment.getPaidAt(), payment);
+        activatePlanForUser(payment.getUser(), payment.getTargetPlan(), payment.getTargetPlanVersion(), payment.getPaidAt(), payment);
     }
 
     @Transactional
@@ -173,7 +248,10 @@ public class SubscriptionService {
         SubscriptionPayment payment = subscriptionPaymentRepository.findByPaymentCode(paymentCode)
                 .orElseThrow(() -> new IllegalArgumentException("Payment request not found"));
 
-        if (!Objects.equals(payment.getUser().getEmail(), email)) {
+        User viewer = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        boolean admin = viewer.getRole() != null && "ADMIN".equalsIgnoreCase(viewer.getRole().getRoleName());
+        if (!admin && !Objects.equals(payment.getUser().getEmail(), email)) {
             throw new IllegalArgumentException("You do not have permission to view this payment request");
         }
 
@@ -189,13 +267,28 @@ public class SubscriptionService {
     public void processPaymentWebhook(PaymentWebhookRequest request, String secretHeader) {
         validateWebhookSecret(secretHeader);
 
-        SubscriptionPayment payment = subscriptionPaymentRepository.findByTransferContent(request.getTransferContent())
+        SubscriptionPayment payment = subscriptionPaymentRepository.findWithLockByTransferContent(request.getTransferContent())
                 .orElseThrow(() -> new IllegalArgumentException("Payment request not found"));
 
         if (payment.getStatus() == PaymentStatus.PAID) {
             log.info("Payment {} already processed", payment.getPaymentCode());
             return;
         }
+
+        if (request.getAmount().compareTo(payment.getAmount()) != 0) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason("Payment amount mismatch");
+            subscriptionPaymentRepository.save(payment);
+            throw new IllegalArgumentException("Payment amount does not match the order amount");
+        }
+
+        if (request.getTransactionReference() == null || request.getTransactionReference().isBlank()) {
+            throw new IllegalArgumentException("Provider transaction ID is required");
+        }
+
+        subscriptionPaymentRepository.findByProviderTransactionRef(request.getTransactionReference())
+                .filter(existing -> !Objects.equals(existing.getId(), payment.getId()))
+                .ifPresent(existing -> { throw new IllegalArgumentException("Provider transaction ID was already used"); });
 
         if (isExpired(payment)) {
             payment.setStatus(PaymentStatus.EXPIRED);
@@ -209,7 +302,42 @@ public class SubscriptionService {
         payment.setProviderTransactionRef(request.getTransactionReference());
         subscriptionPaymentRepository.save(payment);
 
-        activatePlanForUser(payment.getUser(), payment.getTargetPlan(), payment.getPaidAt(), payment);
+        activatePlanForUser(payment.getUser(), payment.getTargetPlan(), payment.getTargetPlanVersion(), payment.getPaidAt(), payment);
+    }
+
+    @Transactional
+    public PaymentStatusResponse processSandboxPayment(String paymentCode, String token, String outcome) {
+        paymentGateway.verifyCheckoutToken(paymentCode, token);
+
+        SubscriptionPayment payment = subscriptionPaymentRepository.findWithLockByPaymentCode(paymentCode)
+                .orElseThrow(() -> new IllegalArgumentException("Payment request not found"));
+        if (payment.getStatus() != PaymentStatus.PENDING) return mapPaymentStatus(payment);
+
+        String normalized = outcome.toUpperCase();
+        if ("SUCCESS".equals(normalized)) {
+            if (isExpired(payment)) {
+                payment.setStatus(PaymentStatus.EXPIRED);
+            } else {
+                payment.setStatus(PaymentStatus.PAID);
+                payment.setPaidAt(LocalDateTime.now());
+                payment.setProviderName("STUDYHUB_SANDBOX");
+                payment.setProviderTransactionRef("SANDBOX-" + payment.getPaymentCode());
+                subscriptionPaymentRepository.save(payment);
+                activatePlanForUser(payment.getUser(), payment.getTargetPlan(), payment.getTargetPlanVersion(), payment.getPaidAt(), payment);
+                return mapPaymentStatus(payment);
+            }
+        } else if ("FAILED".equals(normalized)) {
+            payment.setStatus(PaymentStatus.FAILED);
+            payment.setFailureReason("Sandbox failure requested by tester");
+        } else if ("CANCELLED".equals(normalized)) {
+            payment.setStatus(PaymentStatus.CANCELLED);
+        } else if ("EXPIRED".equals(normalized)) {
+            payment.setStatus(PaymentStatus.EXPIRED);
+        } else {
+            throw new IllegalArgumentException("Unsupported sandbox outcome");
+        }
+        subscriptionPaymentRepository.save(payment);
+        return mapPaymentStatus(payment);
     }
 
     @Transactional(readOnly = true)
@@ -221,7 +349,9 @@ public class SubscriptionService {
         return subscriptionPaymentRepository.findByUser_IdOrderByCreatedAtDesc(user.getId()).stream()
                 .filter(payment -> payment.getStatus() != PaymentStatus.PENDING)
                 .map(payment -> BillingHistoryResponse.builder()
-                        .planName(payment.getTargetPlan().getPlanName())
+                        .planName(payment.getTargetPlanVersion() != null
+                                ? payment.getTargetPlanVersion().getPlanName()
+                                : payment.getTargetPlan().getPlanName())
                         .amount(payment.getAmount())
                         .paidAt(payment.getPaidAt() != null ? payment.getPaidAt() : payment.getCreatedAt())
                         .paymentStatus(payment.getStatus().name())
@@ -298,9 +428,9 @@ public class SubscriptionService {
         userQuotaService.validateUploadAllowed(user, incomingFileSizeBytes);
     }
 
-    private BigDecimal validateUpgradeFlow(SubscriptionPlan currentPlan, SubscriptionPlan targetPlan) {
-        BigDecimal currentPrice = currentPlan != null ? currentPlan.getPrice() : BigDecimal.ZERO;
-        BigDecimal targetPrice = targetPlan.getPrice();
+    private BigDecimal validateUpgradeFlow(BigDecimal currentPrice, SubscriptionPlan targetPlan, SubscriptionPlanVersion targetVersion) {
+        currentPrice = currentPrice != null ? currentPrice : BigDecimal.ZERO;
+        BigDecimal targetPrice = targetVersion.getPrice();
 
         if (targetPrice == null) {
             throw new IllegalArgumentException("Plan price must not be null");
@@ -315,12 +445,16 @@ public class SubscriptionService {
 
     private UpgradeQuote calculateUpgradeQuote(
             SubscriptionPlan currentPlan,
+            SubscriptionPlanVersion currentVersion,
             SubscriptionPlan targetPlan,
+            SubscriptionPlanVersion targetVersion,
             UserSubscription currentSubscription,
             LocalDateTime upgradeDate
     ) {
-        BigDecimal targetPrice = validateUpgradeFlow(currentPlan, targetPlan);
-        BigDecimal currentPrice = currentPlan != null ? currentPlan.getPrice() : BigDecimal.ZERO;
+        BigDecimal currentPrice = currentVersion != null
+                ? currentVersion.getPrice()
+                : currentPlan != null ? currentPlan.getPrice() : BigDecimal.ZERO;
+        BigDecimal targetPrice = validateUpgradeFlow(currentPrice, targetPlan, targetVersion);
 
         if (currentSubscription == null || currentPrice.compareTo(BigDecimal.ZERO) == 0) {
             return new UpgradeQuote(targetPrice, currentPrice, BigDecimal.ZERO, 0L, 0L, null);
@@ -378,16 +512,18 @@ public class SubscriptionService {
             return targetPrice;
         }
 
-        BigDecimal difference = targetPrice.subtract(currentPrice);
-        return difference
+        BigDecimal remainingValue = currentPrice
                 .multiply(BigDecimal.valueOf(remainingDays))
                 .divide(BigDecimal.valueOf(billingCycleDays), 0, RoundingMode.HALF_UP);
+        return targetPrice.subtract(remainingValue).max(BigDecimal.ZERO).setScale(0, RoundingMode.HALF_UP);
     }
 
     private SubscriptionPayment createPendingPayment(
             User user,
             SubscriptionPlan currentPlan,
+            SubscriptionPlanVersion currentVersion,
             SubscriptionPlan targetPlan,
+            SubscriptionPlanVersion targetVersion,
             UpgradeQuote quote
     ) {
         BigDecimal amountDue = quote.amountDue();
@@ -407,9 +543,16 @@ public class SubscriptionService {
                 .user(user)
                 .currentPlan(currentPlan)
                 .targetPlan(targetPlan)
+                .currentPlanVersion(currentVersion)
+                .targetPlanVersion(targetVersion)
                 .paymentCode(paymentCode)
                 .transferContent(transferContent)
                 .amount(amountDue)
+                .originalAmount(targetVersion.getPrice())
+                .remainingValue(quote.creditApplied())
+                .discountAmount(quote.creditApplied())
+                .currency("VND")
+                .idempotencyKey(paymentCode)
                 .status(PaymentStatus.PENDING)
                 .bankName(paymentBankName)
                 .accountName(paymentAccountName)
@@ -425,6 +568,7 @@ public class SubscriptionService {
     private void activatePlanForUser(
             User user,
             SubscriptionPlan targetPlan,
+            SubscriptionPlanVersion targetVersion,
             LocalDateTime paymentSuccessTime,
             SubscriptionPayment payment
     ) {
@@ -437,10 +581,13 @@ public class SubscriptionService {
         boolean preserveCurrentCycle = activeSubscription != null
                 && payment.getCurrentPlan() != null
                 && !"FREE".equalsIgnoreCase(payment.getCurrentPlan().getPlanName())
-                && targetPlan.getPrice().compareTo(payment.getCurrentPlan().getPrice()) > 0;
+                && targetVersion.getPrice().compareTo(
+                        payment.getCurrentPlanVersion() != null
+                                ? payment.getCurrentPlanVersion().getPrice()
+                                : payment.getCurrentPlan().getPrice()) > 0;
 
         user.setPlan(targetPlan);
-        syncStorageStatus(user, targetPlan);
+        userRepository.save(user);
 
         if (preserveCurrentCycle) {
             for (UserSubscription sub : activeSubs) {
@@ -451,8 +598,13 @@ public class SubscriptionService {
             }
 
             activeSubscription.setPlan(targetPlan);
+            activeSubscription.setPlanVersion(targetVersion);
+            activeSubscription.setPayment(payment);
+            activeSubscription.setPricePaid(payment.getAmount());
             activeSubscription.setIsActive(true);
             userSubscriptionRepository.save(activeSubscription);
+            refreshStorageStatusFromEntitlements(user);
+            recordSubscriptionActivation(user, targetPlan, targetVersion, payment);
             notifyPlanUpgrade(user, targetPlan, activeSubscription.getEndDate());
             return;
         }
@@ -463,18 +615,45 @@ public class SubscriptionService {
         }
 
         LocalDateTime startDate = paymentSuccessTime;
-        LocalDateTime endDate = paymentSuccessTime.plusDays(targetPlan.getDurationDays() != null ? targetPlan.getDurationDays() : 30L);
+        LocalDateTime endDate = paymentSuccessTime.plusDays(
+                targetVersion.getDurationDays() != null ? targetVersion.getDurationDays() : 30L);
 
         UserSubscription newSub = UserSubscription.builder()
                 .user(user)
                 .plan(targetPlan)
+                .planVersion(targetVersion)
+                .payment(payment)
+                .pricePaid(payment.getAmount())
                 .startDate(startDate)
                 .endDate(endDate)
                 .isActive(true)
                 .build();
 
         userSubscriptionRepository.save(newSub);
+        refreshStorageStatusFromEntitlements(user);
+        recordSubscriptionActivation(user, targetPlan, targetVersion, payment);
         notifyPlanUpgrade(user, targetPlan, newSub.getEndDate());
+    }
+
+    private void refreshStorageStatusFromEntitlements(User user) {
+        UserQuotaService.StorageQuotaSnapshot quota = userQuotaService.getStorageQuotaSnapshot(user);
+        user.setStorageStatus(quota.storageStatus());
+        userRepository.save(user);
+    }
+
+    private void recordSubscriptionActivation(
+            User user,
+            SubscriptionPlan targetPlan,
+            SubscriptionPlanVersion targetVersion,
+            SubscriptionPayment payment
+    ) {
+        activityLogRepository.save(ActivityLog.builder()
+                .user(user)
+                .actionType("SUBSCRIPTION_ACTIVATED")
+                .entityType("SUBSCRIPTION_PAYMENT")
+                .entityId(payment.getId())
+                .description("Activated " + targetPlan.getPlanName() + " version " + targetVersion.getVersionNumber())
+                .build());
     }
 
     private void notifyPlanUpgrade(User user, SubscriptionPlan targetPlan, LocalDateTime endDate) {
@@ -499,13 +678,19 @@ public class SubscriptionService {
         return PaymentStatusResponse.builder()
                 .paymentCode(payment.getPaymentCode())
                 .planId(payment.getTargetPlan().getId())
-                .planName(payment.getTargetPlan().getPlanName())
+                .planName(payment.getTargetPlanVersion() != null
+                        ? payment.getTargetPlanVersion().getPlanName()
+                        : payment.getTargetPlan().getPlanName())
                 .amount(payment.getAmount())
+                .currency(payment.getCurrency())
                 .status(status)
                 .transferContent(payment.getTransferContent())
                 .createdAt(payment.getCreatedAt())
                 .expiresAt(payment.getExpiresAt())
                 .paidAt(payment.getPaidAt())
+                .transactionId(payment.getVnpTransactionNo() != null
+                        ? payment.getVnpTransactionNo() : payment.getProviderTransactionRef())
+                .subscriptionActivated(userSubscriptionRepository.existsByPayment_Id(payment.getId()))
                 .finalStatus(status != PaymentStatus.PENDING)
                 .message(message)
                 .build();
@@ -531,6 +716,89 @@ public class SubscriptionService {
     private SubscriptionPlan getFreePlan() {
         return subscriptionPlanRepository.findByPlanName("FREE")
                 .orElseThrow(() -> new IllegalStateException("FREE plan not found"));
+    }
+
+    private SubscriptionPlanVersion getLatestPlanVersion(SubscriptionPlan plan) {
+        return planVersionRepository.findFirstByPlan_IdOrderByVersionNumberDesc(plan.getId())
+                .orElseGet(() -> createPlanVersion(plan));
+    }
+
+    private SubscriptionPlanVersion createPlanVersion(SubscriptionPlan plan) {
+        int nextVersion = planVersionRepository.findFirstByPlan_IdOrderByVersionNumberDesc(plan.getId())
+                .map(version -> version.getVersionNumber() + 1)
+                .orElse(1);
+        return planVersionRepository.save(SubscriptionPlanVersion.builder()
+                .plan(plan)
+                .versionNumber(nextVersion)
+                .planName(plan.getPlanName())
+                .description(plan.getDescription())
+                .price(plan.getPrice())
+                .storageLimitMb(plan.getStorageLimitMb())
+                .aiRequestsPerDay(plan.getAiRequestsPerDay())
+                .downloadLimit(plan.getDownloadLimit())
+                .bookmarkLimit(plan.getBookmarkLimit())
+                .durationDays(plan.getDurationDays())
+                .canUseAiSummary(plan.getCanUseAiSummary())
+                .canUseFlashcards(plan.getCanUseFlashcards())
+                .canUseQuizzes(plan.getCanUseQuizzes())
+                .canPublishDocuments(plan.getCanPublishDocuments())
+                .canPublishFolders(plan.getCanPublishFolders())
+                .effectiveFrom(LocalDateTime.now())
+                .build());
+    }
+
+    @Transactional(readOnly = true)
+    public CurrentSubscriptionResponse getCurrentSubscription(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        SubscriptionEntitlementService.ActiveEntitlements active = entitlementService.getActiveEntitlements(user);
+        SubscriptionEntitlementService.PlanBenefits benefits = active.benefits();
+        UserSubscription subscription = active.subscription();
+        return CurrentSubscriptionResponse.builder()
+                .subscriptionId(subscription != null ? subscription.getId() : null)
+                .planName(benefits.planName())
+                .planId(benefits.planId())
+                .planVersionId(benefits.versionId())
+                .planVersionNumber(benefits.versionNumber())
+                .price(benefits.price())
+                .startDate(subscription != null ? subscription.getStartDate() : null)
+                .endDate(subscription != null ? subscription.getEndDate() : null)
+                .autoRenew(subscription != null && Boolean.TRUE.equals(subscription.getAutoRenew()))
+                .storageLimitMb(benefits.storageLimitMb())
+                .aiRequestsPerDay(benefits.aiRequestsPerDay())
+                .downloadLimit(benefits.downloadLimit())
+                .bookmarkLimit(benefits.bookmarkLimit())
+                .canUseAiSummary(benefits.canUseAiSummary())
+                .canUseFlashcards(benefits.canUseFlashcards())
+                .canUseQuizzes(benefits.canUseQuizzes())
+                .canPublishDocuments(benefits.canPublishDocuments())
+                .canPublishFolders(benefits.canPublishFolders())
+                .upcomingVersion(mapVersion(active.upcomingVersion()))
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SubscriptionPlanVersionResponse> getPlanVersions(Long planId) {
+        if (!subscriptionPlanRepository.existsById(planId)) {
+            throw new IllegalArgumentException("Subscription plan not found");
+        }
+        return planVersionRepository.findByPlan_IdOrderByVersionNumberDesc(planId).stream()
+                .map(this::mapVersion)
+                .toList();
+    }
+
+    private SubscriptionPlanVersionResponse mapVersion(SubscriptionPlanVersion version) {
+        if (version == null) return null;
+        return SubscriptionPlanVersionResponse.builder()
+                .id(version.getId()).planId(version.getPlan().getId()).versionNumber(version.getVersionNumber())
+                .planName(version.getPlanName()).description(version.getDescription())
+                .price(version.getPrice()).storageLimitMb(version.getStorageLimitMb())
+                .aiRequestsPerDay(version.getAiRequestsPerDay()).downloadLimit(version.getDownloadLimit())
+                .bookmarkLimit(version.getBookmarkLimit()).durationDays(version.getDurationDays())
+                .canUseAiSummary(version.getCanUseAiSummary()).canUseFlashcards(version.getCanUseFlashcards())
+                .canUseQuizzes(version.getCanUseQuizzes()).canPublishDocuments(version.getCanPublishDocuments())
+                .canPublishFolders(version.getCanPublishFolders()).effectiveFrom(version.getEffectiveFrom())
+                .createdAt(version.getCreatedAt()).build();
     }
 
     private long getStorageLimitBytes(SubscriptionPlan plan) {
@@ -573,11 +841,13 @@ public class SubscriptionService {
 
     private void validateWebhookSecret(String secretHeader) {
         if (webhookSecret == null || webhookSecret.isBlank()) {
-            log.warn("Payment webhook secret is not configured. Webhook requests are accepted without signature validation.");
-            return;
+            log.error("Rejected payment webhook because PAYMENT_WEBHOOK_SECRET is not configured");
+            throw new IllegalStateException("Payment webhook is not configured");
         }
 
-        if (!webhookSecret.equals(secretHeader)) {
+        if (secretHeader == null || !MessageDigest.isEqual(
+                webhookSecret.getBytes(StandardCharsets.UTF_8),
+                secretHeader.getBytes(StandardCharsets.UTF_8))) {
             throw new IllegalArgumentException("Invalid webhook signature");
         }
     }
@@ -624,6 +894,8 @@ public class SubscriptionService {
                 .price(request.getPrice())
                 .storageLimitMb(request.getStorageLimitMb())
                 .aiRequestsPerDay(request.getAiRequestsPerDay())
+                .downloadLimit(request.getDownloadLimit())
+                .bookmarkLimit(request.getBookmarkLimit())
                 .durationDays(request.getDurationDays())
                 .canUseAiSummary(request.getCanUseAiSummary())
                 .canUseFlashcards(request.getCanUseFlashcards())
@@ -632,7 +904,9 @@ public class SubscriptionService {
                 .canPublishFolders(request.getCanPublishFolders())
                 .isActive(request.getIsActive())
                 .build();
-        return subscriptionPlanRepository.save(plan);
+        SubscriptionPlan saved = subscriptionPlanRepository.save(plan);
+        createPlanVersion(saved);
+        return saved;
     }
 
     @Transactional
@@ -645,6 +919,8 @@ public class SubscriptionService {
         plan.setPrice(request.getPrice());
         plan.setStorageLimitMb(request.getStorageLimitMb());
         plan.setAiRequestsPerDay(request.getAiRequestsPerDay());
+        plan.setDownloadLimit(request.getDownloadLimit());
+        plan.setBookmarkLimit(request.getBookmarkLimit());
         plan.setDurationDays(request.getDurationDays());
         plan.setCanUseAiSummary(request.getCanUseAiSummary());
         plan.setCanUseFlashcards(request.getCanUseFlashcards());
@@ -652,7 +928,9 @@ public class SubscriptionService {
         plan.setCanPublishDocuments(request.getCanPublishDocuments());
         plan.setCanPublishFolders(request.getCanPublishFolders());
         plan.setIsActive(request.getIsActive());
-        return subscriptionPlanRepository.save(plan);
+        SubscriptionPlan saved = subscriptionPlanRepository.save(plan);
+        createPlanVersion(saved);
+        return saved;
     }
 
     @Transactional
@@ -660,6 +938,9 @@ public class SubscriptionService {
         if (!subscriptionPlanRepository.existsById(id)) {
             throw new IllegalArgumentException("Subscription plan not found");
         }
-        subscriptionPlanRepository.deleteById(id);
+        SubscriptionPlan plan = subscriptionPlanRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Subscription plan not found"));
+        plan.setIsActive(false);
+        subscriptionPlanRepository.save(plan);
     }
 }

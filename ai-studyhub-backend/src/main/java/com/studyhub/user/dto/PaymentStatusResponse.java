@@ -16,11 +16,14 @@ public class PaymentStatusResponse {
     private Long planId;
     private String planName;
     private BigDecimal amount;
+    private String currency;
     private PaymentStatus status;
     private String transferContent;
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt;
     private LocalDateTime paidAt;
+    private String transactionId;
+    private boolean subscriptionActivated;
     private boolean finalStatus;
     private String message;
 }

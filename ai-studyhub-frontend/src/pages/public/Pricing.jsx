@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import { PageTitle } from '../study-hub/shared'
 import { pricingPlans } from '../study-hub/config'
-import { getActivePlans, getUpgradePaymentInfo } from '../../services/subscriptionService'
+import { createVnpayCheckout, getActivePlans } from '../../services/subscriptionService'
 
 export function PricingPage({ onNavigate, user, onSelectUpgrade }) {
   const [plans, setPlans] = useState([])
@@ -36,7 +36,7 @@ export function PricingPage({ onNavigate, user, onSelectUpgrade }) {
 
     setLoadingPlanId(backendId)
     try {
-      const res = await getUpgradePaymentInfo({ planId: backendId })
+      const res = await createVnpayCheckout(backendId)
       if (res?.success && res?.data) {
         onSelectUpgrade?.(plan, res.data)
       } else {

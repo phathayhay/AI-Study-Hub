@@ -10,6 +10,8 @@ export function AdminPlanModal({ mode, onClose, onSaved, plan = null }) {
     price: String(plan?.price ?? 0),
     storageLimitMb: String(plan?.storageLimitMb ?? 50),
     aiRequestsPerDay: String(plan?.aiRequestsPerDay ?? 10),
+    downloadLimit: String(plan?.downloadLimit ?? 0),
+    bookmarkLimit: String(plan?.bookmarkLimit ?? 0),
     durationDays: String(plan?.durationDays ?? 30),
     canUseAiSummary: plan?.canUseAiSummary ?? true,
     canUseFlashcards: plan?.canUseFlashcards ?? true,
@@ -31,6 +33,8 @@ export function AdminPlanModal({ mode, onClose, onSaved, plan = null }) {
       price: Number(form.price || 0),
       storageLimitMb: Number(form.storageLimitMb || 0),
       aiRequestsPerDay: Number(form.aiRequestsPerDay || 0),
+      downloadLimit: Number(form.downloadLimit || 0),
+      bookmarkLimit: Number(form.bookmarkLimit || 0),
       durationDays: Number(form.durationDays || 30),
       canUseAiSummary: Boolean(form.canUseAiSummary),
       canUseFlashcards: Boolean(form.canUseFlashcards),
@@ -68,6 +72,7 @@ export function AdminPlanModal({ mode, onClose, onSaved, plan = null }) {
         <header className="admin-plan-modal__header">
           <h2>{edit ? `Edit ${plan?.planName || 'Plan'}` : 'Create New Plan'}</h2>
           <p>Configure pricing, capacity, and feature access in one place.</p>
+          {edit && <small>Saving creates a new immutable version. Current subscribers keep their purchased benefits until renewal.</small>}
         </header>
 
         <div className="admin-plan-modal__content">
@@ -129,6 +134,14 @@ export function AdminPlanModal({ mode, onClose, onSaved, plan = null }) {
                 value={form.durationDays}
               />
             </label>
+            <label>
+              Download Limit
+              <input min="0" onChange={(event) => updateField('downloadLimit', event.target.value)} required type="number" value={form.downloadLimit} />
+            </label>
+            <label>
+              Bookmark Limit
+              <input min="0" onChange={(event) => updateField('bookmarkLimit', event.target.value)} required type="number" value={form.bookmarkLimit} />
+            </label>
           </div>
 
           <section className="admin-plan-rights">
@@ -160,6 +173,8 @@ export function AdminPlanModal({ mode, onClose, onSaved, plan = null }) {
               <span>{Number(form.price || 0).toLocaleString('en-US')} VND</span>
               <span>{form.storageLimitMb || 0} MB</span>
               <span>{form.aiRequestsPerDay || 0} AI/day</span>
+              <span>{form.downloadLimit || 0} downloads</span>
+              <span>{form.bookmarkLimit || 0} bookmarks</span>
               <span>{form.durationDays || 30} days</span>
             </div>
           </section>

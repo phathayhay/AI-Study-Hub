@@ -30,6 +30,14 @@ public class SubscriptionPlan {
     @Column(name = "ai_requests_per_day", nullable = false)
     private Integer aiRequestsPerDay;
 
+    @Column(name = "download_limit", nullable = false)
+    @Builder.Default
+    private Integer downloadLimit = 0;
+
+    @Column(name = "bookmark_limit", nullable = false)
+    @Builder.Default
+    private Integer bookmarkLimit = 0;
+
     @Column(name = "duration_days", nullable = false)
     @Builder.Default
     private Integer durationDays = 30;
@@ -61,8 +69,15 @@ public class SubscriptionPlan {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        updatedAt = createdAt;
     }
+
+    @PreUpdate
+    protected void onUpdate() { updatedAt = LocalDateTime.now(); }
 }

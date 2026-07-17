@@ -10,6 +10,7 @@ import com.studyhub.course.repository.MajorRepository;
 import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.dto.UpdateProfileRequest;
 import com.studyhub.user.dto.UserProfileResponse;
+import com.studyhub.user.dto.CurrentSubscriptionResponse;
 import com.studyhub.user.entity.Role;
 import com.studyhub.user.entity.StudentVerification;
 import com.studyhub.user.entity.SubscriptionPlan;
@@ -89,6 +90,13 @@ class UserServiceImplTest {
                 .storageStatus(StorageStatus.NORMAL)
                 .verificationStatus(VerificationStatus.UNVERIFIED)
                 .build();
+
+        lenient().when(subscriptionService.getCurrentSubscription(user.getEmail())).thenReturn(
+                CurrentSubscriptionResponse.builder()
+                        .planId(freePlan.getId()).planName("FREE").price(freePlan.getPrice())
+                        .storageLimitMb(100L).aiRequestsPerDay(10)
+                        .canUseAiSummary(true).canUseFlashcards(true).canUseQuizzes(true)
+                        .canPublishDocuments(false).canPublishFolders(false).build());
     }
 
     @Test

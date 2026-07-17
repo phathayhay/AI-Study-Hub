@@ -9,6 +9,7 @@ import com.studyhub.course.repository.MajorRepository;
 import com.studyhub.storage.service.CloudinaryStorageService;
 import com.studyhub.user.dto.UpdateProfileRequest;
 import com.studyhub.user.dto.UserProfileResponse;
+import com.studyhub.user.dto.CurrentSubscriptionResponse;
 import com.studyhub.user.entity.StudentVerification;
 import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.User;
@@ -131,7 +132,7 @@ public class UserServiceImpl implements UserService {
                 .max(Comparator.naturalOrder())
                 .orElse(null);
 
-        SubscriptionPlan activePlan = user.getPlan();
+        CurrentSubscriptionResponse activeSubscription = subscriptionService.getCurrentSubscription(user.getEmail());
         SubscriptionService.StorageQuotaSnapshot quotaSnapshot = subscriptionService.getStorageQuotaSnapshot(user);
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();
@@ -155,19 +156,19 @@ public class UserServiceImpl implements UserService {
                 .campus(user.getCampus())
                 .majorName(user.getMajor() != null ? user.getMajor().getMajorName() : null)
                 .majorId(user.getMajor() != null ? user.getMajor().getId() : null)
-                .planName(activePlan != null ? activePlan.getPlanName() : "FREE")
+                .planName(activeSubscription.getPlanName())
                 .planExpiresAt(planExpiresAt)
-                .planStorageLimitMb(activePlan != null ? activePlan.getStorageLimitMb() : null)
+                .planStorageLimitMb(activeSubscription.getStorageLimitMb())
                 .planStorageLimitBytes(quotaSnapshot.storageLimitBytes())
                 .planStorageUsedBytes(quotaSnapshot.storageUsedBytes())
                 .planStorageUsedMb(quotaSnapshot.storageUsedMb())
-                .planAiRequestsPerDay(activePlan != null ? activePlan.getAiRequestsPerDay() : null)
+                .planAiRequestsPerDay(activeSubscription.getAiRequestsPerDay())
                 .planAiRequestsUsedToday(aiRequestsUsedToday)
-                .planCanUseAiSummary(activePlan != null ? activePlan.getCanUseAiSummary() : null)
-                .planCanUseFlashcards(activePlan != null ? activePlan.getCanUseFlashcards() : null)
-                .planCanUseQuizzes(activePlan != null ? activePlan.getCanUseQuizzes() : null)
-                .planCanPublishDocuments(activePlan != null ? activePlan.getCanPublishDocuments() : null)
-                .planCanPublishFolders(activePlan != null ? activePlan.getCanPublishFolders() : null)
+                .planCanUseAiSummary(activeSubscription.getCanUseAiSummary())
+                .planCanUseFlashcards(activeSubscription.getCanUseFlashcards())
+                .planCanUseQuizzes(activeSubscription.getCanUseQuizzes())
+                .planCanPublishDocuments(activeSubscription.getCanPublishDocuments())
+                .planCanPublishFolders(activeSubscription.getCanPublishFolders())
                 .storageStatus(quotaSnapshot.storageStatus())
                 .overQuota(quotaSnapshot.overQuota())
                 .canUpload(quotaSnapshot.canUpload())

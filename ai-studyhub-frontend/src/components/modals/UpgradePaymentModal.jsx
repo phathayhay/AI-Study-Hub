@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import StudyHubIcon from '../icons/StudyHubIcons'
 import { getUserProfile } from '../../services/userService'
-import { getPaymentStatus, simulatePaymentSuccess } from '../../services/subscriptionService'
+import { getPaymentStatus } from '../../services/subscriptionService'
 
 export function UpgradePaymentModal({ onClose, user, plan, paymentInfo, onUpgradeSuccess }) {
   const [checking, setChecking] = useState(false)
-  const [demoUpgrading, setDemoUpgrading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [copiedField, setCopiedField] = useState(null)
   const [paymentStatus, setPaymentStatus] = useState(paymentInfo?.paymentStatus || 'PENDING')
@@ -70,22 +69,12 @@ export function UpgradePaymentModal({ onClose, user, plan, paymentInfo, onUpgrad
     }
   }
 
-  const handleDemoUpgrade = async () => {
-    if (!paymentInfo?.planId || demoUpgrading) return
-
-    setDemoUpgrading(true)
-    try {
-      const res = await simulatePaymentSuccess({
-        planId: paymentInfo.planId,
-        transferContent: paymentInfo.transferContent || paymentInfo.paymentCode || `DEMO-${paymentInfo.planId}`,
-      })
-
-      await finishUpgrade(res?.message || 'Demo payment confirmed. Your plan is active.')
-    } catch (err) {
-      window.showToast?.(err.message || 'Unable to complete demo upgrade right now.', 'error')
-    } finally {
-      setDemoUpgrading(false)
+  const openSandboxCheckout = () => {
+    if (!paymentInfo?.checkoutUrl) {
+      window.showToast?.('Sandbox checkout is not available for this order.', 'error')
+      return
     }
+    window.location.assign(paymentInfo.checkoutUrl)
   }
 
   useEffect(() => {
@@ -97,6 +86,39 @@ export function UpgradePaymentModal({ onClose, user, plan, paymentInfo, onUpgrad
 
     return () => window.clearInterval(intervalId)
   }, [paymentInfo?.paymentCode, success])
+
+  if (paymentInfo?.paymentUrl) {
+    const vnpayExpiry = paymentInfo.expiresAt ? new Date(paymentInfo.expiresAt) : null
+    return (
+      <div className="modal-backdrop" style={{ zIndex: 1000 }} onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}>
+        <section className="settings-modal bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700" style={{ width: 'min(92vw, 520px)', overflow: 'hidden' }}>
+          <header className="border-b border-slate-100 dark:border-slate-700" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px' }}>
+            <h2 className="text-slate-900 dark:text-white" style={{ margin: 0, fontSize: 18, display: 'flex', alignItems: 'center', gap: 9 }}>
+              <StudyHubIcon name="shield" size={20} /> Confirm upgrade
+            </h2>
+            <button aria-label="Close" onClick={onClose} style={{ border: 0, background: 'transparent', cursor: 'pointer', fontSize: 20, color: '#64748b' }} type="button">x</button>
+          </header>
+          <div style={{ padding: 22, display: 'grid', gap: 16 }}>
+            <div style={{ padding: 14, borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e40af', lineHeight: 1.55 }}>
+              You will continue to VNPAY Sandbox to select a test payment method. No production payment credentials are used.
+            </div>
+            <div style={{ display: 'grid', gap: 12, padding: 16, border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: '#64748b' }}>Plan</span><strong>{paymentInfo.planName || plan?.name}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: '#64748b' }}>Order</span><strong style={{ fontFamily: 'monospace' }}>{paymentInfo.orderCode}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}><span style={{ color: '#64748b' }}>Amount due</span><strong style={{ fontSize: 22 }}>{Number(paymentInfo.amount || 0).toLocaleString('en-US')} {paymentInfo.currency || 'VND'}</strong></div>
+              {vnpayExpiry && <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><span style={{ color: '#64748b' }}>Checkout expires</span><strong>{vnpayExpiry.toLocaleString('en-GB')}</strong></div>}
+            </div>
+          </div>
+          <footer style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '16px 22px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+            <button onClick={onClose} style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600 }} type="button">Cancel</button>
+            <button onClick={() => window.location.assign(paymentInfo.paymentUrl)} style={{ padding: '10px 18px', borderRadius: 8, border: 0, background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 700 }} type="button">Continue to VNPAY</button>
+          </footer>
+        </section>
+      </div>
+    )
+  }
 
   const statusTone = paymentStatus === 'PAID'
     ? { bg: '#ecfdf5', border: '#bbf7d0', text: '#047857' }
@@ -256,17 +278,17 @@ export function UpgradePaymentModal({ onClose, user, plan, paymentInfo, onUpgrad
               <>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                   <button
-                    onClick={handleDemoUpgrade}
-                    disabled={demoUpgrading || checking}
+                    onClick={openSandboxCheckout}
+                    disabled={checking || !paymentInfo?.checkoutUrl}
                     className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
                     style={{ padding: '8px 18px', borderRadius: '8px', border: 'none' }}
                     type="button"
                   >
-                    {demoUpgrading ? 'Upgrading demo...' : 'Demo upgrade now'}
+                    Open sandbox checkout
                   </button>
                   <button
                     onClick={() => checkStatus(false)}
-                    disabled={checking || demoUpgrading}
+                    disabled={checking}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
                     style={{ padding: '8px 18px', borderRadius: '8px', border: 'none' }}
                     type="button"

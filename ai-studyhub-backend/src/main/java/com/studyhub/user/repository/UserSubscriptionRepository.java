@@ -12,4 +12,5 @@ public interface UserSubscriptionRepository extends JpaRepository<UserSubscripti
     List<UserSubscription> findByUser_EmailOrderByCreatedAtDesc(String email);
     List<UserSubscription> findByUser_IdAndIsActiveTrue(Long userId);
     List<UserSubscription> findByIsActiveTrueAndEndDateBefore(LocalDateTime endDate);
+    boolean existsByPayment_Id(Long paymentId);
 }

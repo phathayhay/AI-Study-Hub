@@ -6,9 +6,7 @@ import com.studyhub.common.AiQuotaExceededException;
 import com.studyhub.common.enums.SenderType;
 import com.studyhub.common.enums.StorageStatus;
 import com.studyhub.document.repository.DocumentRepository;
-import com.studyhub.user.entity.SubscriptionPlan;
 import com.studyhub.user.entity.User;
-import com.studyhub.user.repository.SubscriptionPlanRepository;
 import com.studyhub.user.repository.ActivityLogRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,12 +24,12 @@ public class UserQuotaServiceImpl implements UserQuotaService {
     private final DocumentRepository documentRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ActivityLogRepository activityLogRepository;
-    private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final SubscriptionEntitlementService entitlementService;
 
     @Override
     @Transactional(readOnly = true)
     public StorageQuotaSnapshot getStorageQuotaSnapshot(User user) {
-        SubscriptionPlan effectivePlan = user.getPlan() != null ? user.getPlan() : getFreePlan();
+        SubscriptionEntitlementService.PlanBenefits effectivePlan = entitlementService.getActiveEntitlements(user).benefits();
         long usedStorageBytes = documentRepository.sumFileSizeByUserId(user.getId());
         long storageLimitBytes = getStorageLimitBytes(effectivePlan);
         boolean overQuota = user.getStorageStatus() == StorageStatus.OVER_QUOTA;
@@ -60,8 +58,8 @@ public class UserQuotaServiceImpl implements UserQuotaService {
     @Override
     @Transactional(readOnly = true)
     public boolean hasRemainingAiRequests(User user) {
-        SubscriptionPlan activePlan = user.getPlan() != null ? user.getPlan() : getFreePlan();
-        Integer limit = activePlan.getAiRequestsPerDay();
+        SubscriptionEntitlementService.PlanBenefits activePlan = entitlementService.getActiveEntitlements(user).benefits();
+        Integer limit = activePlan.aiRequestsPerDay();
         if (limit == null) {
             return true; // Unlimited
         }
@@ -91,31 +89,26 @@ public class UserQuotaServiceImpl implements UserQuotaService {
         }
     }
 
-    private SubscriptionPlan getFreePlan() {
-        return subscriptionPlanRepository.findByPlanName("FREE")
-                .orElseThrow(() -> new IllegalStateException("FREE plan not found"));
-    }
-
-    private long getStorageLimitBytes(SubscriptionPlan plan) {
-        Long storageLimitMb = plan != null ? plan.getStorageLimitMb() : null;
+    private long getStorageLimitBytes(SubscriptionEntitlementService.PlanBenefits plan) {
+        Long storageLimitMb = plan != null ? plan.storageLimitMb() : null;
         if (storageLimitMb == null || storageLimitMb <= 0) {
             return 0L;
         }
         return storageLimitMb * 1024L * 1024L;
     }
 
-    private StorageQuotaSnapshot buildStorageQuotaSnapshot(SubscriptionPlan plan, long usedStorageBytes, boolean overQuota) {
+    private StorageQuotaSnapshot buildStorageQuotaSnapshot(SubscriptionEntitlementService.PlanBenefits plan, long usedStorageBytes, boolean overQuota) {
         long storageLimitBytes = getStorageLimitBytes(plan);
         String message = null;
         if (overQuota) {
-            String planName = plan != null && plan.getPlanName() != null ? plan.getPlanName().toUpperCase() : "FREE";
+            String planName = plan != null && plan.planName() != null ? plan.planName().toUpperCase() : "FREE";
             message = "FREE".equals(planName)
                     ? "Your subscription has expired and your storage usage exceeds the FREE plan limit. You can still view, download, or delete existing files, but you cannot upload new files until you free up storage or upgrade your plan."
                     : String.format("Your current storage usage exceeds the %s plan limit. Delete some files or upgrade your plan to continue uploading.", planName);
         }
 
         return new StorageQuotaSnapshot(
-                plan != null ? plan.getStorageLimitMb() : 0L,
+                plan != null ? plan.storageLimitMb() : 0L,
                 storageLimitBytes,
                 usedStorageBytes,
                 usedStorageBytes / (1024d * 1024d),

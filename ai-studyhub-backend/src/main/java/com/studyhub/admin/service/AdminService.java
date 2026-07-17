@@ -325,6 +325,11 @@ public class AdminService {
         subscriptionService.deletePlan(id);
     }
 
+    @Transactional(readOnly = true)
+    public List<com.studyhub.user.dto.SubscriptionPlanVersionResponse> getPlanVersions(Long id) {
+        return subscriptionService.getPlanVersions(id);
+    }
+
     private AdminUserResponse mapUserResponse(User user) {
         return AdminUserResponse.builder()
                 .id(user.getId())
