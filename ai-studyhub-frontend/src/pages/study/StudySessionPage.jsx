@@ -20,13 +20,15 @@ import { ChatbotTab } from './components/ChatbotTab'
 
 export default function StudySessionPage({ activeTab: propActiveTab, file, onBack, onTabChange, onAiUsageUpdated, aiQuotaReached = false }) {
   const documentId = file?.documentId ?? file?.id
+  const [prevActiveTabProp, setPrevActiveTabProp] = useState(propActiveTab)
   const [activeTab, setActiveTab] = useState(propActiveTab || 'original')
-  
-  useEffect(() => {
+
+  if (propActiveTab !== prevActiveTabProp) {
+    setPrevActiveTabProp(propActiveTab)
     if (propActiveTab) {
       setActiveTab(propActiveTab)
     }
-  }, [propActiveTab])
+  }
 
   const handleTabChangeLocal = (tabId) => {
     setActiveTab(tabId)
@@ -38,7 +40,7 @@ export default function StudySessionPage({ activeTab: propActiveTab, file, onBac
   const [quizzes, setQuizzes] = useState([])
   const [quiz, setQuiz] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [initialAiLoading, setInitialAiLoading] = useState(false)
+  const [initialAiLoading, setInitialAiLoading] = useState(true)
   const [error, setError] = useState('')
   const [rightPanelWidth, setRightPanelWidth] = useState(380)
   const [isResizing, setIsResizing] = useState(false)
@@ -107,14 +109,11 @@ export default function StudySessionPage({ activeTab: propActiveTab, file, onBac
     }
   }, [isResizing])
 
+
+
   useEffect(() => {
     if (!documentId) return undefined
     let active = true
-    setInitialAiLoading(true)
-    setError('')
-    setSummary(null)
-    setFlashcardSet(null)
-    setQuiz(null)
 
     Promise.allSettled([
       getDocumentSummary(documentId),
@@ -312,11 +311,10 @@ export default function StudySessionPage({ activeTab: propActiveTab, file, onBac
 
           {/* RIGHT COLUMN (AI TUTOR) */}
           <ChatbotTab 
+            key={documentId}
             documentId={documentId} 
             file={file} 
             rightPanelWidth={rightPanelWidth} 
-            isResizing={isResizing} 
-            setIsResizing={setIsResizing} 
             aiQuotaReached={aiQuotaReached}
             onAiUsageUpdated={onAiUsageUpdated}
           />

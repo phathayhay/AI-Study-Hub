@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import StudyHubIcon from '../../components/icons/StudyHubIcons'
 import { 
   getMyDocuments, 
@@ -120,7 +120,7 @@ export function LibraryPage({
   const [pendingDelete, setPendingDelete] = useState(null)
   const [pendingRenameItem, setPendingRenameItem] = useState(null)
 
-  const loadLibraryData = () => {
+  const loadLibraryData = useCallback(() => {
     setLoading(true)
     Promise.all([
       getMyDocuments().catch(() => ({ data: [] })),
@@ -170,36 +170,82 @@ export function LibraryPage({
     }).catch(err => {
       console.error('Failed to load library data:', err)
     }).finally(() => setLoading(false))
-  }
+  }, [onPurgeStaleRecent])
 
-  useEffect(() => {
-    if (!user?.id) {
-      setApiDocs([])
-      setApiSharedDocs([])
-      setApiFavoriteDocs([])
-      setApiHistoryDocs([])
-      setApiFolders([])
-      setLoading(false)
-      return
-    }
+  const docs = useMemo(() => user?.id ? apiDocs : [], [user?.id, apiDocs])
+  const folders = useMemo(() => user?.id ? apiFolders : [], [user?.id, apiFolders])
+  const sharedDocs = useMemo(() => user?.id ? apiSharedDocs : [], [user?.id, apiSharedDocs])
+  const favoriteDocs = useMemo(() => user?.id ? apiFavoriteDocs : [], [user?.id, apiFavoriteDocs])
+  const historyDocs = useMemo(() => user?.id ? apiHistoryDocs : [], [user?.id, apiHistoryDocs])
 
-    loadLibraryData()
-  }, [user?.id])
+  const handleSelectFolder = useCallback((folder) => {
+    setSelectedFolder(folder)
+    setSelectedFolderDetails(null)
+    setFolderLoading(true)
+    getFolder(folder.id)
+      .then((res) => {
+        if (res?.success && res?.data) {
+          const detail = res.data
+          const displayDate = detail.createdAt ? new Date(detail.createdAt).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : ''
+          setSelectedFolderDetails({
+            id: detail.id,
+            name: detail.folderName || detail.name || 'Untitled Folder',
+            documents: (detail.documents || []).map(mapDoc),
+            parentFolderId: detail.parentFolderId,
+            visibility: detail.visibility || 'PRIVATE',
+            public: detail.visibility === 'PUBLIC',
+            publishReady: detail.publishReady,
+            publishBlockedReason: detail.publishBlockedReason,
+            date: displayDate,
+            createdAt: detail.createdAt
+          })
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load folder detail:', err)
+        window.showToast?.('Failed to load folder content', 'error')
+      })
+      .finally(() => setFolderLoading(false))
+  }, [])
 
-  // Reset folder selection when switching tabs (unless we are opening an initial folder)
-  useEffect(() => {
+  const [prevActiveTab, setPrevActiveTab] = useState(activeTab)
+  const [prevUserId, setPrevUserId] = useState(user?.id)
+
+  if (activeTab !== prevActiveTab) {
+    setPrevActiveTab(activeTab)
     if (!initialFolderId) {
       setSelectedFolder(null)
       setSelectedFolderDetails(null)
     }
-  }, [activeTab, initialFolderId])
+  }
+
+  if (user?.id !== prevUserId) {
+    setPrevUserId(user?.id)
+    if (user?.id) {
+      setLoading(true)
+    } else {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (user?.id) {
+      const timer = setTimeout(() => {
+        loadLibraryData()
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+  }, [user?.id, loadLibraryData])
 
   useEffect(() => {
     if (initialFolderId) {
-      handleSelectFolder({ id: initialFolderId, name: 'Loading...' })
-      onClearInitialFolderId?.()
+      const timer = setTimeout(() => {
+        handleSelectFolder({ id: initialFolderId, name: 'Loading...' })
+        onClearInitialFolderId?.()
+      }, 0)
+      return () => clearTimeout(timer)
     }
-  }, [initialFolderId])
+  }, [initialFolderId, handleSelectFolder, onClearInitialFolderId])
 
   useEffect(() => {
     const handleGlobalClick = (e) => {
@@ -212,31 +258,6 @@ export function LibraryPage({
     return () => document.removeEventListener('click', handleGlobalClick)
   }, [])
 
-  const handleSelectFolder = (folder) => {
-    setSelectedFolder(folder)
-    setSelectedFolderDetails(null)
-    setFolderLoading(true)
-    getFolder(folder.id)
-      .then((res) => {
-        const data = res?.data || res
-        setSelectedFolderDetails({
-          id: data.id || folder.id,
-          name: data.folderName || data.name || folder.name,
-          documents: data.documents || [],
-          subfolders: data.subfolders || [],
-          visibility: data.visibility || folder.visibility || 'PRIVATE',
-          public: data.visibility === 'PUBLIC',
-          publishReady: data.publishReady,
-          publishBlockedReason: data.publishBlockedReason
-        })
-      })
-      .catch((err) => {
-        console.error(err)
-      })
-      .finally(() => {
-        setFolderLoading(false)
-      })
-  }
 
   const handleAddFolder = () => {
     const name = window.prompt('Enter new folder name:')?.trim()
@@ -545,8 +566,8 @@ export function LibraryPage({
   }
 
   const combinedItems = useMemo(() => {
-    const rootDocs = apiDocs.filter(d => !d.folderId)
-    const combined = [...apiFolders, ...rootDocs]
+    const rootDocs = docs.filter(d => !d.folderId)
+    const combined = [...folders, ...rootDocs]
     
     return combined.map(item => {
       const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
@@ -566,7 +587,7 @@ export function LibraryPage({
         return timeB - timeA
       }
     })
-  }, [apiDocs, apiFolders, sortBy, pinnedIds])
+  }, [docs, folders, sortBy, pinnedIds])
 
   const filteredCombinedItems = useMemo(() => {
     return combinedItems.filter(item => 
@@ -575,7 +596,7 @@ export function LibraryPage({
   }, [combinedItems, searchQuery])
 
   const filteredSharedDocs = useMemo(() => {
-    return apiSharedDocs.map(item => {
+    return sharedDocs.map(item => {
       const isPinned = pinnedIds.has(`${item.id}_document`)
       return { ...item, group: isPinned ? 'Pinned' : item.group }
     }).filter(doc => 
@@ -586,10 +607,10 @@ export function LibraryPage({
       if (sortBy === 'name') return a.name.localeCompare(b.name)
       return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
     })
-  }, [apiSharedDocs, searchQuery, sortBy, pinnedIds])
+  }, [sharedDocs, searchQuery, sortBy, pinnedIds])
 
   const filteredFavoriteDocs = useMemo(() => {
-    return apiFavoriteDocs.map(item => {
+    return favoriteDocs.map(item => {
       const isPinned = pinnedIds.has(`${item.id}_document`)
       return { ...item, group: isPinned ? 'Pinned' : item.group }
     }).filter(doc => 
@@ -600,10 +621,10 @@ export function LibraryPage({
       if (sortBy === 'name') return a.name.localeCompare(b.name)
       return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
     })
-  }, [apiFavoriteDocs, searchQuery, sortBy, pinnedIds])
+  }, [favoriteDocs, searchQuery, sortBy, pinnedIds])
 
   const filteredHistoryDocs = useMemo(() => {
-    return apiHistoryDocs.map(item => {
+    return historyDocs.map(item => {
       const isPinned = pinnedIds.has(`${item.id}_document`)
       return { ...item, group: isPinned ? 'Pinned' : item.group }
     }).filter(doc => 
@@ -614,10 +635,10 @@ export function LibraryPage({
       if (sortBy === 'name') return a.name.localeCompare(b.name)
       return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
     })
-  }, [apiHistoryDocs, searchQuery, sortBy, pinnedIds])
+  }, [historyDocs, searchQuery, sortBy, pinnedIds])
 
   const filteredFoldersOnly = useMemo(() => {
-    return apiFolders.map(item => {
+    return folders.map(item => {
       const isPinned = pinnedIds.has(`${item.id}_folder`)
       return { ...item, group: isPinned ? 'Pinned' : item.group }
     }).filter(folder => 
@@ -628,7 +649,7 @@ export function LibraryPage({
       if (sortBy === 'name') return a.name.localeCompare(b.name)
       return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
     })
-  }, [apiFolders, searchQuery, sortBy, pinnedIds])
+  }, [folders, searchQuery, sortBy, pinnedIds])
 
   const customStyles = `
     .hover-action-btn {
@@ -839,43 +860,49 @@ export function LibraryPage({
         </div>
       </main>
 
-      <MoveModal 
-        isOpen={!!moveItem} 
-        onClose={() => setMoveItem(null)} 
-        item={moveItem} 
-        folders={apiFolders} 
-        onMove={handleConfirmMove} 
-      />
+      {moveItem && (
+        <MoveModal 
+          onClose={() => setMoveItem(null)} 
+          item={moveItem} 
+          folders={apiFolders} 
+          onMove={handleConfirmMove} 
+        />
+      )}
 
-      <ShareModal
-        isOpen={!!shareItem}
-        onClose={() => setShareItem(null)}
-        item={shareItem}
-        user={user}
-        onShare={shareDocument}
-        onUpdateVisibility={updateDocumentVisibility}
-        onSuccess={() => {
-          loadLibraryData()
-          if (selectedFolder) {
-            handleSelectFolder(selectedFolder)
-          }
-        }}
-      />
-      <DeleteConfirmModal
-        isOpen={!!pendingDelete}
-        loading={loading}
-        item={pendingDelete?.item}
-        isFolder={pendingDelete?.isFolder}
-        onClose={() => setPendingDelete(null)}
-        onConfirm={handleConfirmDelete}
-      />
-      <RenameItemModal
-        isOpen={!!pendingRenameItem}
-        loading={loading}
-        item={pendingRenameItem}
-        onClose={() => setPendingRenameItem(null)}
-        onConfirm={handleConfirmRenameItem}
-      />
+      {shareItem && (
+        <ShareModal
+          onClose={() => setShareItem(null)}
+          item={shareItem}
+          user={user}
+          onShare={shareDocument}
+          onUpdateVisibility={updateDocumentVisibility}
+          onSuccess={() => {
+            loadLibraryData()
+            if (selectedFolder) {
+              handleSelectFolder(selectedFolder)
+            }
+          }}
+        />
+      )}
+
+      {pendingDelete && (
+        <DeleteConfirmModal
+          loading={loading}
+          item={pendingDelete?.item}
+          isFolder={pendingDelete?.isFolder}
+          onClose={() => setPendingDelete(null)}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
+
+      {pendingRenameItem && (
+        <RenameItemModal
+          loading={loading}
+          item={pendingRenameItem}
+          onClose={() => setPendingRenameItem(null)}
+          onConfirm={handleConfirmRenameItem}
+        />
+      )}
     </div>
   )
 }

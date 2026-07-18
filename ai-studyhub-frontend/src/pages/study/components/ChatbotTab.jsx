@@ -7,8 +7,7 @@ import {
   sendChatMessage,
 } from '../../../features/ai/aiService'
 
-export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setIsResizing, onAiUsageUpdated, aiQuotaReached = false }) {
-  const [chatSessions, setChatSessions] = useState([])
+export function ChatbotTab({ documentId, file, rightPanelWidth, onAiUsageUpdated, aiQuotaReached = false }) {
   const [currentSessionId, setCurrentSessionId] = useState(null)
   const [chatMessages, setChatMessages] = useState([])
   const [chatMessagesLoading, setChatMessagesLoading] = useState(false)
@@ -16,6 +15,14 @@ export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setI
   const [chatInput, setChatInput] = useState('')
   const [chatScope, setChatScope] = useState('document') // 'document' or 'general'
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+
+  const handleScopeChange = (scope) => {
+    setChatScope(scope)
+    setChatMessagesLoading(true)
+    setChatMessages([])
+    setCurrentSessionId(null)
+    setIsDropdownOpen(false)
+  }
 
   const messagesEndRef = useRef(null)
 
@@ -27,18 +34,17 @@ export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setI
     scrollToBottom()
   }, [chatMessages])
 
+
+
   useEffect(() => {
     let active = true
-    setChatMessagesLoading(true)
-    setChatMessages([])
-    setCurrentSessionId(null)
 
     getUserChatSessions()
       .then((res) => {
         if (!active) return
         const list = res?.data || res || []
         const isArr = Array.isArray(list)
-        setChatSessions(isArr ? list : [])
+        
         
         let matchingSession = null
         if (isArr) {
@@ -101,7 +107,6 @@ export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setI
         if (newSession && newSession.id) {
           sessionId = newSession.id
           setCurrentSessionId(sessionId)
-          setChatSessions(prev => [newSession, ...prev])
         } else {
           throw new Error('Không thể tạo phiên trò chuyện')
         }
@@ -329,10 +334,7 @@ export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setI
                       overflow: 'hidden'
                     }}>
                       <button
-                        onClick={() => {
-                          setChatScope('document')
-                          setIsDropdownOpen(false)
-                        }}
+                        onClick={() => handleScopeChange('document')}
                         type="button"
                         className={`w-full py-2.5 px-3.5 text-xs text-left cursor-pointer border-none transition-all duration-150 ${
                           chatScope === 'document'
@@ -343,10 +345,7 @@ export function ChatbotTab({ documentId, file, rightPanelWidth, isResizing, setI
                         This Session
                       </button>
                       <button
-                        onClick={() => {
-                          setChatScope('general')
-                          setIsDropdownOpen(false)
-                        }}
+                        onClick={() => handleScopeChange('general')}
                         type="button"
                         className={`w-full py-2.5 px-3.5 text-xs text-left cursor-pointer border-none transition-all duration-150 ${
                           chatScope === 'general'

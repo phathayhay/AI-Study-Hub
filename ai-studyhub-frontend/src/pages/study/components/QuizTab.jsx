@@ -109,14 +109,12 @@ function QuizViewer({ onBack, quiz }) {
   const scorePercent = total ? Math.round((correctCount / total) * 100) : 0
 
   useEffect(() => {
-    if (showResults) {
-      const timer = setTimeout(() => {
-        setAnimatedScore(scorePercent)
-      }, 150)
-      return () => clearTimeout(timer)
-    } else {
-      setAnimatedScore(0)
-    }
+    if (!showResults) return
+
+    const timer = setTimeout(() => {
+      setAnimatedScore(scorePercent)
+    }, 150)
+    return () => clearTimeout(timer)
   }, [showResults, scorePercent])
 
   if (showResults) {
@@ -236,6 +234,7 @@ function QuizViewer({ onBack, quiz }) {
                 setAnswers({})
                 setSelectedAnswers({})
                 setShowResults(false)
+                setAnimatedScore(0)
               }}
               type="button"
               className="quiz-btn-secondary cursor-pointer"

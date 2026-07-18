@@ -87,22 +87,17 @@ export function VerifyEmailView({ email, onBack, onError, onSuccess }) {
 }
 
 export function VerifyEmailPage({ onNavigate, onSignIn }) {
-  const [status, setStatus] = useState('loading') // 'loading', 'success', 'error'
-  const [message, setMessage] = useState('')
+  const params = new URLSearchParams(window.location.search)
+  const token = params.get('token')
+
+  const [status, setStatus] = useState(() => token ? 'loading' : 'error')
+  const [message, setMessage] = useState(() => token ? '' : 'Mã xác thực không hợp lệ hoặc đã hết hạn.')
   const effectRan = useRef(false)
 
   useEffect(() => {
+    if (!token) return
     if (effectRan.current) return
     effectRan.current = true
-
-    const params = new URLSearchParams(window.location.search)
-    const token = params.get('token')
-
-    if (!token) {
-      setStatus('error')
-      setMessage('Mã xác thực không hợp lệ hoặc đã hết hạn.')
-      return
-    }
 
     verifyEmail(token)
       .then((res) => {
@@ -113,7 +108,7 @@ export function VerifyEmailPage({ onNavigate, onSignIn }) {
         setStatus('error')
         setMessage(err.message || 'Xác nhận email thất bại. Vui lòng kiểm tra lại liên kết.')
       })
-  }, [])
+  }, [token])
 
   return (
     <main className="h-screen overflow-hidden bg-slate-50 dark:bg-[#0f172a] flex flex-col lg:flex-row font-sans transition-colors duration-300">

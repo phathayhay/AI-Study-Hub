@@ -23,32 +23,40 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
   const [verificationFile, setVerificationFile] = useState(null)
   const [currentSubscription, setCurrentSubscription] = useState(null)
   const verificationRequestSubmitted = Boolean(user?.verificationRequestSubmitted)
+  const [prevVerificationStatus, setPrevVerificationStatus] = useState(user?.verificationStatus)
   const [verificationStatus, setVerificationStatus] = useState(() => {
     const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
     const fromUser = user?.verificationStatus ? vsMap[user.verificationStatus] : null
     return fromUser || localStorage.getItem('verificationStatus') || 'unverified'
   })
 
-  useEffect(() => {
+  if (user?.verificationStatus !== prevVerificationStatus) {
+    setPrevVerificationStatus(user?.verificationStatus)
     const vsMap = { APPROVED: 'verified', PENDING: 'pending', UNVERIFIED: 'unverified', REJECTED: 'rejected' }
     const fromUser = user?.verificationStatus ? vsMap[user.verificationStatus] : null
     if (fromUser) {
       setVerificationStatus(fromUser)
       localStorage.setItem('verificationStatus', fromUser)
     }
-  }, [user?.verificationStatus])
+  }
 
-  useEffect(() => {
+  const [prevInitialTab, setPrevInitialTab] = useState(initialTab)
+
+  if (initialTab !== prevInitialTab) {
+    setPrevInitialTab(initialTab)
     setActiveTab(initialTab || 'profile')
-  }, [initialTab])
+  }
 
-  useEffect(() => {
+  const [prevUser, setPrevUser] = useState(user)
+
+  if (user !== prevUser) {
+    setPrevUser(user)
     setFirstName(user?.firstName || '')
     setLastName(user?.lastName || '')
     setCampus(user?.campus || 'HCM')
     setMajorId(user?.majorId || '')
     setCurrentSemester(user?.currentSemester || '')
-  }, [user])
+  }
 
   useEffect(() => {
     getMajors()

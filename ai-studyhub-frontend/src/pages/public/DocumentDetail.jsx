@@ -472,13 +472,27 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
   const [hoverRating, setHoverRating] = useState(0)
   const [commentContent, setCommentContent] = useState('')
   const [commentsLoading, setCommentsLoading] = useState(false)
+  const [prevId, setPrevId] = useState(id)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (!id) return
+  if (id !== prevId) {
+    setPrevId(id)
     setLoading(true)
     setError('')
+  }
+
+  const [prevFavCheckKey, setPrevFavCheckKey] = useState(() => `${guest}_${user?.id || ''}`)
+
+  if (`${guest}_${user?.id || ''}` !== prevFavCheckKey) {
+    setPrevFavCheckKey(`${guest}_${user?.id || ''}`)
+    if (guest || !user?.id) {
+      setIsFavorite(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!id) return
 
     getDocument(id)
       .then((res) => {
@@ -510,8 +524,6 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
           setIsFavorite(isFav)
         })
         .catch((err) => console.error('Failed to check favorites', err))
-    } else {
-      setIsFavorite(false)
     }
   }, [id, guest, user?.id])
 

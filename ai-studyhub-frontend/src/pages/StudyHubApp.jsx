@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { matchPath, useLocation, useNavigate } from 'react-router-dom'
 import AppLayout from '../components/layout/AppLayout'
 import { AdminApp } from './study-hub/admin'
@@ -102,10 +102,38 @@ export default function StudyHubApp() {
     }
   }
 
-  useEffect(() => {
-    const resolved = resolveRoute(location.pathname)
-    setRoute(resolved.route)
+  const [prevPathname, setPrevPathname] = useState(location.pathname)
+  const [prevGuest, setPrevGuest] = useState(guest)
+  const [prevRole, setPrevRole] = useState(role)
 
+  if (location.pathname !== prevPathname || guest !== prevGuest || role !== prevRole) {
+    setPrevPathname(location.pathname)
+    setPrevGuest(guest)
+    setPrevRole(role)
+
+    const resolved = resolveRoute(location.pathname)
+    let nextRoute = resolved.route
+    const isAdminRoute = nextRoute.startsWith('admin-')
+
+    if (guest) {
+      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'sandbox-payment', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']
+      if (!publicRoutes.includes(nextRoute)) {
+        nextRoute = 'login'
+        pushPath('login', {}, true)
+      }
+    } else if (isAdminRoute && role !== 'admin') {
+      window.showToast?.('Admin access is required', 'error')
+      nextRoute = 'explore'
+      pushPath('explore', {}, true)
+    } else {
+      const guestOnlyRoutes = ['login', 'register']
+      if (guestOnlyRoutes.includes(nextRoute)) {
+        nextRoute = role === 'admin' ? 'admin-overview' : 'explore'
+        pushPath(nextRoute, {}, true)
+      }
+    }
+
+    setRoute(nextRoute)
     if (resolved.libraryTab) setLibraryTab(resolved.libraryTab)
     if (resolved.uploadMode) setUploadMode(resolved.uploadMode)
 
@@ -131,7 +159,7 @@ export default function StudyHubApp() {
         setStudyMode('default')
       }
     }
-  }, [location.pathname])
+  }
 
   useEffect(() => {
     window.showToast = (message, type = 'success') => {
@@ -160,7 +188,6 @@ export default function StudyHubApp() {
 
   useEffect(() => {
     if (route !== 'study' || !studyFile?.id) {
-      setStudyBreadcrumbs([])
       return undefined
     }
 
@@ -215,7 +242,7 @@ export default function StudyHubApp() {
     }
   }, [studyFile?.id, route])
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (guest) {
       setNotificationState({ unreadCount: 0, notifications: [] })
       return
@@ -234,7 +261,7 @@ export default function StudyHubApp() {
     } finally {
       setNotificationLoading(false)
     }
-  }
+  }, [guest])
 
   const refreshCurrentUserProfile = async () => {
     if (!user) return
@@ -343,11 +370,13 @@ export default function StudyHubApp() {
 
   useEffect(() => {
     if (guest) {
-      setNotificationState({ unreadCount: 0, notifications: [] })
       return undefined
     }
 
-    loadNotifications()
+    const initialTimer = setTimeout(() => {
+      loadNotifications()
+    }, 0)
+
     const handleRefreshNotifications = () => {
       if (!document.hidden) {
         loadNotifications()
@@ -359,15 +388,15 @@ export default function StudyHubApp() {
     document.addEventListener('visibilitychange', handleRefreshNotifications)
 
     return () => {
+      clearTimeout(initialTimer)
       window.clearInterval(timer)
       window.removeEventListener('focus', handleRefreshNotifications)
       document.removeEventListener('visibilitychange', handleRefreshNotifications)
     }
-  }, [guest, user?.id, user?.email])
+  }, [guest, loadNotifications])
 
   useEffect(() => {
     if (route !== 'doc-detail' || !currentDoc?.folderId) {
-      setDocBreadcrumbs([])
       return undefined
     }
 
@@ -430,9 +459,19 @@ export default function StudyHubApp() {
     }
   }
 
-  const [recentItems, setRecentItems] = useState([])
+  const [prevRecentUser, setPrevRecentUser] = useState(user)
+  const [recentItems, setRecentItems] = useState(() => {
+    const key = user ? `recentItems_${user.id || user.email || 'user'}` : 'recentItems_guest'
+    try {
+      const saved = localStorage.getItem(key)
+      return saved ? JSON.parse(saved) : []
+    } catch (e) {
+      return []
+    }
+  })
 
-  useEffect(() => {
+  if (user !== prevRecentUser) {
+    setPrevRecentUser(user)
     const key = user ? `recentItems_${user.id || user.email || 'user'}` : 'recentItems_guest'
     try {
       const saved = localStorage.getItem(key)
@@ -440,7 +479,7 @@ export default function StudyHubApp() {
     } catch (e) {
       setRecentItems([])
     }
-  }, [user])
+  }
 
   const addRecentItem = (item) => {
     if (!item || !item.id || !item.name) return
@@ -506,27 +545,6 @@ export default function StudyHubApp() {
   }, [])
 
 
-  useEffect(() => {
-    const isAdminRoute = route.startsWith('admin-')
-    if (guest) {
-      const publicRoutes = ['explore', 'folder-detail', 'doc-detail', 'pricing', 'sandbox-payment', 'login', 'register', 'forgot-password', 'reset-password', 'verify-email']
-      if (!publicRoutes.includes(route)) {
-        setRoute('login')
-        pushPath('login', {}, true)
-      }
-    } else if (isAdminRoute && role !== 'admin') {
-      window.showToast?.('Admin access is required', 'error')
-      setRoute('explore')
-      pushPath('explore', {}, true)
-    } else {
-      const guestOnlyRoutes = ['login', 'register']
-      if (guestOnlyRoutes.includes(route)) {
-        const nextRoute = role === 'admin' ? 'admin-overview' : 'explore'
-        setRoute(nextRoute)
-        pushPath(nextRoute, {}, true)
-      }
-    }
-  }, [user, role, route])
 
   const navigate = (nextRoute, params = {}) => {
     if (nextRoute === 'logout') { handleLogout(); return }
@@ -740,6 +758,10 @@ export default function StudyHubApp() {
     : route === 'library' ? (libraryTab === 'shared' ? 'library-shared' : libraryTab === 'folders' ? 'library-folders' : libraryTab === 'favorites' ? 'library-favorites' : 'library')
     : route
 
+  const activeDocBreadcrumbs = (route !== 'doc-detail' || !currentDoc?.folderId) ? [] : docBreadcrumbs
+  const activeStudyBreadcrumbs = (route !== 'study' || !studyFile?.id) ? [] : studyBreadcrumbs
+  const activeNotifications = guest ? { unreadCount: 0, notifications: [] } : notificationState
+
   const appTitle = route === 'doc-detail' ? (currentDoc?.title || 'Loading document...')
     : route === 'folder-detail' ? (currentFolder?.folderName || currentFolder?.name || 'Loading folder...')
     : route === 'study' ? studyFile?.name
@@ -748,9 +770,9 @@ export default function StudyHubApp() {
   const appBreadcrumbs = route === 'folder-detail'
     ? [{ id: 'explore', name: 'Explore' }]
     : route === 'doc-detail'
-    ? [{ id: 'explore', name: 'Explore' }, ...docBreadcrumbs]
+    ? [{ id: 'explore', name: 'Explore' }, ...activeDocBreadcrumbs]
     : route === 'study'
-    ? [{ id: 'library', name: 'Library' }, ...studyBreadcrumbs]
+    ? [{ id: 'library', name: 'Library' }, ...activeStudyBreadcrumbs]
     : []
 
   return (
@@ -768,7 +790,7 @@ export default function StudyHubApp() {
           return next
         })
       }}
-      notificationUnreadCount={notificationState.unreadCount}
+      notificationUnreadCount={activeNotifications.unreadCount}
       sidebarCollapsed={sidebarCollapsed}
       onToggleCollapse={toggleSidebar}
       recentItems={recentItems}
@@ -796,8 +818,8 @@ export default function StudyHubApp() {
       {showNotifications && (
         <NotificationPanel
           onClose={() => setShowNotifications(false)}
-          notifications={notificationState.notifications}
-          unreadCount={notificationState.unreadCount}
+          notifications={activeNotifications.notifications}
+          unreadCount={activeNotifications.unreadCount}
           loading={notificationLoading}
           onOpenNotification={handleOpenNotification}
           onMarkAsRead={async (notificationId) => {
@@ -824,6 +846,7 @@ export default function StudyHubApp() {
 
       {route === 'explore' && (
         <ExplorePage 
+          key={`explore_${exploreFilters.keyword}_${exploreFilters.majorCode}_${exploreFilters.courseCode}_${guest}_${user?.id || ''}`}
           guest={guest} 
           user={user}
           onNavigate={navigate} 
@@ -836,6 +859,7 @@ export default function StudyHubApp() {
       )}
       {route === 'folder-detail' && (
         <FolderDetailPage 
+          key={`folder_${selectedFolderId}_${guest}_${user?.id || ''}`}
           id={selectedFolderId} 
           guest={guest}
           user={user}
@@ -911,6 +935,7 @@ export default function StudyHubApp() {
       )}
       {route === 'study' && (
         <StudyDocumentApi
+          key={`study_${studyFile?.id || studyFile?.documentId}`}
           activeTab={studyTab} file={studyFile}
           onBack={() => navigate(previousRoute || 'library')}
           onTabChange={(tab) => { setStudyTab(tab); setStudyMode('default') }}

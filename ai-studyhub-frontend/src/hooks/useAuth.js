@@ -4,8 +4,27 @@ import { getUserProfile } from '../services/userService'
 import { clearAuthSession, getRefreshToken, getStoredUser, getToken, persistAuthSession } from '../services/api'
 
 export default function useAuth() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(() => {
+    const accessToken = getToken()
+    const savedUser = getStoredUser()
+    if (accessToken && savedUser) {
+      try {
+        const u = JSON.parse(savedUser)
+        const cachedAvatar = localStorage.getItem(`avatarUrl_${u.email}`)
+        if (cachedAvatar) {
+          u.avatarUrl = cachedAvatar
+        }
+        if (!u.fullName && (u.firstName || u.lastName)) {
+          u.fullName = `${u.lastName || ''} ${u.firstName || ''}`.trim()
+        }
+        return u
+      } catch (e) {
+        console.error('Error parsing cached user in initial state:', e)
+      }
+    }
+    return null
+  })
+  const [loading] = useState(false)
 
   const buildSyncedUser = (baseUser, profile) => ({
     ...baseUser,
@@ -50,14 +69,6 @@ export default function useAuth() {
     if (accessToken && savedUser) {
       try {
         const u = JSON.parse(savedUser)
-        const cachedAvatar = localStorage.getItem(`avatarUrl_${u.email}`)
-        if (cachedAvatar) {
-          u.avatarUrl = cachedAvatar
-        }
-        if (!u.fullName && (u.firstName || u.lastName)) {
-          u.fullName = `${u.lastName || ''} ${u.firstName || ''}`.trim()
-        }
-        setUser(u)
 
         // Background-sync user profile with server
         getUserProfile()
@@ -91,7 +102,6 @@ export default function useAuth() {
         console.error('Error parsing cached user:', e)
       }
     }
-    setLoading(false)
   }, [])
 
   const saveSession = async (res, remember = true) => {

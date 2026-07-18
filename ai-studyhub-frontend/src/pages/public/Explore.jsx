@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import FeaturedFolders from '../../components/home/FeaturedFolders'
 import StudyHubIcon, { getFileIconName } from '../../components/icons/StudyHubIcons'
-import Badge from '../../components/ui/Badge'
+
 import {
   searchDocuments as getDocuments
 } from '../../features/documents/documentService'
@@ -14,7 +14,7 @@ import {
   getPublicFolders
 } from '../../features/folders/folderService'
 import { getMajors, getCourses, getCategories } from '../../services/courseService'
-import { getToken } from '../../services/api'
+
 
 const SHARED_FOUNDATION_PREFIXES = ['PRF', 'PRO', 'CSD', 'DBI', 'MAD', 'MAE', 'OSG', 'JPD', 'WED', 'SWT', 'SSI', 'PFP', 'SSL']
 
@@ -238,10 +238,6 @@ function ExploreSearchFilter({
 export function DocumentCard({ doc, onOpen, guest }) {
   const [favorite, setFavorite] = useState(Boolean(doc.favorite))
 
-  useEffect(() => {
-    setFavorite(Boolean(doc.favorite))
-  }, [doc.favorite])
-
   const handleToggleFavorite = (event) => {
     event.stopPropagation()
     if (guest) {
@@ -389,7 +385,6 @@ function mapFolderToCard(folder) {
 }
 
 export function ExplorePage({ 
-  onNavigate, 
   onOpenDocument, 
   onOpenFolder, 
   guest = false,
@@ -404,18 +399,12 @@ export function ExplorePage({
   const [selectedCategory, setSelectedCategory] = useState('')
   const [searchQuery, setSearchQuery] = useState(initialKeyword)
 
-  useEffect(() => {
-    setSearchQuery(initialKeyword)
-    setSelectedMajor(initialMajor)
-    setSelectedCourse(initialCourse)
-  }, [initialKeyword, initialMajor, initialCourse])
-
   const [documents, setDocuments] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [favoriteIds, setFavoriteIds] = useState(new Set())
   const [realFolders, setRealFolders] = useState([])
-  const [foldersLoading, setFoldersLoading] = useState(false)
+
 
   const [majorsList, setMajorsList] = useState([])
   const [coursesList, setCoursesList] = useState([])
@@ -448,10 +437,7 @@ export function ExplorePage({
   }, [])
 
   useEffect(() => {
-    if (guest || !user?.id) {
-      setFavoriteIds(new Set())
-      return
-    }
+    if (guest || !user?.id) return
 
     getFavoriteDocuments()
       .then((res) => {
@@ -463,7 +449,7 @@ export function ExplorePage({
 
   useEffect(() => {
     let active = true
-    setFoldersLoading(true)
+
 
     const fetchPublicFolders = async () => {
       try {
@@ -480,8 +466,7 @@ export function ExplorePage({
         if (active) {
           setRealFolders([])
         }
-      } finally {
-        if (active) setFoldersLoading(false)
+
       }
     }
 
@@ -494,8 +479,12 @@ export function ExplorePage({
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    setError('')
+    const timer = setTimeout(() => {
+      if (active) {
+        setLoading(true)
+        setError('')
+      }
+    }, 0)
 
     const majorId = null
     const courseObj = coursesList.find(c => c.courseCode === selectedCourse)
@@ -525,6 +514,7 @@ export function ExplorePage({
 
     return () => {
       active = false
+      clearTimeout(timer)
     }
   }, [searchQuery, selectedMajor, selectedCourse, selectedSemester, selectedCategory, majorsList, coursesList])
 

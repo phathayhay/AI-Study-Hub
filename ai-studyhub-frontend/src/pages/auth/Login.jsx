@@ -36,18 +36,10 @@ export function LoginPage({ onLogin, onNavigate }) {
 }
 
 function SignInForm({ onLogin, onLoading, onError, onNavigate, loading }) {
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => localStorage.getItem(REMEMBERED_EMAIL_KEY) || '')
   const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(true)
+  const [remember, setRemember] = useState(() => !!localStorage.getItem(REMEMBERED_EMAIL_KEY))
   const [fieldErrors, setFieldErrors] = useState({})
-
-  useEffect(() => {
-    const rememberedEmail = localStorage.getItem(REMEMBERED_EMAIL_KEY) || ''
-    if (rememberedEmail) {
-      setEmail(rememberedEmail)
-      setRemember(true)
-    }
-  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()

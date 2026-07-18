@@ -12,6 +12,7 @@ export function NotificationPanel({
 }) {
   const [activeTab, setActiveTab] = useState('All')
   const panelRef = useRef(null)
+  const [now] = useState(() => Date.now())
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -59,7 +60,7 @@ export function NotificationPanel({
     const createdAt = new Date(value)
     if (Number.isNaN(createdAt.getTime())) return 'Just now'
 
-    const diffMs = Date.now() - createdAt.getTime()
+    const diffMs = now - createdAt.getTime()
     const diffMinutes = Math.max(1, Math.floor(diffMs / 60000))
 
     if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`

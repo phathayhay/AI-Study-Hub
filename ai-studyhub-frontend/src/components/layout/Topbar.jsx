@@ -39,13 +39,13 @@ export default function Topbar({
   route = ''
 }) {
   const [isEditing, setIsEditing] = useState(false)
-  const [editedName, setEditedName] = useState('')
+  const [prevTitle, setPrevTitle] = useState(title)
+  const [editedName, setEditedName] = useState(title || '')
 
-  useEffect(() => {
-    if (title) {
-      setEditedName(title)
-    }
-  }, [title])
+  if (title !== prevTitle) {
+    setPrevTitle(title)
+    setEditedName(title || '')
+  }
 
   const handleSave = () => {
     const trimmed = editedName.trim()

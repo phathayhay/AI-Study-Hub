@@ -1,16 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import StudyHubIcon from '../../../components/icons/StudyHubIcons'
 import { getFolder } from '../../../features/folders/folderService'
 
 export function DeleteConfirmModal({
-  isOpen,
   loading,
   item,
   isFolder,
   onClose,
   onConfirm
 }) {
-  if (!isOpen || !item) return null
+  if (!item) return null
 
   const itemName = item.name || (isFolder ? 'Untitled Folder' : 'Untitled Document')
 
@@ -46,7 +45,6 @@ export function DeleteConfirmModal({
 }
 
 export function RenameItemModal({
-  isOpen,
   loading,
   item,
   onClose,
@@ -54,11 +52,7 @@ export function RenameItemModal({
 }) {
   const [name, setName] = useState(item?.name || '')
 
-  useEffect(() => {
-    setName(item?.name || '')
-  }, [item])
-
-  if (!isOpen || !item) return null
+  if (!item) return null
 
   const isFolder = item.isFolder || item.type === 'folder' || item.kind === 'folder'
 
@@ -109,18 +103,11 @@ export function RenameItemModal({
   )
 }
 
-export function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
+export function MoveModal({ onClose, item, folders = [], onMove }) {
   const [currentFolder, setCurrentFolder] = useState(null)
-  const [currentSubfolders, setCurrentSubfolders] = useState([])
+  const [currentSubfolders, setCurrentSubfolders] = useState(() => folders.filter(f => f.id !== item?.id))
   const [loading, setLoading] = useState(false)
   const [breadcrumbs, setBreadcrumbs] = useState([])
-
-  useEffect(() => {
-    if (!isOpen) return
-    setCurrentFolder(null)
-    setBreadcrumbs([])
-    setCurrentSubfolders(folders.filter(f => f.id !== item?.id)) // exclude self
-  }, [isOpen, folders, item])
 
   const navigateToFolder = (folder) => {
     if (folder.id === item?.id) return // cannot move into self
@@ -163,7 +150,7 @@ export function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
     }
   }
 
-  if (!isOpen || !item) return null
+  if (!item) return null
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(4px)' }}>
@@ -225,21 +212,14 @@ export function MoveModal({ isOpen, onClose, item, folders = [], onMove }) {
   )
 }
 
-export function ShareModal({ isOpen, onClose, item, user, onShare, onUpdateVisibility, onSuccess }) {
+export function ShareModal({ onClose, item, user, onShare, onUpdateVisibility, onSuccess }) {
   const [email, setEmail] = useState('')
-  const [visibility, setVisibility] = useState('PRIVATE')
+  const [visibility, setVisibility] = useState(() => item?.public || item?.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE')
   const [loading, setLoading] = useState(false)
   const [saveLoading, setSaveLoading] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
 
-  useEffect(() => {
-    if (!isOpen || !item) return
-    setEmail('')
-    setIsCopied(false)
-    setVisibility(item.public || item.visibility === 'PUBLIC' ? 'PUBLIC' : 'PRIVATE')
-  }, [isOpen, item])
-
-  if (!isOpen || !item) return null
+  if (!item) return null
 
   const isOwner = !item.userId || !user?.id || Number(item.userId) === Number(user?.id) || item.uploader === user?.fullName
 

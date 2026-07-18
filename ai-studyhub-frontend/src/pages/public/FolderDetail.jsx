@@ -22,7 +22,6 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
   useEffect(() => {
     const hasToken = !!getToken()
     if (!hasToken || guest || !user?.id) {
-      setFavoriteIds(new Set())
       return
     }
 
@@ -37,8 +36,6 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
   useEffect(() => {
     if (!id) return
     let active = true
-    setLoading(true)
-    setError('')
 
     const loadFolder = async () => {
       const hasToken = !!getToken()
@@ -194,7 +191,7 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
           {docCount > 0 ? (
             f.documents.map((doc) => (
               <DocumentCard
-                key={doc.id}
+                key={`${doc.id}_${favoriteIds.has(doc.id)}`}
                 doc={{
                   id: doc.id,
                   code: getDocCourseCode(doc),
