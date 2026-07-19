@@ -6,6 +6,78 @@ import {
 } from '../../features/documents/documentService'
 import { getMajors, getCourses, getCategories } from '../../services/courseService'
 
+function SearchableSelect({ label, placeholder, options, value, onChange, hint }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const filteredOptions = options.filter(option =>
+    String(option || '').toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <div className="searchable-select-container" ref={containerRef}>
+      <span className="searchable-select-label">
+        <span>{label}</span>
+        {hint && <small>{hint}</small>}
+      </span>
+      
+      <div 
+        className={`searchable-select-trigger ${!value ? 'placeholder' : ''}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <span>{value || placeholder}</span>
+        <span style={{ fontSize: '9px', opacity: 0.7 }}>▼</span>
+      </div>
+
+      {isOpen && (
+        <div className="searchable-select-dropdown">
+          <input 
+            className="searchable-select-input"
+            type="text" 
+            placeholder="Search..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            autoFocus
+          />
+          <div className="searchable-select-options">
+            {filteredOptions.length === 0 ? (
+              <div className="searchable-select-no-results">
+                No results found
+              </div>
+            ) : (
+              filteredOptions.map(option => (
+                <div 
+                  key={option}
+                  className={`searchable-select-option ${option === value ? 'selected' : ''}`}
+                  onClick={() => {
+                    onChange({ target: { value: option } })
+                    setIsOpen(false)
+                    setSearch('')
+                  }}
+                >
+                  {option}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const SHARED_FOUNDATION_PREFIXES = ['PRF', 'PRO', 'CSD', 'DBI', 'MAD', 'MAE', 'OSG', 'JPD', 'WED', 'SWT', 'SSI', 'PFP', 'SSL']
 
 function resolveMajorCode(majorValue, majorsList = []) {
@@ -52,6 +124,90 @@ function isCourseEligibleForMajor(course, selectedMajor, majorsList = []) {
   if (!selectedMajorCode || selectedMajorCode === 'ALL') return true
   if (isSharedFoundationCourse(course?.courseCode)) return true
   return getCourseMajorCodes(course, majorsList).includes(selectedMajorCode)
+}
+
+const CORE_COURSE_SEMESTERS = {
+  // Semester 1
+  'CSI104': 'Semester 1',
+  'MAD101': 'Semester 1',
+  'SSL101c': 'Semester 1',
+  'VOV101': 'Semester 1',
+  'ENT101': 'Semester 1',
+  'MAE101': 'Semester 1',
+  
+  // Semester 2
+  'PRF192': 'Semester 2',
+  'PRO192': 'Semester 2',
+  'LAB211': 'Semester 2',
+  'JPD111': 'Semester 2',
+  
+  // Semester 3
+  'CSD201': 'Semester 3',
+  'DBI202': 'Semester 3',
+  'CEA201': 'Semester 3',
+  'MAS291': 'Semester 3',
+  'JPD112': 'Semester 3',
+  
+  // Semester 4
+  'OSG202': 'Semester 4',
+  'NWC203': 'Semester 4',
+  'SWE201c': 'Semester 4',
+  'JPD113': 'Semester 4',
+  
+  // Semester 5
+  'SWP391': 'Semester 5',
+  'SWT301': 'Semester 5',
+  'SWR302': 'Semester 5',
+  'ITE302c': 'Semester 5',
+  'PMG201c': 'Semester 5',
+  
+  // Semester 6
+  'SWD391': 'Semester 6',
+  'PRM392': 'Semester 6',
+  'JPD121': 'Semester 6',
+  
+  // Semester 7
+  'MLP301': 'Semester 7',
+  'AIL301': 'Semester 7',
+  'ITA301': 'Semester 7',
+  'ISP392': 'Semester 7',
+  'JPD123': 'Semester 7',
+
+  // Semester 8
+  'DLP301': 'Semester 8',
+  'DTA301': 'Semester 8',
+  'DSS301': 'Semester 8',
+  
+  // Semester 9
+  'SEP490': 'Semester 9'
+}
+
+function isCourseMatchingSemester(courseCode, selectedSemester) {
+  if (!selectedSemester) return true
+  
+  const mappedSemester = CORE_COURSE_SEMESTERS[courseCode]
+  if (mappedSemester) {
+    return mappedSemester === selectedSemester
+  }
+  
+  const match = courseCode.match(/\d/)
+  if (!match) return true
+  const firstDigit = match[0]
+  
+  const semNumber = parseInt(selectedSemester.replace('Semester ', ''), 10)
+  if (isNaN(semNumber)) return true
+  
+  if (firstDigit === '1') {
+    return semNumber === 1 || semNumber === 2
+  } else if (firstDigit === '2') {
+    return semNumber === 3 || semNumber === 4
+  } else if (firstDigit === '3') {
+    return semNumber >= 5 && semNumber <= 8
+  } else if (firstDigit === '4') {
+    return semNumber === 9
+  }
+  
+  return true
 }
 
 function canReadAsText(file) {
@@ -314,10 +470,14 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
             <label>Description<textarea ref={descRef} placeholder="Brief description of the document..." /></label>
             <div className="upload-form__grid">
               {(() => {
-                const dynamicSelectFields = [
+                const eligibleCourses = coursesList
+                  .filter(c => !selectedMajor || isCourseEligibleForMajor(c, selectedMajor, majorsList))
+                  .filter(c => isCourseMatchingSemester(c.courseCode, selectedSemester))
+                 const dynamicSelectFields = [
                   {
                     label: 'Major *',
                     placeholder: 'Select major',
+                    isSearchable: true,
                     options: majorsList.map(m => m.majorName),
                     value: selectedMajor,
                     onChange: (e) => {
@@ -330,15 +490,17 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
                     placeholder: 'Select semester',
                     options: ['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8', 'Semester 9'],
                     value: selectedSemester,
-                    onChange: (e) => setSelectedSemester(e.target.value)
+                    onChange: (e) => {
+                      setSelectedSemester(e.target.value)
+                      setSelectedCourse('')
+                    }
                   },
                   {
                     label: 'Course Code *',
-                    hint: '[1 course]',
+                    hint: `[${eligibleCourses.length} ${eligibleCourses.length === 1 ? 'course' : 'courses'}]`,
                     placeholder: 'Select course code',
-                    options: coursesList
-                      .filter(c => !selectedMajor || isCourseEligibleForMajor(c, selectedMajor, majorsList))
-                      .map(c => c.courseCode),
+                    isSearchable: true,
+                    options: eligibleCourses.map(c => c.courseCode),
                     value: selectedCourse,
                     onChange: (e) => setSelectedCourse(e.target.value)
                   },
@@ -351,19 +513,34 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
                   }
                 ]
 
-                return dynamicSelectFields.map((field) => (
-                  <label key={field.label}>
-                    {field.label} {field.hint && <small>{field.hint}</small>}
-                    <select value={field.value} onChange={field.onChange}>
-                      <option disabled value="">{field.placeholder}</option>
-                      {field.options.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ))
+                return dynamicSelectFields.map((field) => {
+                  if (field.isSearchable) {
+                    return (
+                      <SearchableSelect
+                        key={field.label}
+                        label={field.label}
+                        placeholder={field.placeholder}
+                        options={field.options}
+                        value={field.value}
+                        onChange={field.onChange}
+                        hint={field.hint}
+                      />
+                    )
+                  }
+                  return (
+                    <label key={field.label}>
+                      {field.label} {field.hint && <small>{field.hint}</small>}
+                      <select value={field.value} onChange={field.onChange}>
+                        <option disabled value="">{field.placeholder}</option>
+                        {field.options.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )
+                })
               })()}
               <label>Visibility<select ref={visibilityRef} defaultValue="PRIVATE">
                 <option value="PUBLIC">Public</option><option value="PRIVATE">Private</option>

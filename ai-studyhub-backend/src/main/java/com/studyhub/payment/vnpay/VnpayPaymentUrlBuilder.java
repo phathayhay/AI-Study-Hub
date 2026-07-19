@@ -17,8 +17,8 @@ public class VnpayPaymentUrlBuilder {
 
     public String build(Map<String, String> parameters) {
         Map<String, String> signedParameters = new LinkedHashMap<>(parameters);
+        String payload = signatureService.signingPayload(signedParameters);
         String hash = signatureService.sign(signedParameters);
-        return properties.getPaymentUrl() + "?" + signatureService.signingPayload(signedParameters)
-                + "&vnp_SecureHash=" + hash;
+        return properties.getPaymentUrl() + "?" + payload + "&vnp_SecureHash=" + hash;
     }
 }

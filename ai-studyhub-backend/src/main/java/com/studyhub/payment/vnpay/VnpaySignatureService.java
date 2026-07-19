@@ -51,6 +51,7 @@ public class VnpaySignatureService {
     }
 
     public String encode(String value) {
+        if (value == null) return "";
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
