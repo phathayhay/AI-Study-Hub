@@ -17,6 +17,7 @@ import { getMajors, getCourses, getCategories } from '../../services/courseServi
 import { getToken } from '../../services/api'
 
 const SHARED_FOUNDATION_PREFIXES = ['PRF', 'PRO', 'CSD', 'DBI', 'MAD', 'MAE', 'OSG', 'JPD', 'WED', 'SWT', 'SSI', 'PFP', 'SSL']
+const EMPTY_FAVORITE_IDS = new Set()
 
 function resolveMajorCode(majorValue, majorsList = []) {
   if (!majorValue) return ''
@@ -235,12 +236,9 @@ function ExploreSearchFilter({
   )
 }
 
-export function DocumentCard({ doc, onOpen, guest }) {
-  const [favorite, setFavorite] = useState(Boolean(doc.favorite))
-
-  useEffect(() => {
-    setFavorite(Boolean(doc.favorite))
-  }, [doc.favorite])
+export function DocumentCard({ doc, onOpen, guest, onFavoriteChange }) {
+  const [updatingFavorite, setUpdatingFavorite] = useState(false)
+  const favorite = Boolean(doc.favorite)
 
   const handleToggleFavorite = (event) => {
     event.stopPropagation()
@@ -252,15 +250,20 @@ export function DocumentCard({ doc, onOpen, guest }) {
     const docId = doc.id
     if (!docId) return
 
+    if (updatingFavorite) return
+
+    const nextFavorite = !favorite
+    setUpdatingFavorite(true)
     const apiCall = favorite ? unfavoriteDocument(docId) : favoriteDocument(docId)
     apiCall
       .then(() => {
-        setFavorite(!favorite)
+        onFavoriteChange?.(docId, nextFavorite)
         window.showToast?.(favorite ? 'Removed from favorites' : 'Added to favorites', 'success')
       })
       .catch(err => {
         window.showToast?.(err.message || 'Error updating favorites', 'error')
       })
+      .finally(() => setUpdatingFavorite(false))
   }
 
   const typeUpper = (doc.type || 'PDF').toUpperCase()
@@ -302,6 +305,9 @@ export function DocumentCard({ doc, onOpen, guest }) {
           <button
             onClick={handleToggleFavorite}
             type="button"
+            disabled={updatingFavorite}
+            aria-pressed={favorite}
+            aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
             className={`p-1.5 rounded-full border border-slate-100 dark:border-slate-700 hover:border-red-100 hover:bg-red-50/50 transition-colors bg-transparent ${favorite ? 'text-red-500 border-red-50' : 'text-slate-400 dark:text-slate-500'}`}
           >
             <StudyHubIcon name="heart" size={15} className={favorite ? 'fill-current' : ''} />
@@ -413,7 +419,10 @@ export function ExplorePage({
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [favoriteIds, setFavoriteIds] = useState(new Set())
+  const [favoriteState, setFavoriteState] = useState({ userId: null, ids: EMPTY_FAVORITE_IDS })
+  const favoriteIds = !guest && String(favoriteState.userId) === String(user?.id)
+    ? favoriteState.ids
+    : EMPTY_FAVORITE_IDS
   const [realFolders, setRealFolders] = useState([])
   const [foldersLoading, setFoldersLoading] = useState(false)
 
@@ -448,18 +457,44 @@ export function ExplorePage({
   }, [])
 
   useEffect(() => {
+    let active = true
+
     if (guest || !user?.id) {
-      setFavoriteIds(new Set())
-      return
+      return () => {
+        active = false
+      }
     }
 
     getFavoriteDocuments()
       .then((res) => {
+        if (!active) return
         const list = res?.content || res?.data?.content || res?.data || res || []
-        setFavoriteIds(new Set(list.map(item => item.id)))
+        setFavoriteState({
+          userId: String(user.id),
+          ids: new Set(list.map(item => String(item.id)))
+        })
       })
-      .catch((err) => console.error('Failed to load favorites', err))
+      .catch((err) => {
+        if (active) console.error('Failed to load favorites', err)
+      })
+
+    return () => {
+      active = false
+    }
   }, [guest, user?.id])
+
+  const handleFavoriteChange = (documentId, isFavorite) => {
+    const normalizedId = String(documentId)
+    const currentUserId = String(user?.id)
+    setFavoriteState((current) => {
+      const next = String(current.userId) === currentUserId
+        ? new Set(current.ids)
+        : new Set()
+      if (isFavorite) next.add(normalizedId)
+      else next.delete(normalizedId)
+      return { userId: currentUserId, ids: next }
+    })
+  }
 
   useEffect(() => {
     let active = true
@@ -634,10 +669,11 @@ export function ExplorePage({
                           downloads: doc.totalDownloads || doc.downloads || 0,
                           rating: doc.averageRating || doc.rating || 0,
                           createdAt: doc.createdAt,
-                          favorite: favoriteIds.has(doc.id)
+                          favorite: favoriteIds.has(String(doc.id))
                         }}
                         onOpen={() => onOpenDocument?.(doc.id)}
                         guest={guest}
+                        onFavoriteChange={handleFavoriteChange}
                       />
                     ))}
                   </div>
@@ -677,10 +713,11 @@ export function ExplorePage({
                             downloads: doc.totalDownloads || doc.downloads || 0,
                             rating: doc.averageRating || doc.rating || 0,
                             createdAt: doc.createdAt,
-                            favorite: favoriteIds.has(doc.id)
+                            favorite: favoriteIds.has(String(doc.id))
                           }}
                           onOpen={() => onOpenDocument?.(doc.id)}
                           guest={guest}
+                          onFavoriteChange={handleFavoriteChange}
                         />
                       ))}
                     </div>
@@ -709,10 +746,11 @@ export function ExplorePage({
                             downloads: doc.totalDownloads || doc.downloads || 0,
                             rating: doc.averageRating || doc.rating || 0,
                             createdAt: doc.createdAt,
-                            favorite: favoriteIds.has(doc.id)
+                            favorite: favoriteIds.has(String(doc.id))
                           }}
                           onOpen={() => onOpenDocument?.(doc.id)}
                           guest={guest}
+                          onFavoriteChange={handleFavoriteChange}
                         />
                       ))}
                     </div>
@@ -741,10 +779,11 @@ export function ExplorePage({
                             downloads: doc.totalDownloads || doc.downloads || 0,
                             rating: doc.averageRating || doc.rating || 0,
                             createdAt: doc.createdAt,
-                            favorite: favoriteIds.has(doc.id)
+                            favorite: favoriteIds.has(String(doc.id))
                           }}
                           onOpen={() => onOpenDocument?.(doc.id)}
                           guest={guest}
+                          onFavoriteChange={handleFavoriteChange}
                         />
                       ))}
                     </div>

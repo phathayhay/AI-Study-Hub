@@ -34,7 +34,7 @@ export function getSharedDocuments(page, size) {
  * @param {any} page - Query parameter
  * @param {any} size - Query parameter
  */
-export function getUserFavorites(page, size) {
+export function getUserFavorites(page = 0, size = 1000) {
   const query = new URLSearchParams();
   if (page !== undefined && page !== null) query.append('page', page);
   if (size !== undefined && size !== null) query.append('size', size);

@@ -7,6 +7,8 @@ import { getUserFavorites as getFavoriteDocuments } from '../../services/communi
 import { getFolder, getPublicFolder, updateFolderVisibility } from '../../features/folders/folderService'
 import { getToken } from '../../services/api'
 
+const EMPTY_FAVORITE_IDS = new Set()
+
 function getFolderCode(folderName = '') {
   const codeMatch = folderName.match(/^([A-Z]{3}\d{3})/i)
   return codeMatch ? codeMatch[1].toUpperCase() : 'FPTU'
@@ -14,25 +16,54 @@ function getFolderCode(folderName = '') {
 
 export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest = false, user = null }) {
   const [folder, setFolder] = useState(null)
-  const [favoriteIds, setFavoriteIds] = useState(new Set())
+  const [favoriteState, setFavoriteState] = useState({ userId: null, ids: EMPTY_FAVORITE_IDS })
+  const favoriteIds = !guest && String(favoriteState.userId) === String(user?.id)
+    ? favoriteState.ids
+    : EMPTY_FAVORITE_IDS
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [publishing, setPublishing] = useState(false)
 
   useEffect(() => {
+    let active = true
+
     const hasToken = !!getToken()
     if (!hasToken || guest || !user?.id) {
-      setFavoriteIds(new Set())
-      return
+      return () => {
+        active = false
+      }
     }
 
     getFavoriteDocuments()
       .then((res) => {
+        if (!active) return
         const list = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : res?.data?.content || res?.content || [])
-        setFavoriteIds(new Set(list.map(item => item.id)))
+        setFavoriteState({
+          userId: String(user.id),
+          ids: new Set(list.map(item => String(item.id)))
+        })
       })
-      .catch((err) => console.error('Failed to load favorites', err))
+      .catch((err) => {
+        if (active) console.error('Failed to load favorites', err)
+      })
+
+    return () => {
+      active = false
+    }
   }, [guest, user?.id])
+
+  const handleFavoriteChange = (documentId, isFavorite) => {
+    const normalizedId = String(documentId)
+    const currentUserId = String(user?.id)
+    setFavoriteState((current) => {
+      const next = String(current.userId) === currentUserId
+        ? new Set(current.ids)
+        : new Set()
+      if (isFavorite) next.add(normalizedId)
+      else next.delete(normalizedId)
+      return { userId: currentUserId, ids: next }
+    })
+  }
 
   useEffect(() => {
     if (!id) return
@@ -204,10 +235,11 @@ export function FolderDetailPage({ id, onNavigate, onLoad, onOpenDocument, guest
                   downloads: doc.totalDownloads || doc.downloads || 0,
                   rating: doc.averageRating || doc.rating || 0,
                   createdAt: doc.createdAt,
-                  favorite: favoriteIds.has(doc.id)
+                  favorite: favoriteIds.has(String(doc.id))
                 }}
                 onOpen={() => onOpenDocument?.(doc.id)}
                 guest={guest}
+                onFavoriteChange={handleFavoriteChange}
               />
             ))
           ) : (

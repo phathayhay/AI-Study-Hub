@@ -118,10 +118,8 @@ public class CommunityService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        Favorite favorite = favoriteRepository.findByUserIdAndDocumentId(user.getId(), documentId)
-                .orElseThrow(() -> new IllegalArgumentException("Tài liệu chưa được thêm vào danh sách yêu thích"));
-
-        favoriteRepository.delete(favorite);
+        favoriteRepository.findByUserIdAndDocumentId(user.getId(), documentId)
+                .ifPresent(favoriteRepository::delete);
     }
 
     @Transactional(readOnly = true)

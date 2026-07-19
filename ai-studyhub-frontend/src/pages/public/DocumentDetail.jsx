@@ -477,41 +477,53 @@ export function DocumentDetailPage({ id, onBack, onReport, guest = false, onNavi
 
   useEffect(() => {
     if (!id) return
+    let active = true
     setLoading(true)
     setError('')
+    setIsFavorite(false)
 
     getDocument(id)
       .then((res) => {
+        if (!active) return
         const data = res?.data || res
         setDoc(data)
         onLoad?.(data)
       })
       .catch((err) => {
+        if (!active) return
         setError(err.message || 'Could not load document from backend.')
       })
       .finally(() => {
-        setLoading(false)
+        if (active) setLoading(false)
       })
 
     // Load comments
     getDocumentComments(id)
       .then((res) => {
+        if (!active) return
         const list = res?.data || res || []
         setComments(list)
       })
-      .catch((err) => console.error('Failed to load comments', err))
+      .catch((err) => {
+        if (active) console.error('Failed to load comments', err)
+      })
 
     // Check if favorited
     if (!guest && user?.id) {
       getFavoriteDocuments()
         .then((res) => {
+          if (!active) return
           const list = res?.content || res?.data?.content || res?.data || res || []
-          const isFav = list.some(fav => fav.id === Number(id))
+          const isFav = list.some(fav => String(fav.id) === String(id))
           setIsFavorite(isFav)
         })
-        .catch((err) => console.error('Failed to check favorites', err))
-    } else {
-      setIsFavorite(false)
+        .catch((err) => {
+          if (active) console.error('Failed to check favorites', err)
+        })
+    }
+
+    return () => {
+      active = false
     }
   }, [id, guest, user?.id])
 
