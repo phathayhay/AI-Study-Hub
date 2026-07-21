@@ -38,7 +38,7 @@ export function AdminSortableTh({ children, defaultDirection = 'asc', field, onS
     <th aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}>
       <button className={`admin-sort-header${active ? ' is-active' : ''}`} onClick={() => onSort(nextSort)} type="button">
         <span>{children}</span>
-        <span aria-hidden="true" className="admin-sort-arrows">{active ? (direction === 'asc' ? 'â†‘' : 'â†“') : 'â†‘â†“'}</span>
+        <span aria-hidden="true" className="admin-sort-arrows">{active ? (direction === 'asc' ? '↑' : '↓') : '↑↓'}</span>
       </button>
     </th>
   )

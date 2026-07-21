@@ -1,5 +1,6 @@
 package com.studyhub.user.service;
 
+import com.studyhub.common.enums.NotificationType;
 import com.studyhub.common.enums.StorageStatus;
 import com.studyhub.document.repository.DocumentRepository;
 import com.studyhub.user.dto.*;
@@ -204,7 +205,8 @@ class SubscriptionServiceTest {
 
         UpgradePaymentResponse response = subscriptionService.getUpgradePaymentInfo(3L, "student@fpt.edu.vn");
 
-        assertEquals(BigDecimal.valueOf(64167), response.getAmount());
+        assertEquals(BigDecimal.valueOf(6667), response.getAmount());
+        assertTrue(response.getAmount().compareTo(premiumPlan.getPrice().subtract(proPlan.getPrice())) < 0);
         assertEquals(5L, response.getRemainingDays());
         assertEquals(30L, response.getBillingCycleDays());
         assertNotNull(response.getCurrentPeriodEndDate());
@@ -403,6 +405,36 @@ class SubscriptionServiceTest {
         verify(userSubscriptionRepository).save(expiredSubscription);
         verify(userRepository).save(mockUser);
         verify(notificationService).createNotification(eq(mockUser), eq("Subscription expired"), contains("returned to FREE"), any());
+    }
+
+    @Test
+    void notifySubscriptionsExpiringInThreeDays_CreatesOneSystemNotification() {
+        mockUser.setPlan(proPlan);
+        UserSubscription expiringSubscription = UserSubscription.builder()
+                .id(302L)
+                .user(mockUser)
+                .plan(proPlan)
+                .startDate(LocalDateTime.now().minusDays(27))
+                .endDate(LocalDateTime.now().plusDays(3))
+                .isActive(true)
+                .build();
+
+        when(userSubscriptionRepository.findActiveSubscriptionsEndingBetween(
+                any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of(expiringSubscription));
+        when(notificationService.createNotificationIfAbsent(any(), anyString(), anyString(), any()))
+                .thenReturn(true);
+
+        subscriptionService.notifySubscriptionsExpiringInThreeDays();
+
+        assertTrue(expiringSubscription.getIsActive());
+        assertEquals(proPlan, mockUser.getPlan());
+        verify(notificationService).createNotificationIfAbsent(
+                eq(mockUser),
+                eq("Subscription expires in 3 days"),
+                contains("Your PRO plan expires in 3 days"),
+                eq(NotificationType.SYSTEM)
+        );
     }
 
     @Test

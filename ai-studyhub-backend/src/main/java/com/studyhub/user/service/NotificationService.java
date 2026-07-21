@@ -69,6 +69,17 @@ public class NotificationService {
     }
 
     @Transactional
+    public boolean createNotificationIfAbsent(User user, String title, String content, NotificationType notificationType) {
+        if (user == null || notificationRepository.existsByUserIdAndTitleAndContentAndNotificationType(
+                user.getId(), title, content, notificationType)) {
+            return false;
+        }
+
+        createNotification(user, title, content, notificationType);
+        return true;
+    }
+
+    @Transactional
     public void createNotification(User user, String title, String content, NotificationType notificationType, Long sourceCommentId) {
         if (user == null) {
             return;

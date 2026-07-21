@@ -39,6 +39,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -391,6 +392,35 @@ public class SubscriptionService {
         }
     }
 
+    @Scheduled(cron = "0 0 * * * *")
+    @Transactional
+    public void notifySubscriptionsExpiringInThreeDays() {
+        LocalDate targetDate = LocalDate.now().plusDays(3);
+        LocalDateTime targetDayStart = targetDate.atStartOfDay();
+        LocalDateTime targetDayEnd = targetDate.plusDays(1).atStartOfDay();
+        List<UserSubscription> expiringSubscriptions =
+                userSubscriptionRepository.findActiveSubscriptionsEndingBetween(targetDayStart, targetDayEnd);
+
+        for (UserSubscription subscription : expiringSubscriptions) {
+            SubscriptionPlan plan = subscription.getPlan();
+            if (plan == null || "FREE".equalsIgnoreCase(plan.getPlanName())) {
+                continue;
+            }
+
+            String content = String.format(
+                    "Your %s plan expires in 3 days on %s. Renew or upgrade your plan to keep uninterrupted access.",
+                    plan.getPlanName(),
+                    subscription.getEndDate().toLocalDate()
+            );
+            notificationService.createNotificationIfAbsent(
+                    subscription.getUser(),
+                    "Subscription expires in 3 days",
+                    content,
+                    NotificationType.SYSTEM
+            );
+        }
+    }
+
     @Transactional
     public StorageQuotaSnapshot syncStorageStatus(User user) {
         return syncStorageStatus(user, user.getPlan());
@@ -512,10 +542,11 @@ public class SubscriptionService {
             return targetPrice;
         }
 
-        BigDecimal remainingValue = currentPrice
-                .multiply(BigDecimal.valueOf(remainingDays))
+        long billableRemainingDays = Math.min(remainingDays, billingCycleDays);
+        BigDecimal upgradePriceDifference = targetPrice.subtract(currentPrice);
+        return upgradePriceDifference
+                .multiply(BigDecimal.valueOf(billableRemainingDays))
                 .divide(BigDecimal.valueOf(billingCycleDays), 0, RoundingMode.HALF_UP);
-        return targetPrice.subtract(remainingValue).max(BigDecimal.ZERO).setScale(0, RoundingMode.HALF_UP);
     }
 
     private SubscriptionPayment createPendingPayment(

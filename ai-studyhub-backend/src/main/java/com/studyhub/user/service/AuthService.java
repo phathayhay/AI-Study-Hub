@@ -111,7 +111,7 @@ public class AuthService {
                 .plan(freePlan)
                 .role(userRole)
                 .currentSemester(null)
-                .status(fptEmail ? UserStatus.ACTIVE : UserStatus.INACTIVE)
+                .status(UserStatus.INACTIVE)
                 .verificationStatus(initialVerificationStatus)
                 .build();
  
@@ -134,14 +134,12 @@ public class AuthService {
                  .user(user).plan(freePlan).planVersion(freeVersion).pricePaid(BigDecimal.ZERO)
                  .startDate(LocalDateTime.now()).endDate(null).isActive(true).autoRenew(false).build());
  
-         if (!fptEmail) {
-             try {
-                 String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
-                 String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
-                 emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
-             } catch (Exception e) {
-                 log.warn("Failed to send verification email to {}: {}. Registration will proceed, but user must be verified manually in the database.", user.getEmail(), e.getMessage());
-             }
+         try {
+             String verificationToken = jwtTokenProvider.generateEmailVerificationToken(user.getEmail());
+             String verificationLink = frontendUrl + "/verify-email?token=" + verificationToken;
+             emailService.sendEmailVerificationEmail(user.getEmail(), verificationLink);
+         } catch (Exception e) {
+             log.warn("Failed to send verification email to {}: {}. The account remains inactive until email verification succeeds.", user.getEmail(), e.getMessage());
          }
      }
 

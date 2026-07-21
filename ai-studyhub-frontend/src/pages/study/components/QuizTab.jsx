@@ -473,7 +473,7 @@ function QuizViewer({ onBack, quiz }) {
                   </strong>
                 </div>
                 <div style={{ fontSize: '13px', fontWeight: 600, color: '#4c0519' }} className="dark:text-rose-200">
-                  Đáp án đúng: <span style={{ fontWeight: 700 }}>{question.correctOption}. {
+                  Correct answer: <span style={{ fontWeight: 700 }}>{question.correctOption}. {
                     question.correctOption === 'A' ? question.optionA :
                     question.correctOption === 'B' ? question.optionB :
                     question.correctOption === 'C' ? question.optionC :
@@ -482,7 +482,7 @@ function QuizViewer({ onBack, quiz }) {
                 </div>
                 {question.explanation && (
                   <div style={{ fontSize: '12px', marginTop: '6px', opacity: 0.85 }}>
-                    Giải thích: {question.explanation}
+                    Explanation: {question.explanation}
                   </div>
                 )}
               </div>
