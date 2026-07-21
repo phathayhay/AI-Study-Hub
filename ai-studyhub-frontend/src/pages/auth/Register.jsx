@@ -44,16 +44,7 @@ export function RegisterPage({ onNavigate }) {
       onNavigate={onNavigate}
     >
       <SignUpForm
-        onRegisterSuccess={(email) => {
-          const normalizedEmail = email.toLowerCase()
-          const isFptEmail = normalizedEmail.endsWith('@fpt.edu.vn') || normalizedEmail.endsWith('@fe.edu.vn')
-          if (isFptEmail) {
-            window.showToast?.('Registration successful. You can sign in now.', 'success')
-            onNavigate('login')
-            return
-          }
-          setRegisteredEmail(email)
-        }}
+        onRegisterSuccess={setRegisteredEmail}
         onLoading={setLoading}
         onError={setError}
         onNavigate={onNavigate}
