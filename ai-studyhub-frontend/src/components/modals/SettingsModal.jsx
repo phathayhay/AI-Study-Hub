@@ -4,8 +4,10 @@ import { changePassword } from '../../features/auth/authService'
 import { uploadAvatar, verifyStudent, updateUserProfile } from '../../services/userService'
 import { getMajors } from '../../services/courseService'
 import { getCurrentSubscription } from '../../services/subscriptionService'
+import { useLanguage } from '../../context/LanguageContext'
 
 export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initialTab = 'profile' }) {
+  const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState(initialTab)
   const [loading, setLoading] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
@@ -83,11 +85,11 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
   const aiPercent = aiDailyLimit > 0 ? Math.min((aiUsedToday / aiDailyLimit) * 100, 100) : 0
   const isOverQuota = Boolean(user?.overQuota)
   const planRights = [
-    { label: 'AI Summary', enabled: Boolean(user?.planCanUseAiSummary) },
-    { label: 'Flashcards', enabled: Boolean(user?.planCanUseFlashcards) },
-    { label: 'Quizzes', enabled: Boolean(user?.planCanUseQuizzes) },
-    { label: 'Public documents', enabled: Boolean(user?.planCanPublishDocuments) },
-    { label: 'Public folders', enabled: Boolean(user?.planCanPublishFolders) },
+    { label: t('aiSummaryFeature'), enabled: Boolean(user?.planCanUseAiSummary) },
+    { label: t('flashcardsFeature'), enabled: Boolean(user?.planCanUseFlashcards) },
+    { label: t('quizzesFeature'), enabled: Boolean(user?.planCanUseQuizzes) },
+    { label: t('publicDocsFeature'), enabled: Boolean(user?.planCanPublishDocuments) },
+    { label: t('publicFoldersFeature'), enabled: Boolean(user?.planCanPublishFolders) },
   ]
 
   const formatStorageText = (valueMb) => {
@@ -231,76 +233,107 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
 
   return (
     <div className="modal-backdrop">
-      <section className="settings-modal bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 transition-colors duration-300 ease-in-out">
-        <header className="border-b border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 24px' }}>
-          <h2 className="text-slate-900 dark:text-white transition-colors duration-300" style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <StudyHubIcon name="settings" size={20} /> Account Settings
-          </h2>
-          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors duration-205" style={{ background: 'transparent', border: 'none', fontSize: '20px', cursor: 'pointer' }} type="button">x</button>
+      <section className="settings-modal-v2">
+        <header className="settings-modal-header">
+          <div className="settings-modal-header__brand">
+            <span className="settings-modal-header__icon">
+              <StudyHubIcon name="settings" size={20} />
+            </span>
+            <h2>{t('accountSettings')}</h2>
+          </div>
+          <button onClick={onClose} className="settings-close-btn" aria-label="Close" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </header>
 
-        <nav className="settings-modal-tabs bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-700 transition-colors duration-300">
-          <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => { setActiveTab('profile'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Profile</button>
-          <button className={activeTab === 'plan' ? 'active' : ''} onClick={() => { setActiveTab('plan'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Plan</button>
-          <button className={activeTab === 'password' ? 'active' : ''} onClick={() => { setActiveTab('password'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Security</button>
-          <button className={activeTab === 'verification' ? 'active' : ''} onClick={() => { setActiveTab('verification'); setSuccessMsg(''); setErrorMsg(''); }} type="button">Verification</button>
+        <nav className="settings-nav-tabs">
+          <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => { setActiveTab('profile'); setSuccessMsg(''); setErrorMsg(''); }} type="button">
+            <StudyHubIcon name="user" size={16} />
+            <span>{t('profile')}</span>
+          </button>
+          <button className={activeTab === 'plan' ? 'active' : ''} onClick={() => { setActiveTab('plan'); setSuccessMsg(''); setErrorMsg(''); }} type="button">
+            <StudyHubIcon name="sparkle" size={16} />
+            <span>{t('plan')}</span>
+          </button>
+          <button className={activeTab === 'password' ? 'active' : ''} onClick={() => { setActiveTab('password'); setSuccessMsg(''); setErrorMsg(''); }} type="button">
+            <StudyHubIcon name="lock" size={16} />
+            <span>{t('security')}</span>
+          </button>
+          <button className={activeTab === 'verification' ? 'active' : ''} onClick={() => { setActiveTab('verification'); setSuccessMsg(''); setErrorMsg(''); }} type="button">
+            <StudyHubIcon name="check" size={16} />
+            <span>{t('verification')}</span>
+          </button>
         </nav>
 
-        <div className="settings-modal-content">
-          {successMsg && <div className="modal-alert success">{successMsg}</div>}
-          {errorMsg && <div className="modal-alert error">{errorMsg}</div>}
+        <div className="settings-modal-body">
+          {successMsg && <div className="settings-alert success">{successMsg}</div>}
+          {errorMsg && <div className="settings-alert error">{errorMsg}</div>}
 
           {activeTab === 'profile' && (
-            <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="avatar-upload-container bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300">
-                <img
-                  src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&h=100"}
-                  alt="Avatar"
-                  className="avatar-upload-preview"
-                />
-                <div className="avatar-upload-btn-container">
+            <form onSubmit={handleProfileSubmit} className="settings-form">
+              <div className="avatar-banner-card">
+                <div className="avatar-ring-wrapper">
+                  <img
+                    src={user?.avatarUrl || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&h=120"}
+                    alt="Avatar"
+                    className={`avatar-banner-img ${uploadProgress !== null ? 'is-uploading' : ''}`}
+                  />
+                  <label className="avatar-camera-overlay" title={t('changeAvatar')}>
+                    <StudyHubIcon name="plus" size={16} />
+                    <input type="file" accept="image/*" onChange={handleAvatarChange} disabled={loading} style={{ display: 'none' }} />
+                  </label>
+                </div>
+                <div className="avatar-banner-info">
                   {uploadProgress !== null ? (
-                    <div style={{ width: '100%', minWidth: '180px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }} className="text-slate-600 dark:text-slate-400 font-medium">
-                        <span>Uploading avatar...</span>
-                        <span>{uploadProgress}%</span>
+                    <div className="upload-progress-card">
+                      <div className="upload-progress-header">
+                        <div className="upload-progress-title">
+                          <span>{uploadProgress === 100 ? t('processingAvatar') : t('uploadingAvatar')}</span>
+                        </div>
+                        <span className="upload-progress-badge">{uploadProgress}%</span>
                       </div>
-                      <div style={{ width: '100%', height: '6px', backgroundColor: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }} className="dark:bg-slate-700">
-                        <div style={{ width: `${uploadProgress}%`, height: '100%', backgroundColor: '#6366f1', borderRadius: '3px', transition: 'width 0.1s ease-out' }}></div>
+                      <div className="upload-progress-track">
+                        <div className="upload-progress-fill" style={{ width: `${uploadProgress}%` }} />
                       </div>
                     </div>
                   ) : (
                     <>
-                      <label className="avatar-upload-btn bg-[#6366f1] hover:bg-indigo-700 transition-colors duration-250 cursor-pointer text-white">
-                        Change Avatar
-                        <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} disabled={loading} />
-                      </label>
-                      <span className="avatar-upload-info text-slate-400 dark:text-slate-500">Supports JPG, PNG max 5MB.</span>
+                      <div className="avatar-banner-actions">
+                        <label className="settings-avatar-btn">
+                          <StudyHubIcon name="plus" size={16} />
+                          <span>{t('changeAvatar')}</span>
+                          <input type="file" accept="image/*" onChange={handleAvatarChange} disabled={loading} style={{ display: 'none' }} />
+                        </label>
+                      </div>
+                      <span className="avatar-banner-hint">{t('supportsJpgPng')}</span>
                     </>
                   )}
                 </div>
               </div>
 
-              <div className="settings-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">Last Name *</label>
-                  <input required value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }} />
+              <div className="settings-form-row">
+                <div className="settings-field">
+                  <label>{t('lastNameLabel')}</label>
+                  <input required value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={loading} className="settings-input" />
                 </div>
-                <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">First Name *</label>
-                  <input required value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }} />
+                <div className="settings-field">
+                  <label>{t('firstNameLabel')}</label>
+                  <input required value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={loading} className="settings-input" />
                 </div>
               </div>
 
-              <div className="settings-input-group">
-                <label className="text-slate-600 dark:text-slate-400">Registered Email (Read-only)</label>
-                <input value={user?.email || ''} readOnly className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 cursor-not-allowed" style={{ outline: 'none', padding: '8px 12px', borderRadius: '6px' }} />
+              <div className="settings-field">
+                <label>{t('emailReadOnlyLabel')}</label>
+                <input value={user?.email || ''} readOnly className="settings-input is-readonly" />
               </div>
 
-              <div className="settings-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">Campus *</label>
-                  <select value={campus} onChange={(e) => setCampus(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }}>
+              <div className="settings-form-row">
+                <div className="settings-field">
+                  <label>{t('campusLabel')}</label>
+                  <select value={campus} onChange={(e) => setCampus(e.target.value)} disabled={loading} className="settings-select">
                     <option value="HCM">FPTU Ho Chi Minh City</option>
                     <option value="HN">FPTU Hanoi</option>
                     <option value="DN">FPTU Da Nang</option>
@@ -308,10 +341,10 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
                     <option value="QN">FPTU Quy Nhon</option>
                   </select>
                 </div>
-                <div className="settings-input-group">
-                  <label className="text-slate-600 dark:text-slate-400">Current Semester</label>
-                  <select value={currentSemester} onChange={(e) => setCurrentSemester(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }}>
-                    <option value="">Select Semester</option>
+                <div className="settings-field">
+                  <label>{t('currentSemesterLabel')}</label>
+                  <select value={currentSemester} onChange={(e) => setCurrentSemester(e.target.value)} disabled={loading} className="settings-select">
+                    <option value="">{t('selectSemester')}</option>
                     {['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8', 'Semester 9'].map(sem => (
                       <option key={sem} value={sem}>{sem}</option>
                     ))}
@@ -319,18 +352,18 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
                 </div>
               </div>
 
-              <div className="settings-input-group">
-                <label className="text-slate-600 dark:text-slate-400">Major</label>
-                <select value={majorId} onChange={(e) => setMajorId(e.target.value)} disabled={loading} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" style={{ padding: '8px 12px', borderRadius: '6px' }}>
-                  <option value="">Select Major</option>
+              <div className="settings-field">
+                <label>{t('majorLabelForm')}</label>
+                <select value={majorId} onChange={(e) => setMajorId(e.target.value)} disabled={loading} className="settings-select">
+                  <option value="">{t('selectMajor')}</option>
                   {majorsList.map(major => (
                     <option key={major.id} value={major.id}>{major.majorName} ({major.majorCode})</option>
                   ))}
                 </select>
               </div>
 
-              <button className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200 cursor-pointer" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', marginTop: '8px', padding: '10px 18px', border: 'none', borderRadius: '8px' }}>
-                {loading ? 'Saving...' : 'Save Profile Changes'}
+              <button className="settings-submit-btn" type="submit" disabled={loading}>
+                {loading ? t('saving') : t('saveProfileChanges')}
               </button>
             </form>
           )}
@@ -339,34 +372,34 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
             <div className="settings-plan-panel">
               <div className="settings-plan-hero">
                 <div>
-                  <span className="settings-plan-eyebrow">Current plan</span>
+                  <span className="settings-plan-eyebrow">{t('currentPlan')}</span>
                   <h3>{normalizedPlan}</h3>
                   <p>
                     {formattedExpiry
-                      ? `Your plan is active until ${formattedExpiry}.`
-                      : 'Your current plan is active.'}
+                      ? `${t('planActiveUntil')} ${formattedExpiry}.`
+                      : t('planActive')}
                   </p>
                 </div>
                 <button
                   type="button"
-                  className="settings-plan-upgrade-btn cursor-pointer"
+                  className="settings-plan-upgrade-btn"
                   onClick={() => {
                     onClose?.()
                     onNavigate?.('pricing')
                   }}
                 >
-                  Compare plans
+                  {t('comparePlans')}
                 </button>
               </div>
 
               {currentSubscription?.upcomingVersion && (
-                <div style={{ padding: '14px 16px', marginBottom: 16, borderRadius: 8, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e40af', fontSize: 13, lineHeight: 1.5 }}>
+                <div className="settings-notice-box info">
                   <strong>Changes coming at renewal</strong>
-                  <div style={{ marginTop: 3 }}>Your current benefits remain unchanged until the end of this billing period.</div>
+                  <div>Your current benefits remain unchanged until the end of this billing period.</div>
                   {upcomingPlanChanges.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                    <div className="settings-notice-tags">
                       {upcomingPlanChanges.map((change) => (
-                        <span key={change} style={{ padding: '4px 8px', borderRadius: 999, background: '#dbeafe', fontWeight: 600 }}>
+                        <span key={change} className="settings-notice-tag">
                           {change}
                         </span>
                       ))}
@@ -377,48 +410,37 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
 
               <div className="settings-plan-usage-grid">
                 {isOverQuota && (
-                  <div
-                    style={{
-                      gridColumn: '1 / -1',
-                      padding: '14px 16px',
-                      borderRadius: '14px',
-                      background: 'rgba(245, 158, 11, 0.12)',
-                      color: '#b45309',
-                      fontSize: '13px',
-                      lineHeight: 1.6,
-                      fontWeight: 600
-                    }}
-                  >
+                  <div className="settings-notice-box warning">
                     {user?.storageMessage || 'Your current storage usage exceeds the FREE plan limit. You can still view, download, and delete your existing documents, but uploading new documents is temporarily disabled.'}
                   </div>
                 )}
                 <div className="settings-plan-usage-card">
                   <div className="settings-plan-usage-head">
-                    <strong>Storage</strong>
+                    <strong>{t('storage')}</strong>
                     <span>{formatStorageText(storageUsedMb)} / {formatStorageText(storageLimitMb)}</span>
                   </div>
                   <div className="settings-plan-progress">
                     <div className="settings-plan-progress__fill settings-plan-progress__fill--storage" style={{ width: `${storagePercent}%` }} />
                   </div>
-                  <small>{formatStorageText(Math.max(storageLimitMb - storageUsedMb, 0))} remaining</small>
+                  <small>{formatStorageText(Math.max(storageLimitMb - storageUsedMb, 0))} {t('remaining')}</small>
                 </div>
 
                 <div className="settings-plan-usage-card">
                   <div className="settings-plan-usage-head">
-                    <strong>AI usage today</strong>
-                    <span>{aiDisplayedToday} / {aiDailyLimit || 0} requests</span>
+                    <strong>{t('aiUsageToday')}</strong>
+                    <span>{aiDisplayedToday} / {aiDailyLimit || 0} {t('requests')}</span>
                   </div>
                   <div className="settings-plan-progress">
                     <div className="settings-plan-progress__fill settings-plan-progress__fill--ai" style={{ width: `${aiPercent}%` }} />
                   </div>
-                  <small>{Math.max(aiDailyLimit - aiUsedToday, 0)} AI requests left today</small>
+                  <small>{Math.max(aiDailyLimit - aiUsedToday, 0)} {t('aiRequestsLeftToday')}</small>
                 </div>
               </div>
 
               <div className="settings-plan-rights">
                 <div className="settings-plan-rights__header">
-                  <strong>Included features</strong>
-                  <small>What this plan unlocks for your workspace.</small>
+                  <strong>{t('includedFeatures')}</strong>
+                  <small>{t('planUnlocksText')}</small>
                 </div>
                 <div className="settings-plan-rights__grid">
                   {planRights.map((right) => (
@@ -427,7 +449,7 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
                       className={`settings-plan-right ${right.enabled ? 'is-enabled' : 'is-disabled'}`}
                     >
                       <span>{right.label}</span>
-                      <strong>{right.enabled ? 'Included' : 'Locked'}</strong>
+                      <strong>{right.enabled ? t('included') : t('locked')}</strong>
                     </div>
                   ))}
                 </div>
@@ -436,65 +458,65 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
           )}
 
           {activeTab === 'password' && (
-            <form onSubmit={handlePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="settings-input-group">
-                <label className="text-slate-600 dark:text-slate-400">Current Password *</label>
-                <input type="password" required value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} disabled={loading} placeholder="Enter current password" className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" />
+            <form onSubmit={handlePasswordSubmit} className="settings-form">
+              <div className="settings-field">
+                <label>{t('currentPasswordLabel')}</label>
+                <input type="password" required value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} disabled={loading} placeholder={t('enterCurrentPassword')} className="settings-input" />
               </div>
-              <div className="settings-input-group">
-                <label className="text-slate-600 dark:text-slate-400">New Password *</label>
-                <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={loading} placeholder="At least 6 characters" className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" />
+              <div className="settings-field">
+                <label>{t('newPasswordLabel')}</label>
+                <input type="password" required value={newPassword} onChange={(e) => setNewPassword(e.target.value)} disabled={loading} placeholder={t('atLeast6Chars')} className="settings-input" />
               </div>
-              <div className="settings-input-group">
-                <label className="text-slate-600 dark:text-slate-400">Confirm New Password *</label>
-                <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading} placeholder="Enter new password again" className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-900 dark:text-white outline-none focus:border-[#4f46e5] dark:focus:border-indigo-400 transition-colors duration-200" />
+              <div className="settings-field">
+                <label>{t('confirmNewPasswordLabel')}</label>
+                <input type="password" required value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} disabled={loading} placeholder={t('enterNewPasswordAgain')} className="settings-input" />
               </div>
-              <button className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200 cursor-pointer" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', marginTop: '8px', padding: '10px 18px', border: 'none', borderRadius: '8px' }}>
-                {loading ? 'Saving...' : 'Change Password'}
+              <button className="settings-submit-btn" type="submit" disabled={loading}>
+                {loading ? t('saving') : t('changePasswordBtn')}
               </button>
             </form>
           )}
 
           {activeTab === 'verification' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', borderRadius: '10px' }}>
-                <span className="text-slate-800 dark:text-slate-200" style={{ fontSize: '14px', fontWeight: 500 }}>Verification Status:</span>
-                {verificationStatus === 'verified' && <span className="settings-status-badge verified">Verified</span>}
-                {verificationStatus === 'pending' && <span className="settings-status-badge pending">Pending</span>}
-                {verificationStatus === 'unverified' && <span className="settings-status-badge unverified">Unverified</span>}
-                {verificationStatus === 'rejected' && <span className="settings-status-badge rejected">Rejected</span>}
+            <div className="settings-form">
+              <div className="settings-verification-bar">
+                <span>{t('verificationStatusLabel')}</span>
+                {verificationStatus === 'verified' && <span className="settings-status-badge verified">{t('statusVerified')}</span>}
+                {verificationStatus === 'pending' && <span className="settings-status-badge pending">{t('statusPending')}</span>}
+                {verificationStatus === 'unverified' && <span className="settings-status-badge unverified">{t('statusUnverified')}</span>}
+                {verificationStatus === 'rejected' && <span className="settings-status-badge rejected">{t('statusRejected')}</span>}
               </div>
 
               {((verificationStatus === 'unverified') || verificationStatus === 'rejected' || (verificationStatus === 'pending' && !verificationRequestSubmitted)) && (
-                <form onSubmit={handleVerificationSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', fontSize: '13px', lineHeight: '19px' }} className="dark:bg-blue-950/20 dark:border-blue-900/50 dark:text-blue-300 transition-colors duration-300">
-                    Please upload a clear photo of your student ID card so the admin team can review it. Accounts that stay unverified for more than 3 days after registration may be banned automatically.
+                <form onSubmit={handleVerificationSubmit} className="settings-form">
+                  <div className="settings-notice-box info">
+                    {t('verificationNoticeText')}
                   </div>
-                  <div className="settings-input-group">
-                    <label className="text-slate-600 dark:text-slate-400">Upload Student ID Card image (Front) *</label>
-                    <div className="avatar-upload-container bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 transition-colors duration-300">
-                      <div className="avatar-upload-btn-container" style={{ flex: 1 }}>
-                        <input type="file" accept="image/*" onChange={(e) => setVerificationFile(e.target.files[0])} disabled={loading} required className="text-slate-700 dark:text-slate-300" />
-                        <span className="avatar-upload-info" style={{ marginTop: '4px' }}>
-                          {verificationFile ? `Selected: ${verificationFile.name}` : 'Please select your student ID Card image.'}
+                  <div className="settings-field">
+                    <label>{t('uploadStudentIdCardLabel')}</label>
+                    <div className="avatar-banner-card">
+                      <div className="avatar-banner-info">
+                        <input type="file" accept="image/*" onChange={(e) => setVerificationFile(e.target.files[0])} disabled={loading} required className="settings-file-input" />
+                        <span className="avatar-banner-hint">
+                          {verificationFile ? `${t('selectedFile')} ${verificationFile.name}` : t('pleaseSelectImage')}
                         </span>
                       </div>
                     </div>
                   </div>
-                  <button className="bg-[#6366f1] hover:bg-indigo-700 text-white font-semibold transition-colors duration-200 cursor-pointer" type="submit" disabled={loading} style={{ alignSelf: 'flex-start', padding: '10px 18px', border: 'none', borderRadius: '8px' }}>
-                    {loading ? 'Submitting...' : 'Submit Verification Request'}
+                  <button className="settings-submit-btn" type="submit" disabled={loading}>
+                    {loading ? t('submitting') : t('submitVerificationRequest')}
                   </button>
                 </form>
               )}
 
               {verificationStatus === 'pending' && verificationRequestSubmitted && (
-                <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#fffbeb', border: '1px solid #fef3c7', color: '#b45309', fontSize: '13px', lineHeight: '18px' }} className="dark:bg-amber-950/20 dark:border-amber-900/50 dark:text-amber-300 transition-colors duration-300">
-                  Your verification request has been submitted successfully. Admin will review and approve your student ID card within the next 24-48 hours.
+                <div className="settings-notice-box warning">
+                  {t('pendingReviewNotice')}
                 </div>
               )}
 
               {verificationStatus === 'rejected' && (
-                <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '13px', lineHeight: '18px' }} className="dark:bg-rose-950/20 dark:border-rose-900/50 dark:text-rose-300 transition-colors duration-300">
+                <div className="settings-notice-box danger">
                   {user?.verificationReviewNote
                     ? `Your previous verification request was rejected. Admin note: ${user.verificationReviewNote}`
                     : 'Your previous verification request was rejected. Please upload a clearer student ID image and submit again.'}
@@ -502,21 +524,23 @@ export function SettingsModal({ onClose, user, onUserUpdate, onNavigate, initial
               )}
 
               {verificationStatus === 'verified' && (
-                <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', fontSize: '13px', lineHeight: '18px', display: 'flex', alignItems: 'center', gap: '8px' }} className="dark:bg-emerald-950/20 dark:border-emerald-900/50 dark:text-emerald-450 transition-colors duration-300">
+                <div className="settings-notice-box success">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  Your account has been verified as an official student.
+                  <span>{t('officialStudentVerified')}</span>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <footer className="bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 transition-colors duration-300" style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 24px', gap: '12px' }}>
-          <button onClick={onClose} className="border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors duration-200 cursor-pointer" style={{ padding: '8px 16px', borderRadius: '8px', background: 'transparent', fontWeight: 500 }} type="button">Close</button>
+        <footer className="settings-modal-footer">
+          <button onClick={onClose} className="settings-footer-close-btn" type="button">{t('close')}</button>
         </footer>
       </section>
     </div>
   )
 }
+
+export default SettingsModal

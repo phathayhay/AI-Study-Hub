@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
 import StudyHubIcon from '../icons/StudyHubIcons'
+import LanguageSelector from './LanguageSelector'
+
+import { useLanguage } from '../../context/LanguageContext'
 
 function VisibilityBadge({ visibility }) {
   if (!visibility) return null
@@ -64,16 +67,18 @@ export default function Topbar({
     }
   }
 
-  const displayTitle = active === 'explore' ? 'Explore Documents'
-    : active === 'library' ? 'My Library'
-      : active === 'library-shared' ? 'Shared with me'
-        : active === 'library-folders' ? 'Folders'
-          : active === 'library-favorites' ? 'Favorites'
-            : active === 'library-recent' ? 'Recent'
-              : active === 'upload' ? 'Upload Document'
-                : active === 'pricing' ? 'Upgrade Plans'
-                  : active === 'profile' ? 'Profile'
-                    : 'Home'
+  const { t } = useLanguage()
+
+  const displayTitle = active === 'explore' ? t('exploreDocuments')
+    : active === 'library' ? t('myLibrary')
+      : active === 'library-shared' ? t('sharedWithMe')
+        : active === 'library-folders' ? t('folders')
+          : active === 'library-favorites' ? t('favorites')
+            : active === 'library-recent' ? t('recent')
+              : active === 'upload' ? t('uploadDocument')
+                : active === 'pricing' ? t('upgradePlans')
+                  : active === 'profile' ? t('profile')
+                    : t('home')
 
   return (
     <header
@@ -162,8 +167,9 @@ export default function Topbar({
         )}
       </div>
 
-      {guest ? null : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <LanguageSelector />
+        {!guest && (
           <button
             data-notification-trigger
             onClick={onNotifications}
@@ -177,8 +183,8 @@ export default function Topbar({
               </span>
             )}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </header>
   )
 }

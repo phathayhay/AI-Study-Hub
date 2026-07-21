@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import FeaturedFolders from '../../components/home/FeaturedFolders'
 import StudyHubIcon, { getFileIconName } from '../../components/icons/StudyHubIcons'
 import Badge from '../../components/ui/Badge'
+import { useLanguage } from '../../context/LanguageContext'
 import {
   searchDocuments as getDocuments
 } from '../../features/documents/documentService'
@@ -123,12 +124,14 @@ function ExploreSearchFilter({
   categories,
   guest
 }) {
+  const { t } = useLanguage()
+
   return (
     <section className="hero-section flex flex-col items-center text-center py-10 px-6 w-full bg-transparent dark:bg-transparent border border-transparent dark:border-transparent rounded-3xl transition-all duration-300" aria-labelledby="home-title">
       <h1 id="home-title" className="text-3xl md:text-5xl font-extrabold text-slate-950 dark:text-white tracking-tight leading-none mb-3">
-        {guest ? 'Study Materials for FPTU Students' : 'FPTU Study Materials'}
+        {guest ? t('heroTitleGuest') : t('heroTitleUser')}
       </h1>
-      <p className="text-slate-500 dark:text-slate-400 max-w-lg mb-8 text-sm md:text-base leading-relaxed">Search, share, and manage academic documents powered by Gemini AI</p>
+      <p className="text-slate-500 dark:text-slate-400 max-w-lg mb-8 text-sm md:text-base leading-relaxed">{t('heroSubtitle')}</p>
 
       {/* Search Input Box */}
       <div
@@ -138,7 +141,7 @@ function ExploreSearchFilter({
         <StudyHubIcon name="search" size={20} className="text-slate-400 dark:text-slate-500" />
         <input
           className="w-full text-slate-900 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 border-0 outline-none text-base bg-transparent font-medium"
-          placeholder="Search by course code, document title, or keyword..."
+          placeholder={t('searchPlaceholderInput')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -157,7 +160,7 @@ function ExploreSearchFilter({
       <div className="hero-filters w-full max-w-2xl mt-8 flex flex-col gap-4">
         {/* Major Filter */}
         <div className="filter-row flex flex-wrap gap-2 items-center justify-center text-xs md:text-sm text-slate-500 dark:text-slate-400">
-          <span className="font-semibold text-slate-600 dark:text-slate-300 mr-1 flex items-center gap-1"><StudyHubIcon name="globe" size={14} /> Major:</span>
+          <span className="font-semibold text-slate-600 dark:text-slate-300 mr-1 flex items-center gap-1"><StudyHubIcon name="globe" size={14} /> {t('majorLabel')}</span>
           {['ALL', ...majors].map((major) => {
             const isSelected = selectedMajor === major;
             return (
@@ -173,7 +176,7 @@ function ExploreSearchFilter({
                   setSelectedCourse(null)
                 }}
               >
-                {major === 'ALL' ? 'All Majors' : major}
+                {major === 'ALL' ? t('allMajors') : major}
               </button>
             );
           })}
@@ -181,7 +184,7 @@ function ExploreSearchFilter({
 
         {/* Course Filter */}
         <div className="filter-row flex flex-wrap gap-2 items-center justify-center text-xs md:text-sm text-slate-500 dark:text-slate-400">
-          <span className="font-semibold text-slate-600 dark:text-slate-300 mr-1 flex items-center gap-1"><StudyHubIcon name="book" size={14} /> Course:</span>
+          <span className="font-semibold text-slate-600 dark:text-slate-300 mr-1 flex items-center gap-1"><StudyHubIcon name="book" size={14} /> {t('courseLabel')}</span>
           {popularCourses.map((course) => {
             const isSelected = selectedCourse === course;
             return (
@@ -202,13 +205,13 @@ function ExploreSearchFilter({
 
         <div className="filter-row flex flex-wrap gap-3 items-center justify-center text-xs md:text-sm text-slate-500 dark:text-slate-400">
           <label className="font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">
-            Semester
+            {t('semesterLabel')}
             <select
               className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
               onChange={(event) => setSelectedSemester(event.target.value)}
               value={selectedSemester}
             >
-              <option value="">All semesters</option>
+              <option value="">{t('allSemesters')}</option>
               {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((number) => {
                 const semester = `Semester ${number}`
                 return (
@@ -218,13 +221,13 @@ function ExploreSearchFilter({
             </select>
           </label>
           <label className="font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">
-            Type
+            {t('typeLabel')}
             <select
               className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-500"
               onChange={(event) => setSelectedCategory(event.target.value)}
               value={selectedCategory}
             >
-              <option value="">All document types</option>
+              <option value="">{t('allDocumentTypes')}</option>
               {categories.map((category) => (
                 <option key={category.id} value={String(category.id)}>{category.categoryName}</option>
               ))}
@@ -237,6 +240,7 @@ function ExploreSearchFilter({
 }
 
 export function DocumentCard({ doc, onOpen, guest, onFavoriteChange }) {
+  const { t } = useLanguage()
   const [updatingFavorite, setUpdatingFavorite] = useState(false)
   const favorite = Boolean(doc.favorite)
 
@@ -318,12 +322,12 @@ export function DocumentCard({ doc, onOpen, guest, onFavoriteChange }) {
           {doc.title}
         </h3>
         <p className="text-slate-500 dark:text-slate-400 text-xs line-clamp-2 leading-relaxed">
-          {doc.description || 'No detailed description available.'}
+          {doc.description || t('noDescription')}
         </p>
       </div>
 
       <div className="pt-3 border-t border-slate-50 dark:border-slate-800 flex items-center justify-between text-[11.5px] text-slate-400 dark:text-slate-500 font-medium">
-        <span className="flex items-center gap-1"><StudyHubIcon name="download" size={13} /> {doc.downloads} downloads</span>
+        <span className="flex items-center gap-1"><StudyHubIcon name="download" size={13} /> {doc.downloads} {t('downloadsCount')}</span>
         <span>{formatDocDate(doc.createdAt)}</span>
       </div>
     </article>
@@ -404,6 +408,7 @@ export function ExplorePage({
   initialMajor = 'ALL',
   initialCourse = null
 }) {
+  const { t } = useLanguage()
   const [selectedMajor, setSelectedMajor] = useState(initialMajor)
   const [selectedCourse, setSelectedCourse] = useState(initialCourse)
   const [selectedSemester, setSelectedSemester] = useState('')
@@ -652,9 +657,9 @@ export function ExplorePage({
                 <section>
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                      <span>🔍</span> Found Documents
+                      <span>🔍</span> {t('foundDocuments')}
                     </h2>
-                    <span className="text-xs text-slate-400 font-semibold">{documents.length} items</span>
+                    <span className="text-xs text-slate-400 font-semibold">{documents.length} {t('itemsCount')}</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {documents.map((doc) => (
@@ -683,7 +688,7 @@ export function ExplorePage({
                 <section className="border-t border-slate-100 pt-8 mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                      <span>📁</span> Featured Study Folders
+                      <span>📁</span> {t('featuredStudyFolders')}
                     </h2>
                   </div>
                   <FeaturedFolders folders={filteredFolders} onOpenFolder={onOpenFolder} hideHeader={true} />
@@ -696,9 +701,9 @@ export function ExplorePage({
                   <section>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                        <span>🔥</span> Trending This Week
+                        <span>🔥</span> {t('trendingThisWeek')}
                       </h2>
-                      <span className="text-xs text-slate-400 font-semibold">Most downloaded</span>
+                      <span className="text-xs text-slate-400 font-semibold">{t('mostDownloaded')}</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {trendingDocs.map((doc) => (
@@ -729,9 +734,9 @@ export function ExplorePage({
                   <section>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                        <span>✨</span> Recommended for You
+                        <span>✨</span> {t('recommendedForYou')}
                       </h2>
-                      <span className="text-xs text-slate-400 font-semibold">Based on your activity</span>
+                      <span className="text-xs text-slate-400 font-semibold">{t('basedOnActivity')}</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {recommendedDocs.map((doc) => (
@@ -762,9 +767,9 @@ export function ExplorePage({
                   <section>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                        <span>🕒</span> Recently Added
+                        <span>🕒</span> {t('recentlyAdded')}
                       </h2>
-                      <span className="text-xs text-slate-400 font-semibold">Latest updates</span>
+                      <span className="text-xs text-slate-400 font-semibold">{t('latestUpdates')}</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                       {recentlyAddedDocs.map((doc) => (
@@ -794,7 +799,7 @@ export function ExplorePage({
                 <section className="border-t border-slate-100 pt-8 mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg md:text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                      <span>📁</span> Featured Study Folders
+                      <span>📁</span> {t('featuredStudyFolders')}
                     </h2>
                   </div>
                   <FeaturedFolders folders={filteredFolders} onOpenFolder={onOpenFolder} hideHeader={true} />

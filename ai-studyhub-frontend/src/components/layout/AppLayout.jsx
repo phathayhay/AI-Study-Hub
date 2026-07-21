@@ -1,5 +1,6 @@
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import VerificationBanner from './VerificationBanner'
 
 export default function AppLayout({
   active = 'home', children, className = '',
@@ -11,7 +12,8 @@ export default function AppLayout({
   onBreadcrumbClick,
   onRenameTitle,
   visibility = null,
-  route = ''
+  route = '',
+  onOpenVerification
 }) {
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'app-shell--collapsed' : ''} ${className} dark:bg-[#0f172a] text-gray-900 dark:text-white transition-colors duration-300 ease-in-out`}>
@@ -27,6 +29,7 @@ export default function AppLayout({
         activeItemContext={activeItemContext}
       />
       <div className="app-shell__body dark:bg-[#0f172a] transition-colors duration-300 ease-in-out">
+        <VerificationBanner user={user} onOpenVerification={onOpenVerification} />
         {withTopbar && (
           <Topbar
             guest={guest}

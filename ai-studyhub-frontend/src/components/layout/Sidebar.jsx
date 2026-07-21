@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { mainNavItems, publicNavItems } from '../../data/studyHubData'
 import StudyHubIcon from '../icons/StudyHubIcons'
 import Brand from './Brand'
+import { useLanguage } from '../../context/LanguageContext'
 
 export default function Sidebar({
   active = 'home', guest = false, onNavigate, user, collapsed = false, onToggleCollapse,
   recentItems = [], onOpenRecentItem, activeItemContext = {}
 }) {
+  const { t } = useLanguage()
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [recentExpanded, setRecentExpanded] = useState(true)
 
@@ -241,10 +243,10 @@ export default function Sidebar({
             transition: 'all 0.2s',
             boxShadow: '0 4px 6px -1px rgba(99, 102, 241, 0.2), 0 2px 4px -1px rgba(99, 102, 241, 0.1)'
           }}
-          title={collapsed ? "New Study Session" : undefined}
+          title={collapsed ? t('newStudySession') : undefined}
         >
           <StudyHubIcon name="plus" size={18} />
-          {!collapsed && "New Study Session"}
+          {!collapsed && t('newStudySession')}
         </button>
       </div>
 
@@ -273,26 +275,26 @@ export default function Sidebar({
                 <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
                 <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
-            ), 'Shared with me')}
+            ), t('sharedWithMe'))}
 
             {renderNavButton('library-folders', (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" />
               </svg>
-            ), 'Folders')}
+            ), t('folders'))}
 
             {renderNavButton('library-favorites', (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
-            ), 'Favorites')}
+            ), t('favorites'))}
 
             {renderNavButton('library-recent', (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <polyline points="12 6 12 12 16 14" />
               </svg>
-            ), 'Recent')}
+            ), t('recent'))}
           </nav>
         ) : (
           <>
@@ -302,11 +304,11 @@ export default function Sidebar({
                   <circle cx="12" cy="12" r="10" />
                   <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
                 </svg>
-              ), 'Explore')}
+              ), t('explore'))}
             </nav>
 
             <div>
-              <h4 style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8', fontWeight: 600, paddingLeft: '8px', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Library</h4>
+              <h4 style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8', fontWeight: 600, paddingLeft: '8px', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('myLibrary')}</h4>
               <nav style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {renderNavButton('library', (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -314,7 +316,7 @@ export default function Sidebar({
                     <line x1="12" y1="20" x2="12" y2="4" />
                     <line x1="6" y1="20" x2="6" y2="14" />
                   </svg>
-                ), 'Study sessions')}
+                ), t('studySessions'))}
 
                 {renderNavButton('library-shared', (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -323,19 +325,19 @@ export default function Sidebar({
                     <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
                     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
-                ), 'Shared with me')}
+                ), t('sharedWithMe'))}
 
                 {renderNavButton('library-folders', (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z" />
                   </svg>
-                ), 'Folders')}
+                ), t('folders'))}
 
                 {renderNavButton('library-favorites', (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
-                ), 'Favorites')}
+                ), t('favorites'))}
               </nav>
             </div>
 
@@ -353,7 +355,7 @@ export default function Sidebar({
                 }}
                 className="sidebar-recent-header"
               >
-                <h4 style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8', fontWeight: 600, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recent</h4>
+                <h4 style={{ fontSize: '11px', color: isDark ? '#64748b' : '#94a3b8', fontWeight: 600, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('recent')}</h4>
                 <svg
                   width="14"
                   height="14"
@@ -495,7 +497,7 @@ export default function Sidebar({
                   </svg>
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div className="sidebar-plan-card__eyebrow">Current plan</div>
+                  <div className="sidebar-plan-card__eyebrow">{t('currentPlan')}</div>
                   <div className="sidebar-plan-card__title">{planLabel}</div>
                 </div>
               </div>
@@ -519,7 +521,7 @@ export default function Sidebar({
                 )}
                 <div className="sidebar-plan-card__row">
                   <div className="sidebar-plan-card__labels">
-                    <strong>Storage</strong>
+                    <strong>{t('storage')}</strong>
                     <span>{formatPlanStorage(storageUsedMb)} / {formatPlanStorage(storageLimitMb)}</span>
                   </div>
                   <div className="sidebar-plan-card__progress">
@@ -529,7 +531,7 @@ export default function Sidebar({
 
                 <div className="sidebar-plan-card__row">
                   <div className="sidebar-plan-card__labels">
-                    <strong>AI today</strong>
+                    <strong>{t('aiToday')}</strong>
                     <span>{aiDisplayedToday} / {aiDailyLimit || 0}</span>
                   </div>
                   <div className="sidebar-plan-card__progress">
@@ -541,7 +543,7 @@ export default function Sidebar({
               <div className="sidebar-plan-card__footer">
                 <span>{storageFooterMessage}</span>
                 <button type="button" onClick={() => onNavigate?.('settings', { tab: 'plan' })}>
-                  Manage
+                  {t('manage')}
                 </button>
               </div>
             </div>

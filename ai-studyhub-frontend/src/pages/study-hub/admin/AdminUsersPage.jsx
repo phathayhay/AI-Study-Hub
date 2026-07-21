@@ -10,10 +10,12 @@ import { AdminStatus } from '../../../features/admin/components/AdminStatus'
 import { AdminResourceState as AdminTableState, AdminNoResults } from '../../../features/admin/components/AdminResourceState'
 import { AdminSortableTh } from '../../../features/admin/components/AdminSortableTh'
 import { runAdminAction } from '../../../features/admin/utils/adminActions'
+import { useLanguage } from '../../../context/LanguageContext'
 
 import { banAdminUser, getAdminUsers, unbanAdminUser } from '../../../features/admin/adminService'
 
 export function AdminUsers({ onOpenUser }) {
+  const { t } = useLanguage()
   const { data: users, error, loading, reload } = useAdminList(getAdminUsers)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -38,20 +40,20 @@ export function AdminUsers({ onOpenUser }) {
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
-        <AdminSectionHeader icon="users" title="User Management">
+        <AdminSectionHeader icon="users" title={t('userManagement')}>
           <AdminStatusFilter onChange={setStatusFilter} options={statusOptions} value={statusFilter} />
-          <AdminSearch onChange={setQuery} placeholder="Search users..." value={query} />
+          <AdminSearch onChange={setQuery} placeholder={t('searchUsersPlaceholder')} value={query} />
         </AdminSectionHeader>
         <AdminTableState error={error} loading={loading} />
         <table className="admin-table">
           <thead>
             <tr>
-              <AdminSortableTh field="name" sortBy={sortBy} onSort={setSortBy}>User</AdminSortableTh>
-              <th>Email</th>
-              <AdminSortableTh defaultDirection="desc" field="date" sortBy={sortBy} onSort={setSortBy}>Joined</AdminSortableTh>
-              <th>Plan</th>
-              <AdminSortableTh field="status" sortBy={sortBy} onSort={setSortBy}>Status</AdminSortableTh>
-              <th>Actions</th>
+              <AdminSortableTh field="name" sortBy={sortBy} onSort={setSortBy}>{t('tableUser')}</AdminSortableTh>
+              <th>{t('tableEmail')}</th>
+              <AdminSortableTh defaultDirection="desc" field="date" sortBy={sortBy} onSort={setSortBy}>{t('tableJoined')}</AdminSortableTh>
+              <th>{t('tablePlan')}</th>
+              <AdminSortableTh field="status" sortBy={sortBy} onSort={setSortBy}>{t('tableStatus')}</AdminSortableTh>
+              <th>{t('tableActions')}</th>
             </tr>
           </thead>
           <tbody>

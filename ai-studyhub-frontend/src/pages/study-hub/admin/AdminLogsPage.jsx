@@ -6,8 +6,10 @@ import { formatDateTime, formatTypeLabel } from '../../../features/admin/utils/a
 import { ADMIN_LOG_TYPES } from '../../../features/admin/constants/adminStatus'
 import { callToast } from '../../../features/admin/utils/adminActions'
 import { AdminNoResults, AdminPagination, AdminSearch, AdminSectionHeader, AdminStatus, AdminTableState } from '../../../features/admin/components/legacyShared'
+import { useLanguage } from '../../../context/LanguageContext'
 
 export function AdminLogs() {
+  const { t } = useLanguage()
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
@@ -85,15 +87,15 @@ export function AdminLogs() {
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card logs-card">
-        <AdminSectionHeader icon="trend" title="Activity Logs">
+        <AdminSectionHeader icon="trend" title={t('activityLogsTitle')}>
           <div className="admin-toolbar-group">
-            <AdminSearch onChange={setQuery} placeholder="Search logs..." value={query} />
+            <AdminSearch onChange={setQuery} placeholder={t('searchLogsPlaceholder')} value={query} />
             <select className="admin-filter-input" onChange={(event) => setTypeFilter(event.target.value)} value={typeFilter}>
-              <option value="">All types</option>
+              <option value="">{t('allTypes')}</option>
               {ADMIN_LOG_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
             <div className="admin-date-range" aria-label="Filter by date range">
-              <span className="admin-date-range__label">Date range</span>
+              <span className="admin-date-range__label">{t('dateRangeLabel')}</span>
               <div className="admin-date-range__field">
                 <input
                   aria-label="From date"
@@ -114,19 +116,19 @@ export function AdminLogs() {
                 />
               </div>
             </div>
-            <button className="admin-primary" onClick={handleExport} type="button">Export CSV</button>
+            <button className="admin-primary" onClick={handleExport} type="button">{t('exportCsv')}</button>
           </div>
         </AdminSectionHeader>
         <AdminTableState error={state.error} loading={state.loading} />
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Time</th>
-              <th>Type</th>
-              <th>Action</th>
-              <th>Actor</th>
-              <th>Target</th>
-              <th>Status</th>
+              <th>{t('timeHeader')}</th>
+              <th>{t('typeHeader')}</th>
+              <th>{t('actionHeader')}</th>
+              <th>{t('actorHeader')}</th>
+              <th>{t('targetHeader')}</th>
+              <th>{t('statusHeader')}</th>
             </tr>
           </thead>
           <tbody>

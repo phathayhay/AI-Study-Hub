@@ -5,6 +5,7 @@ import {
   uploadDocument
 } from '../../features/documents/documentService'
 import { getMajors, getCourses, getCategories } from '../../services/courseService'
+import { useLanguage } from '../../context/LanguageContext'
 
 const SHARED_FOUNDATION_PREFIXES = ['PRF', 'PRO', 'CSD', 'DBI', 'MAD', 'MAE', 'OSG', 'JPD', 'WED', 'SWT', 'SSI', 'PFP', 'SSL']
 
@@ -69,6 +70,7 @@ function formatFileSize(bytes) {
 }
 
 export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentUploaded, onNavigate, defaultFolderId = null, user = null }) {
+  const { t } = useLanguage()
   const [selectedUploadFile, setSelectedUploadFile] = useState(null)
   const [uploadedText, setUploadedText] = useState('')
   const [readStatus, setReadStatus] = useState('')
@@ -247,8 +249,8 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
   return (
     <main className="page-surface upload-page">
       <PageTitle
-        title={isStudyUpload ? 'Create New Study Session' : 'Upload Document'}
-        subtitle={isStudyUpload ? 'Upload a file to let AI create a study workspace from your content' : 'Share study documents with the FPTU community or store them privately'}
+        title={isStudyUpload ? t('createNewStudySession') : t('uploadDocumentTitle')}
+        subtitle={isStudyUpload ? t('createStudySessionSubtitle') : t('uploadDocumentSubtitle')}
       />
       <section className="upload-card">
         {(isOverQuota || wouldExceedQuota) && (
@@ -290,18 +292,18 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
               }}
             >
               <StudyHubIcon name="upload" size={46} />
-              <h3>Drag and drop files or folders here</h3>
-              <p>or</p>
+              <h3>{t('dragAndDrop')}</h3>
+              <p>{t('or')}</p>
               <button className="file-picker-button cursor-pointer" disabled={isOverQuota} onClick={() => fileInputRef.current?.click()} type="button">
-                <StudyHubIcon name="file" size={18} /> Select File
+                <StudyHubIcon name="file" size={18} /> {t('selectFile')}
               </button>
-              <small>Supported formats: PDF, Word, PowerPoint, ZIP (max 10MB)</small>
+              <small>{t('supportedFormats')}</small>
             </div>
-            <button className="upload-submit cursor-pointer" disabled={isOverQuota} onClick={() => fileInputRef.current?.click()} type="button">Upload</button>
+            <button className="upload-submit cursor-pointer" disabled={isOverQuota} onClick={() => fileInputRef.current?.click()} type="button">{t('upload')}</button>
           </>
         ) : (
           <div className="upload-form">
-            <h3>Selected File (1)</h3>
+            <h3>{t('selectedFileTitle')}</h3>
             <div className="selected-file">
               <StudyHubIcon name="file" size={18} />
               <span><strong>{selectedUploadFile.name}</strong><small>{formatFileSize(selectedUploadFile.size)}</small></span>
@@ -310,14 +312,14 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
             {readStatus && <p className="upload-read-status">{readStatus}</p>}
             {uploadError && <p className="auth-error">{uploadError}</p>}
             {uploadSuccess && <p className="upload-success">Uploaded successfully!</p>}
-            <label>Document Title *<input ref={titleRef} defaultValue={selectedUploadFile.name} placeholder="Enter document title" /></label>
-            <label>Description<textarea ref={descRef} placeholder="Brief description of the document..." /></label>
+            <label>{t('documentTitleLabel')}<input ref={titleRef} defaultValue={selectedUploadFile.name} placeholder={t('documentTitleLabel')} /></label>
+            <label>{t('descriptionLabel')}<textarea ref={descRef} placeholder={t('descriptionLabel')} /></label>
             <div className="upload-form__grid">
               {(() => {
                 const dynamicSelectFields = [
                   {
-                    label: 'Major *',
-                    placeholder: 'Select major',
+                    label: t('majorLabelForm'),
+                    placeholder: t('selectMajor'),
                     options: majorsList.map(m => m.majorName),
                     value: selectedMajor,
                     onChange: (e) => {
@@ -326,16 +328,16 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
                     }
                   },
                   {
-                    label: 'Semester *',
-                    placeholder: 'Select semester',
+                    label: t('semesterLabelForm'),
+                    placeholder: t('selectSemester'),
                     options: ['Semester 1', 'Semester 2', 'Semester 3', 'Semester 4', 'Semester 5', 'Semester 6', 'Semester 7', 'Semester 8', 'Semester 9'],
                     value: selectedSemester,
                     onChange: (e) => setSelectedSemester(e.target.value)
                   },
                   {
-                    label: 'Course Code *',
+                    label: t('courseCodeLabelForm'),
                     hint: '[1 course]',
-                    placeholder: 'Select course code',
+                    placeholder: t('selectCourseCode'),
                     options: coursesList
                       .filter(c => !selectedMajor || isCourseEligibleForMajor(c, selectedMajor, majorsList))
                       .map(c => c.courseCode),
@@ -343,8 +345,8 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
                     onChange: (e) => setSelectedCourse(e.target.value)
                   },
                   {
-                    label: 'Document Type *',
-                    placeholder: 'Select document type',
+                    label: t('documentTypeLabelForm'),
+                    placeholder: t('selectDocumentType'),
                     options: categoriesList.map(c => c.categoryName),
                     value: selectedCategory,
                     onChange: (e) => setSelectedCategory(e.target.value)
@@ -365,20 +367,20 @@ export function UploadPage({ mode = 'document', onStudyFileUploaded, onDocumentU
                   </label>
                 ))
               })()}
-              <label>Visibility<select ref={visibilityRef} defaultValue="PRIVATE">
-                <option value="PUBLIC">Public</option><option value="PRIVATE">Private</option>
+              <label>{t('visibilityLabel')}<select ref={visibilityRef} defaultValue="PRIVATE">
+                <option value="PUBLIC">{t('publicVisibility')}</option><option value="PRIVATE">{t('privateVisibility')}</option>
               </select></label>
-              <label>Tags (separated by commas)<input ref={tagsRef} placeholder="SWP, Study, ..." /></label>
+              <label>{t('tagsLabel')}<input ref={tagsRef} placeholder="SWP, Study, ..." /></label>
             </div>
             <div className="upload-form__actions">
               <button className="upload-submit cursor-pointer" onClick={isStudyUpload ? handleUpload : handleUpload} type="button" disabled={uploading || uploadBlocked}>
                 {uploading
-                  ? 'Uploading...'
+                  ? t('uploadingStatus')
                   : uploadBlocked
-                    ? (isOverQuota ? 'Upload disabled' : 'Over plan limit')
-                    : (isStudyUpload ? 'Start Studying with AI' : 'Upload')}
+                    ? (isOverQuota ? t('uploadDisabled') : t('overPlanLimit'))
+                    : (isStudyUpload ? t('startStudyingWithAi') : t('upload'))}
               </button>
-              <button className="cancel-button cursor-pointer" onClick={clearSelectedFile} type="button">Cancel</button>
+              <button className="cancel-button cursor-pointer" onClick={clearSelectedFile} type="button">{t('cancel')}</button>
             </div>
           </div>
         )}

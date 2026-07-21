@@ -759,6 +759,10 @@ export default function StudyHubApp() {
       guest={guest} user={user}
       title={appTitle}
       onNavigate={navigate}
+      onOpenVerification={() => {
+        setSettingsInitialTab('verification')
+        setShowSettings(true)
+      }}
       onNotifications={() => {
         setShowNotifications((open) => {
           const next = !open
