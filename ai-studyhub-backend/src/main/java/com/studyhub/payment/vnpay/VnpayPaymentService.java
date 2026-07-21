@@ -193,7 +193,7 @@ public class VnpayPaymentService {
     }
 
     private String normalizeIp(String value) {
-        if (value == null || value.isBlank()) return "127.0.0.1";
+        if (value == null || value.isBlank() || value.contains(":")) return "127.0.0.1";
         return value.length() <= 45 ? value : value.substring(0, 45);
     }
 
