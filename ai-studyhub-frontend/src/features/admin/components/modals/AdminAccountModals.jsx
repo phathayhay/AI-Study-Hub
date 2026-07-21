@@ -5,29 +5,31 @@ import { readCourseMajors } from '../../utils/adminNormalizers'
 import { formatDate, getInitial } from '../../utils/adminFormatters'
 import { runAdminAction } from '../../utils/adminActions'
 import { InfoBlock } from '../../../../pages/study-hub/shared'
+import { useLanguage } from '../../../../context/LanguageContext'
 
 export function AdminUserModal({ onClose, user }) {
+  const { t } = useLanguage()
   return (
     <div className="admin-modal-backdrop">
       <section className="admin-user-modal">
         <button className="admin-modal-close" onClick={onClose} type="button">x</button>
-        <h2>Account Details</h2>
-        <div className="admin-user-profile"><span>{getInitial(user.fullName || user.email)}</span><div><h3>{user.fullName || user.email}</h3><p>Joined: {formatDate(user.createdAt)}</p></div></div>
+        <h2>{t('accountDetails')}</h2>
+        <div className="admin-user-profile"><span>{getInitial(user.fullName || user.email)}</span><div><h3>{user.fullName || user.email}</h3><p>{t('joinedDate')} {formatDate(user.createdAt)}</p></div></div>
         <div className="admin-detail-grid">
-          <InfoBlock label="Email" value={user.email || '-'} />
-          <InfoBlock label="Student Code" value={user.studentCode || '-'} />
-          <InfoBlock label="Verification" value={user.verificationStatus || '-'} />
-          <InfoBlock label="Role" value={user.roleName || '-'} />
-          <InfoBlock label="Plan" value={user.planName || '-'} />
+          <InfoBlock label={t('emailLabel')} value={user.email || '-'} />
+          <InfoBlock label={t('studentCodeLabel')} value={user.studentCode || '-'} />
+          <InfoBlock label={t('verificationLabel')} value={user.verificationStatus || '-'} />
+          <InfoBlock label={t('roleLabel')} value={user.roleName || '-'} />
+          <InfoBlock label={t('planLabel')} value={user.planName || '-'} />
         </div>
-        <footer><p><small>Account Status</small><strong className="green-text">{user.status || '-'}</strong></p></footer>
+        <footer><p><small>{t('accountStatusLabel')}</small><strong className="green-text">{user.status || '-'}</strong></p></footer>
       </section>
     </div>
   )
 }
 
-
 export function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
+  const { t } = useLanguage()
   const edit = mode === 'edit'
   const majors = useAdminList(getAdminMajors)
   const hasMajors = majors.data.length > 0
@@ -56,12 +58,12 @@ export function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
     <div className="admin-modal-backdrop">
       <form className="admin-course-modal" onSubmit={submit}>
         <button className="admin-modal-close" onClick={onClose} type="button">x</button>
-        <h2>{edit ? 'Edit Subject' : 'Add New Subject'}</h2>
-        <label>Course Code<input onChange={(e) => setForm({ ...form, courseCode: e.target.value })} placeholder="e.g. CEA201" required value={form.courseCode} /></label>
-        <label>Course Name<input onChange={(e) => setForm({ ...form, courseName: e.target.value })} placeholder="e.g. Computer Architecture" required value={form.courseName} /></label>
-        <label>Description<input onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Short description" value={form.description} /></label>
+        <h2>{edit ? t('edit') : t('addSubject')}</h2>
+        <label>{t('courseCodeLabelForm')}<input onChange={(e) => setForm({ ...form, courseCode: e.target.value })} placeholder="e.g. CEA201" required value={form.courseCode} /></label>
+        <label>{t('courseLabel')}<input onChange={(e) => setForm({ ...form, courseName: e.target.value })} placeholder="e.g. Computer Architecture" required value={form.courseName} /></label>
+        <label>{t('descriptionLabel')}<input onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Short description" value={form.description} /></label>
         <label>
-          Majors
+          {t('majorsTitle')}
           <select
             className="admin-multi-select"
             disabled={majors.loading || Boolean(majors.error) || !hasMajors}
@@ -73,11 +75,11 @@ export function AdminCourseModal({ course = {}, mode, onClose, onSaved }) {
           >
             {majors.data.map((major) => <option key={major.id} value={major.id}>{major.majorCode} - {major.majorName}</option>)}
           </select>
-          {!majors.loading && !majors.error && hasMajors && <small className="admin-field-help">Hold Ctrl or Shift to choose multiple majors. You can also drag the bottom edge to expand this list.</small>}
+          {!majors.loading && !majors.error && hasMajors && <small className="admin-field-help">Hold Ctrl or Shift to choose multiple majors.</small>}
           {majors.error && <small className="admin-field-error">{majors.error}</small>}
           {!majors.loading && !majors.error && !hasMajors && <small className="admin-field-error">Please create a major in Settings first.</small>}
         </label>
-        <footer><button onClick={onClose} type="button">Cancel</button><button className="dark-button" type="submit">{edit ? 'Update' : 'Add Subject'}</button></footer>
+        <footer><button onClick={onClose} type="button">{t('cancel')}</button><button className="dark-button" type="submit">{edit ? t('save') : t('addSubject')}</button></footer>
       </form>
     </div>
   )

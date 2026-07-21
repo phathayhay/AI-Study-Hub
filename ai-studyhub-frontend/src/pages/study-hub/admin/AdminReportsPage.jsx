@@ -10,8 +10,10 @@ import { getStatusOptions, matchesSearch, matchesStatus, sortItems } from '../..
 import { AdminNameCell, AdminNoResults, AdminSectionHeader, AdminSearch, AdminStatus, AdminStatusFilter, AdminSortableTh, AdminTableState } from '../../../features/admin/components/legacyShared'
 import { ADMIN_STATUS_LABELS as STATUS_LABELS } from '../../../features/admin/constants/adminStatus'
 import { runAdminAction } from '../../../features/admin/utils/adminActions'
+import { useLanguage } from '../../../context/LanguageContext'
 
 export function AdminReports() {
+  const { t } = useLanguage()
   const { data: reports, error, loading, reload } = useAdminList(getAdminReports)
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -81,20 +83,20 @@ export function AdminReports() {
   return (
     <main className="admin-page">
       <section className="admin-card admin-table-card">
-        <AdminSectionHeader icon="flag" title="Reports">
+        <AdminSectionHeader icon="flag" title={t('reportsTitle')}>
           <AdminStatusFilter onChange={setStatusFilter} options={statusOptions} value={statusFilter} />
-          <AdminSearch onChange={setQuery} placeholder="Search reports..." value={query} />
+          <AdminSearch onChange={setQuery} placeholder={t('searchReportsPlaceholder')} value={query} />
         </AdminSectionHeader>
         <AdminTableState error={error} loading={loading} />
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Reporter</th>
-              <AdminSortableTh field="name" sortBy={sortBy} onSort={setSortBy}>Document</AdminSortableTh>
-              <th>Violation Type</th>
-              <AdminSortableTh defaultDirection="desc" field="date" sortBy={sortBy} onSort={setSortBy}>Report Date</AdminSortableTh>
-              <AdminSortableTh field="status" sortBy={sortBy} onSort={setSortBy}>Status</AdminSortableTh>
-              <th>Actions</th>
+              <th>{t('reporterHeader')}</th>
+              <AdminSortableTh field="name" sortBy={sortBy} onSort={setSortBy}>{t('documentHeader')}</AdminSortableTh>
+              <th>{t('violationTypeHeader')}</th>
+              <AdminSortableTh defaultDirection="desc" field="date" sortBy={sortBy} onSort={setSortBy}>{t('reportDateHeader')}</AdminSortableTh>
+              <AdminSortableTh field="status" sortBy={sortBy} onSort={setSortBy}>{t('statusHeader')}</AdminSortableTh>
+              <th>{t('actionsHeader')}</th>
             </tr>
           </thead>
           <tbody>
